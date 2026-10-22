@@ -9,8 +9,12 @@ const walletEl = $("wallet"),
       statusEl = $("status"),
       noticeEl = $("limitNotice"),
       bodyEl = $("tradeBody"),
+      contractsBodyEl = $("contractsBody"),
+      dailyBodyEl = $("dailyBody"),
       monthlyBodyEl = $("monthlyBody"),
       tableMeta = $("tableMeta"),
+      contractsMeta = $("contractsMeta"),
+      dailyMeta = $("dailyMeta"),
       monthlyMeta = $("monthlyMeta"),
       csvBtn = $("csvBtn"),
       jsonBtn = $("jsonBtn"),
@@ -25,8 +29,12 @@ const walletEl = $("wallet"),
       themeIcon = $("themeIcon"),
       themeLabel = $("themeLabel"),
       tabTradesBtn = $("tabTradesBtn"),
+      tabContractsBtn = $("tabContractsBtn"),
+      tabDailyBtn = $("tabDailyBtn"),
       tabMonthlyBtn = $("tabMonthlyBtn"),
       panelTrades = $("panelTrades"),
+      panelContracts = $("panelContracts"),
+      panelDaily = $("panelDaily"),
       panelMonthly = $("panelMonthly"),
       feeCard = $("feeCard"),
       feeModal = $("feeModal"),
@@ -38,6 +46,7 @@ const walletEl = $("wallet"),
 
 let fills = [];
 let fundingHistory = [];
+let holdingsData = null;
 let currentPage = 1;
 const rowsPerPage = 50;
 
@@ -45,6 +54,7 @@ const SAVED_WALLET_KEY = "hyperliquid_saved_wallet";
 const SAVED_THEME_KEY = "hyperliquid_theme";
 const CACHE_FILLS_KEY = "hyperliquid_persisted_fills";
 const CACHE_FUNDING_KEY = "hyperliquid_persisted_funding";
+const CACHE_HOLDINGS_KEY = "hyperliquid_persisted_holdings";
 const CACHE_TIME_KEY = "hyperliquid_cache_timestamp";
 
 if (localStorage.getItem(SAVED_WALLET_KEY)) {
@@ -59,18 +69,25 @@ feeCard.addEventListener("click", () => feeModal.classList.remove("hidden"));
 closeModalBtn.addEventListener("click", () => feeModal.classList.add("hidden"));
 window.addEventListener("click", e => { if (e.target === feeModal) feeModal.classList.add("hidden"); });
 
-tabTradesBtn.addEventListener("click", () => {
-  tabTradesBtn.classList.add("active");
-  tabMonthlyBtn.classList.remove("active");
-  panelTrades.classList.remove("hidden");
-  panelMonthly.classList.add("hidden");
-});
+function switchTab(activeBtn, activePanel) {
+  [tabTradesBtn, tabContractsBtn, tabDailyBtn, tabMonthlyBtn].forEach(b => b.classList.remove("active"));
+  [panelTrades, panelContracts, panelDaily, panelMonthly].forEach(p => p.classList.add("hidden"));
 
+  activeBtn.classList.add("active");
+  activePanel.classList.remove("hidden");
+}
+
+tabTradesBtn.addEventListener("click", () => switchTab(tabTradesBtn, panelTrades));
+tabContractsBtn.addEventListener("click", () => {
+  switchTab(tabContractsBtn, panelContracts);
+  renderContracts();
+});
+tabDailyBtn.addEventListener("click", () => {
+  switchTab(tabDailyBtn, panelDaily);
+  renderDailyPnl();
+});
 tabMonthlyBtn.addEventListener("click", () => {
-  tabMonthlyBtn.classList.add("active");
-  tabTradesBtn.classList.remove("active");
-  panelMonthly.classList.remove("hidden");
-  panelTrades.classList.add("hidden");
+  switchTab(tabMonthlyBtn, panelMonthly);
   renderMonthlyPnl();
 });
 
@@ -227,15 +244,33 @@ async function fetchAccountData(user, startMs, endMs) {
     return [];
   })();
 
-  const [fillsRes, fundingRes] = await Promise.all([fillsPromise, fundingPromise]);
+  const holdingsPromise = (async () => {
+    try {
+      const res = await postInfo({ type: "clearinghouseState", user: cleanUser });
+      return res;
+    } catch (e) {
+      console.warn("Clearinghouse state fetch warning:", e);
+      return null;
+    }
+  })();
+
+  const [fillsRes, fundingRes, holdingsRes] = await Promise.all([
+    fillsPromise, fundingPromise, holdingsPromise
+  ]);
+
   return {
     fills: fillsRes.result,
     funding: fundingRes,
+    holdings: holdingsRes,
     reachedGlobalLimit: fillsRes.reachedGlobalLimit
   };
 }
 
-function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function num(v) { 
+  if (v === null || v === undefined) return 0;
+  const n = Number(String(v).trim()); 
+  return Number.isFinite(n) ? n : 0; 
+}
 
 function money(v, d = 2) {
   const n = num(v), s = n > 0 ? "+" : n < 0 ? "−" : "";
@@ -268,7 +303,7 @@ function setMetric(id, value, s = null) {
 }
 
 function resetMetrics() {
-  ["mFills", "mPnl", "mFees", "mNet", "mWinRate"].forEach(id => {
+  ["mFills", "mPnl", "mFees", "mNet", "mWinRate", "mWalletHoldings"].forEach(id => {
     setMetric(id, "—");
   });
   csvBtn.disabled = true;
@@ -304,11 +339,18 @@ function updateMetrics() {
   const winningTrades = tradesWithPnl.filter(f => num(f.closedPnl) > 0);
   const winRate = tradesWithPnl.length > 0 ? (winningTrades.length / tradesWithPnl.length) * 100 : 0;
 
+  let totalAccountVal = 0;
+  if (holdingsData) {
+    const marginSummary = holdingsData.marginSummary || {};
+    totalAccountVal = num(marginSummary.accountValue || holdingsData.accountValue);
+  }
+
   setMetric("mFills", fills.length.toLocaleString());
   setMetric("mPnl", money(closedPnl, 2), closedPnl);
   setMetric("mFees", plainMoney(totalFees, 2));
   setMetric("mNet", money(netPnl, 2), netPnl);
   setMetric("mWinRate", winRate.toFixed(1) + "%", winRate > 50 ? 1 : winRate < 50 ? -1 : 0);
+  setMetric("mWalletHoldings", plainMoney(totalAccountVal, 2));
 }
 
 function updateCoinFilterOptions() {
@@ -326,9 +368,134 @@ function getFilteredFills() {
     const pnl = num(f.closedPnl);
     if (pnlVal === "positive" && pnl <= 0) return false;
     if (pnlVal === "negative" && pnl >= 0) return false;
+    if (pnlVal === "nonzero" && pnl === 0) return false;
     if (coinVal !== "all" && f.coin !== coinVal) return false;
     return true;
   });
+}
+
+function renderContracts() {
+  if (!holdingsData) {
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">No clearinghouse data loaded. Click "Fetch Data" above.</td></tr>';
+    contractsMeta.textContent = "No data loaded.";
+    return;
+  }
+
+  const assetPositions = holdingsData.assetPositions || [];
+
+  if (!Array.isArray(assetPositions) || assetPositions.length === 0) {
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">No open perpetual positions found in account state.</td></tr>';
+    contractsMeta.textContent = "0 active derivative contracts.";
+    return;
+  }
+
+  const rows = [];
+  let count = 0;
+
+  assetPositions.forEach(item => {
+    const pos = item.position;
+    if (!pos) return;
+
+    const sizeNum = num(pos.szi);
+    if (sizeNum === 0) return;
+
+    count++;
+    const coin = pos.coin || "PERP";
+    const entryPx = num(pos.entryPx);
+    const posValue = num(pos.positionValue);
+    const unPnl = num(pos.unrealizedPnl);
+    const markPx = sizeNum !== 0 ? Math.abs(posValue / sizeNum) : 0;
+    
+    const levObj = pos.leverage;
+    const leverageText = levObj && levObj.value ? ` (${levObj.value}x)` : "";
+    const dirLabel = sizeNum > 0 ? `LONG${leverageText}` : `SHORT${leverageText}`;
+
+    rows.push(`
+      <tr>
+        <td style="text-align: left; font-weight: 800;" class="coin-name">${esc(coin)}</td>
+        <td class="${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</td>
+        <td>${Math.abs(sizeNum).toLocaleString()}</td>
+        <td>${plainMoney(entryPx, 4)}</td>
+        <td>${plainMoney(markPx > 0 ? markPx : entryPx, 4)}</td>
+        <td>${plainMoney(Math.abs(posValue), 2)}</td>
+        <td class="${unPnl > 0 ? "text-positive" : unPnl < 0 ? "text-negative" : ""}">${money(unPnl, 2)}</td>
+      </tr>
+    `);
+  });
+
+  if (rows.length === 0) {
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">No open perpetual positions currently active.</td></tr>';
+    contractsMeta.textContent = "0 active derivative contracts.";
+    return;
+  }
+
+  contractsBodyEl.innerHTML = rows.join("");
+  contractsMeta.textContent = `Displaying ${count} active perpetual contract(s).`;
+}
+
+function renderDailyPnl() {
+  if (!fills.length && !fundingHistory.length) {
+    dailyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">No trade fills loaded to generate daily breakdown.</td></tr>';
+    dailyMeta.textContent = "No data loaded.";
+    return;
+  }
+
+  const dailyMap = {};
+
+  fills.forEach(f => {
+    const d = new Date(Number(f.time));
+    const dateKey = d.toISOString().split("T")[0];
+
+    if (!dailyMap[dateKey]) {
+      dailyMap[dateKey] = { label: dateKey, closedPnl: 0, fees: 0, netPnl: 0, volume: 0, fillsCount: 0 };
+    }
+
+    const closedPnl = num(f.closedPnl);
+    const tradingFee = num(f.fee);
+    const builderFee = num(f.builderFee);
+
+    dailyMap[dateKey].closedPnl += closedPnl;
+    dailyMap[dateKey].fees += (tradingFee + builderFee);
+    dailyMap[dateKey].netPnl += (closedPnl - tradingFee - builderFee);
+    dailyMap[dateKey].volume += Math.abs(num(f.px) * num(f.sz));
+    dailyMap[dateKey].fillsCount += 1;
+  });
+
+  fundingHistory.forEach(item => {
+    const timeVal = item.time || item.delta?.time;
+    if (!timeVal) return;
+    const d = new Date(Number(timeVal));
+    const dateKey = d.toISOString().split("T")[0];
+
+    if (!dailyMap[dateKey]) {
+      dailyMap[dateKey] = { label: dateKey, closedPnl: 0, fees: 0, netPnl: 0, volume: 0, fillsCount: 0 };
+    }
+
+    const usdPayment = num(item.delta?.usdc);
+    if (usdPayment < 0) {
+      const paid = Math.abs(usdPayment);
+      dailyMap[dateKey].fees += paid;
+      dailyMap[dateKey].netPnl -= paid;
+    } else {
+      dailyMap[dateKey].netPnl += usdPayment;
+    }
+  });
+
+  const sortedKeys = Object.keys(dailyMap).sort().reverse();
+
+  dailyBodyEl.innerHTML = sortedKeys.map(k => {
+    const day = dailyMap[k];
+    return `<tr>
+      <td style="text-align: left; font-weight: 800;">${esc(day.label)}</td>
+      <td class="${day.closedPnl > 0 ? "text-positive" : day.closedPnl < 0 ? "text-negative" : ""}">${money(day.closedPnl, 2)}</td>
+      <td>${plainMoney(day.fees, 2)}</td>
+      <td class="${day.netPnl > 0 ? "text-positive" : day.netPnl < 0 ? "text-negative" : ""}">${money(day.netPnl, 2)}</td>
+      <td>${plainMoney(day.volume, 2)}</td>
+      <td>${day.fillsCount.toLocaleString()}</td>
+    </tr>`;
+  }).join("");
+
+  dailyMeta.textContent = `Showing aggregated daily performance across ${sortedKeys.length} active day(s).`;
 }
 
 function renderMonthlyPnl() {
@@ -452,6 +619,8 @@ function renderTrades() {
   pdfBtn.disabled = false;
 
   updateMetrics();
+  renderContracts();
+  renderDailyPnl();
   renderMonthlyPnl();
 }
 
@@ -462,6 +631,7 @@ window.addEventListener("DOMContentLoaded", () => {
   if (isExpired) {
     localStorage.removeItem(CACHE_FILLS_KEY);
     localStorage.removeItem(CACHE_FUNDING_KEY);
+    localStorage.removeItem(CACHE_HOLDINGS_KEY);
     localStorage.removeItem(CACHE_TIME_KEY);
     sessionStorage.clear();
     return;
@@ -469,11 +639,13 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const savedFills = localStorage.getItem(CACHE_FILLS_KEY);
   const savedFunding = localStorage.getItem(CACHE_FUNDING_KEY);
+  const savedHoldings = localStorage.getItem(CACHE_HOLDINGS_KEY);
 
   if (savedFills) {
     try {
       fills = JSON.parse(savedFills);
       fundingHistory = savedFunding ? JSON.parse(savedFunding) : [];
+      holdingsData = savedHoldings ? JSON.parse(savedHoldings) : null;
       if (fills.length > 0) {
         updateCoinFilterOptions();
         renderTrades();
@@ -517,22 +689,26 @@ fetchBtn.addEventListener("click", async () => {
   fetchBtn.disabled = true;
   fills = [];
   fundingHistory = [];
+  holdingsData = null;
   currentPage = 1;
   resetMetrics();
 
   try {
-    setStatus("Fetching trade statement and funding history from Hyperliquid…");
+    setStatus("Fetching trade statement and active perpetual contracts from Hyperliquid…");
 
     const accountData = await fetchAccountData(wallet, s, e);
     fills = accountData.fills;
     fundingHistory = accountData.funding;
+    holdingsData = accountData.holdings;
 
     localStorage.setItem(CACHE_FILLS_KEY, JSON.stringify(fills));
     localStorage.setItem(CACHE_FUNDING_KEY, JSON.stringify(fundingHistory));
+    localStorage.setItem(CACHE_HOLDINGS_KEY, JSON.stringify(holdingsData));
     localStorage.setItem(CACHE_TIME_KEY, Date.now());
 
     sessionStorage.setItem("hl_cached_fills", JSON.stringify(fills));
     sessionStorage.setItem("hl_cached_funding", JSON.stringify(fundingHistory));
+    sessionStorage.setItem("hl_cached_holdings", JSON.stringify(holdingsData));
 
     updateCoinFilterOptions();
     renderTrades();
@@ -542,7 +718,7 @@ fetchBtn.addEventListener("click", async () => {
       noticeEl.classList.remove("hidden");
     }
 
-    setStatus(`Loaded ${fills.length.toLocaleString()} fill(s) and ${fundingHistory.length.toLocaleString()} funding record(s).`, "success");
+    setStatus(`Successfully fetched trades and active perpetual contracts.`, "success");
   } catch (err) {
     console.error(err);
     setStatus("Error fetching data: " + (err?.message || "Check network connection or wallet address."), "error");
@@ -559,13 +735,12 @@ setInterval(async () => {
       const accountData = await fetchAccountData(wallet, s, e);
       fills = accountData.fills;
       fundingHistory = accountData.funding;
+      holdingsData = accountData.holdings;
 
       localStorage.setItem(CACHE_FILLS_KEY, JSON.stringify(fills));
       localStorage.setItem(CACHE_FUNDING_KEY, JSON.stringify(fundingHistory));
+      localStorage.setItem(CACHE_HOLDINGS_KEY, JSON.stringify(holdingsData));
       localStorage.setItem(CACHE_TIME_KEY, Date.now());
-
-      sessionStorage.setItem("hl_cached_fills", JSON.stringify(fills));
-      sessionStorage.setItem("hl_cached_funding", JSON.stringify(fundingHistory));
 
       updateCoinFilterOptions();
       renderTrades();
@@ -622,7 +797,7 @@ jsonBtn.addEventListener("click", () => {
   const targetFills = getFilteredFills();
   if (targetFills.length) {
     const mappedFills = targetFills.map(f => ({ ...f, sideFormatted: mapSide(f.side) }));
-    downloadBlob(JSON.stringify({ fills: mappedFills, fundingHistory }, null, 2), `hyperliquid-statement-${walletEl.value.trim().slice(0, 10)}.json`, "application/json");
+    downloadBlob(JSON.stringify({ fills: mappedFills, fundingHistory, holdings: holdingsData }, null, 2), `hyperliquid-statement-${walletEl.value.trim().slice(0, 10)}.json`, "application/json");
   }
 });
 
@@ -769,18 +944,24 @@ $("clearBtn").addEventListener("click", () => {
   localStorage.removeItem(SAVED_WALLET_KEY);
   localStorage.removeItem(CACHE_FILLS_KEY);
   localStorage.removeItem(CACHE_FUNDING_KEY);
+  localStorage.removeItem(CACHE_HOLDINGS_KEY);
   localStorage.removeItem(CACHE_TIME_KEY);
   sessionStorage.clear();
   setPreset("30");
   fills = [];
   fundingHistory = [];
+  holdingsData = null;
   pnlFilterSelect.value = "all";
   coinFilterSelect.innerHTML = '<option value="all">All Coins</option>';
   clearStatus();
   noticeEl.classList.add("hidden");
   bodyEl.innerHTML = '<tr class="empty-row"><td colspan="12">Enter a valid wallet address to display trade history.</td></tr>';
+  contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">Enter a valid wallet address to view active contracts.</td></tr>';
+  dailyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">Enter a valid wallet address to view daily breakdown.</td></tr>';
   monthlyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">Enter a valid wallet address to view monthly breakdown.</td></tr>';
   tableMeta.textContent = "No data loaded.";
+  contractsMeta.textContent = "No data loaded.";
+  dailyMeta.textContent = "No data loaded.";
   monthlyMeta.textContent = "No data loaded.";
   resetMetrics();
 });

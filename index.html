@@ -94,6 +94,11 @@
         <strong id="mWinRate" class="value">—</strong>
         <span class="subtext">Profitable fills</span>
       </div>
+      <div class="metric-card">
+        <span class="label">WALLET HOLDINGS</span>
+        <strong id="mWalletHoldings" class="value">—</strong>
+        <span class="subtext">Account balance & collateral</span>
+      </div>
     </section>
 
     <!-- Fee Breakdown Modal (Hidden by default) -->
@@ -116,6 +121,8 @@
     <!-- View Toggle Tabs -->
     <div class="view-tabs">
       <button id="tabTradesBtn" class="view-tab active">Trade Executions</button>
+      <button id="tabContractsBtn" class="view-tab">Active Contracts</button>
+      <button id="tabDailyBtn" class="view-tab">Daily P&L Breakdown</button>
       <button id="tabMonthlyBtn" class="view-tab">Monthly P&L Breakdown</button>
     </div>
 
@@ -139,6 +146,7 @@
               <option value="all">All Trades</option>
               <option value="positive">Positive CLOSED P&L (> $0)</option>
               <option value="negative">Negative CLOSED P&L (< $0)</option>
+              <option value="nonzero">Bigger & Smaller than $0 (≠ $0)</option>
             </select>
           </div>
           <div class="export-actions">
@@ -178,6 +186,65 @@
         <button id="prevPageBtn" class="secondary" disabled>← Previous</button>
         <span id="pageIndicator" class="page-indicator">Page 1 of 1</span>
         <button id="nextPageBtn" class="secondary" disabled>Next →</button>
+      </div>
+    </section>
+
+    <!-- Active Contracts Panel (Hidden by default) -->
+    <section id="panelContracts" class="panel table-panel hidden">
+      <div class="table-header">
+        <div class="table-header-info">
+          <h2>Active Perpetual Contracts</h2>
+          <p id="contractsMeta" class="meta-info">Open derivative positions and contracts.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="coinglass-table">
+          <thead>
+            <tr>
+              <th style="text-align: left;">COIN</th>
+              <th>POSITION</th>
+              <th>SIZE</th>
+              <th>ENTRY PRICE</th>
+              <th>MARK PRICE</th>
+              <th>NOTIONAL VALUE</th>
+              <th>UNREALIZED P&L</th>
+            </tr>
+          </thead>
+          <tbody id="contractsBody">
+            <tr class="empty-row">
+              <td colspan="7">Enter a valid wallet address to view active contracts.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Daily P&L Panel (Hidden by default) -->
+    <section id="panelDaily" class="panel table-panel hidden">
+      <div class="table-header">
+        <div class="table-header-info">
+          <h2>Daily Profit & Loss Breakdown</h2>
+          <p id="dailyMeta" class="meta-info">Aggregated day-by-day performance metrics.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="coinglass-table">
+          <thead>
+            <tr>
+              <th style="text-align: left;">DATE</th>
+              <th>CLOSED P&L</th>
+              <th>NET FEES & FUNDING</th>
+              <th>NET P&L</th>
+              <th>TOTAL VOLUME</th>
+              <th>TOTAL FILLS</th>
+            </tr>
+          </thead>
+          <tbody id="dailyBody">
+            <tr class="empty-row">
+              <td colspan="6">Enter a valid wallet address to view daily breakdown.</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
