@@ -314,7 +314,10 @@ button {
 }
 
 /* Tables */
-.table-panel { overflow: hidden; margin-bottom: 16px; }
+.table-panel { 
+  overflow: hidden; 
+  margin-bottom: 16px; 
+}
 
 .table-header {
   display: flex;
@@ -349,9 +352,10 @@ h2 { margin: 0; font-size: 14px; font-weight: 700; }
 }
 
 .table-wrap {
+  width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  width: 100%;
+  position: relative;
 }
 
 .table-wrap::-webkit-scrollbar { height: 6px; }
@@ -361,7 +365,7 @@ h2 { margin: 0; font-size: 14px; font-weight: 700; }
 .coinglass-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 600px;
+  min-width: 650px;
 }
 
 .coinglass-table th {
@@ -371,14 +375,15 @@ h2 { margin: 0; font-size: 14px; font-weight: 700; }
   font-weight: 800;
   letter-spacing: 0.5px;
   text-align: right;
-  padding: 9px 10px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--panel-border);
+  white-space: nowrap;
 }
 
 .coinglass-table th:first-child, .coinglass-table th:nth-child(2) { text-align: left; }
 
 .coinglass-table td {
-  padding: 9px 10px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--table-border);
   text-align: right;
   white-space: nowrap;
@@ -402,6 +407,33 @@ h2 { margin: 0; font-size: 14px; font-weight: 700; }
 
 .flash-up { animation: flashGreen 1.2s ease-out; }
 .flash-down { animation: flashRed 1.2s ease-out; }
+
+/* Animated Rolling Number Styling */
+.rolling-number {
+  display: inline-block;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.25s ease;
+  will-change: transform;
+}
+
+.rolling-up {
+  animation: rollUp 0.35s ease-out;
+}
+
+.rolling-down {
+  animation: rollDown 0.35s ease-out;
+}
+
+@keyframes rollUp {
+  0% { transform: translateY(6px); opacity: 0.4; }
+  50% { transform: translateY(-3px); opacity: 0.8; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes rollDown {
+  0% { transform: translateY(-6px); opacity: 0.4; }
+  50% { transform: translateY(3px); opacity: 0.8; }
+  100% { transform: translateY(0); opacity: 1; }
+}
 
 .empty-row td { text-align: center !important; color: var(--text-muted); padding: 30px 0; }
 
@@ -519,7 +551,7 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 }
 .page-indicator { font-size: 11px; font-weight: 600; color: var(--text-muted); }
 
-/* Mobile Responsiveness Breakpoints */
+/* Mobile Responsiveness Breakpoints & Card Transformation */
 @media (max-width: 1024px) {
   .metrics-grid { grid-template-columns: repeat(3, 1fr); }
   .control-row { grid-template-columns: 1fr; }
@@ -527,7 +559,7 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 }
 
 @media (max-width: 768px) {
-  body { padding: 8px 6px; }
+  body { padding: 8px 4px; }
   .topbar { flex-direction: column; align-items: stretch; }
   .header-right { width: 100%; justify-content: space-between; }
   .table-header { flex-direction: column; align-items: stretch; }
@@ -536,7 +568,55 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   .filter-dropdown-field select { width: 65%; }
   .export-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; }
   .export-actions .pdf-export { grid-column: span 3; }
-  .mobile-hide-col { display: none !important; }
+
+  /* Transform Active Contracts Table into Mobile Cards */
+  #panelContracts .coinglass-table, 
+  #panelContracts .coinglass-table tbody, 
+  #panelContracts .coinglass-table tr, 
+  #panelContracts .coinglass-table td {
+    display: block;
+    width: 100% !important;
+    text-align: left !important;
+    white-space: normal !important;
+  }
+
+  #panelContracts .coinglass-table thead {
+    display: none; /* Hide standard table headers on mobile */
+  }
+
+  #panelContracts .coinglass-table tbody tr {
+    background: var(--input-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    padding: 12px;
+  }
+
+  #panelContracts .coinglass-table tbody tr:hover {
+    background: var(--input-bg);
+  }
+
+  #panelContracts .coinglass-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--panel-border);
+    font-size: 12px;
+  }
+
+  #panelContracts .coinglass-table td:last-child {
+    border-bottom: none;
+  }
+
+  /* Inject data labels dynamically using CSS content attributes for mobile card view */
+  #panelContracts .coinglass-table td:nth-child(1):before { content: "Coin"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(2):before { content: "Position / Lev"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(3):before { content: "Size"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(4):before { content: "Entry Price"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(5):before { content: "Mark Price"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(6):before { content: "Notional Value"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(7):before { content: "Unrealized P&L"; font-weight: 800; color: var(--text-muted); }
 }
 
 @media (max-width: 600px) {
@@ -545,6 +625,4 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   .actions-row { flex-direction: column; align-items: stretch; }
   .preset-btns { display: grid; grid-template-columns: 1fr 1fr; }
   .main-btns { display: grid; grid-template-columns: 2fr 1fr; }
-  .coinglass-table th, .coinglass-table td { padding: 8px 6px; font-size: 11px; }
 }
-
