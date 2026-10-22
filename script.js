@@ -1,4 +1,5 @@
 const API = "https://api.hyperliquid.xyz/info";
+const WS_URL = "wss://api.hyperliquid.xyz/ws";
 const EXPLORER_URL = "https://app.hyperliquid.xyz/explorer/tx/";
 const $ = id => document.getElementById(id);
 
@@ -47,6 +48,11 @@ const walletEl = $("wallet"),
 let fills = [];
 let fundingHistory = [];
 let holdingsData = null;
+let activePositions = [];
+let livePrices = {};
+let previousMetricsMap = {};
+let wsConnection = null;
+let pollTimer = null;
 let currentPage = 1;
 const rowsPerPage = 50;
 
@@ -55,6 +61,7 @@ const SAVED_THEME_KEY = "hyperliquid_theme";
 const CACHE_FILLS_KEY = "hyperliquid_persisted_fills";
 const CACHE_FUNDING_KEY = "hyperliquid_persisted_funding";
 const CACHE_HOLDINGS_KEY = "hyperliquid_persisted_holdings";
+const CACHE_POSITIONS_KEY = "hyperliquid_persisted_positions";
 const CACHE_TIME_KEY = "hyperliquid_cache_timestamp";
 
 if (localStorage.getItem(SAVED_WALLET_KEY)) {
@@ -77,10 +84,13 @@ function switchTab(activeBtn, activePanel) {
   activePanel.classList.remove("hidden");
 }
 
-tabTradesBtn.addEventListener("click", () => switchTab(tabTradesBtn, panelTrades));
 tabContractsBtn.addEventListener("click", () => {
   switchTab(tabContractsBtn, panelContracts);
   renderContracts();
+});
+tabTradesBtn.addEventListener("click", () => {
+  switchTab(tabTradesBtn, panelTrades);
+  renderTrades();
 });
 tabDailyBtn.addEventListener("click", () => {
   switchTab(tabDailyBtn, panelDaily);
@@ -185,6 +195,36 @@ async function postInfo(body) {
   return r.json();
 }
 
+async function fetchActiveContractsOnly(cleanUser) {
+  try {
+    const [defaultData, xyzData] = await Promise.all([
+      postInfo({ type: "clearinghouseState", user: cleanUser }).catch(() => null),
+      postInfo({ type: "clearinghouseState", user: cleanUser, dex: "xyz" }).catch(() => null)
+    ]);
+    const rawAssetPositions = [
+      ...(defaultData?.assetPositions || []),
+      ...(xyzData?.assetPositions || [])
+    ];
+    return rawAssetPositions.filter(item => num(item.position?.szi) !== 0);
+  } catch (e) {
+    console.warn("Fast contracts poll error:", e);
+    return null;
+  }
+}
+
+function startFiveSecondPoller(cleanUser) {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    if (!cleanUser || !isAddress(cleanUser)) return;
+    const freshPositions = await fetchActiveContractsOnly(cleanUser);
+    if (freshPositions !== null) {
+      activePositions = freshPositions;
+      localStorage.setItem(CACHE_POSITIONS_KEY, JSON.stringify(activePositions));
+      renderContracts();
+    }
+  }, 5000);
+}
+
 async function fetchAccountData(user, startMs, endMs) {
   const cleanUser = user.toLowerCase().trim();
   
@@ -246,8 +286,11 @@ async function fetchAccountData(user, startMs, endMs) {
 
   const holdingsPromise = (async () => {
     try {
-      const res = await postInfo({ type: "clearinghouseState", user: cleanUser });
-      return res;
+      const [defaultData, xyzData] = await Promise.all([
+        postInfo({ type: "clearinghouseState", user: cleanUser }),
+        postInfo({ type: "clearinghouseState", user: cleanUser, dex: "xyz" }).catch(() => null)
+      ]);
+      return { defaultData, xyzData };
     } catch (e) {
       console.warn("Clearinghouse state fetch warning:", e);
       return null;
@@ -258,10 +301,16 @@ async function fetchAccountData(user, startMs, endMs) {
     fillsPromise, fundingPromise, holdingsPromise
   ]);
 
+  const rawAssetPositions = [
+    ...(holdingsRes?.defaultData?.assetPositions || []),
+    ...(holdingsRes?.xyzData?.assetPositions || [])
+  ];
+
   return {
     fills: fillsRes.result,
     funding: fundingRes,
-    holdings: holdingsRes,
+    holdings: holdingsRes?.defaultData || null,
+    positions: rawAssetPositions.filter(item => num(item.position?.szi) !== 0),
     reachedGlobalLimit: fillsRes.reachedGlobalLimit
   };
 }
@@ -289,6 +338,40 @@ function formatDate(ms) {
 
 function esc(v) {
   return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function initWebSocket(coins) {
+  if (wsConnection) wsConnection.close();
+  if (!coins || coins.length === 0) return;
+
+  wsConnection = new WebSocket(WS_URL);
+
+  wsConnection.onopen = () => {
+    wsConnection.send(JSON.stringify({
+      method: "subscribe",
+      subscription: { type: "allMids" }
+    }));
+  };
+
+  wsConnection.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.channel === "allMids" && msg.data?.mids) {
+        livePrices = msg.data.mids;
+        if (!panelContracts.classList.contains("hidden")) {
+          renderContracts();
+        }
+      }
+    } catch (e) {
+      console.error("WS message parse error:", e);
+    }
+  };
+
+  wsConnection.onclose = () => {
+    setTimeout(() => {
+      if (coins.length > 0) initWebSocket(coins);
+    }, 5000);
+  };
 }
 
 function setMetric(id, value, s = null) {
@@ -375,16 +458,8 @@ function getFilteredFills() {
 }
 
 function renderContracts() {
-  if (!holdingsData) {
-    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">No clearinghouse data loaded. Click "Fetch Data" above.</td></tr>';
-    contractsMeta.textContent = "No data loaded.";
-    return;
-  }
-
-  const assetPositions = holdingsData.assetPositions || [];
-
-  if (!Array.isArray(assetPositions) || assetPositions.length === 0) {
-    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">No open perpetual positions found in account state.</td></tr>';
+  if (!activePositions || activePositions.length === 0) {
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">No open perpetual positions currently active.</td></tr>';
     contractsMeta.textContent = "0 active derivative contracts.";
     return;
   }
@@ -392,8 +467,8 @@ function renderContracts() {
   const rows = [];
   let count = 0;
 
-  assetPositions.forEach(item => {
-    const pos = item.position;
+  activePositions.forEach(item => {
+    const pos = item.position || item;
     if (!pos) return;
 
     const sizeNum = num(pos.szi);
@@ -402,23 +477,33 @@ function renderContracts() {
     count++;
     const coin = pos.coin || "PERP";
     const entryPx = num(pos.entryPx);
-    const posValue = num(pos.positionValue);
-    const unPnl = num(pos.unrealizedPnl);
-    const markPx = sizeNum !== 0 ? Math.abs(posValue / sizeNum) : 0;
     
+    const currentMarkPx = num(livePrices[coin]) || (sizeNum !== 0 ? Math.abs(num(pos.positionValue) / sizeNum) : entryPx);
+    const liveNotional = Math.abs(sizeNum * currentMarkPx);
+    const priceDiff = sizeNum > 0 ? (currentMarkPx - entryPx) : (entryPx - currentMarkPx);
+    const liveUnPnl = priceDiff * Math.abs(sizeNum);
+
+    // Animation flash detection
+    const prevPnl = previousMetricsMap[coin]?.pnl;
+    let animClass = "";
+    if (prevPnl !== undefined && prevPnl !== liveUnPnl) {
+      animClass = liveUnPnl > prevPnl ? "flash-up" : "flash-down";
+    }
+    previousMetricsMap[coin] = { pnl: liveUnPnl, price: currentMarkPx };
+
     const levObj = pos.leverage;
     const leverageText = levObj && levObj.value ? ` (${levObj.value}x)` : "";
     const dirLabel = sizeNum > 0 ? `LONG${leverageText}` : `SHORT${leverageText}`;
 
     rows.push(`
-      <tr>
+      <tr class="${animClass}">
         <td style="text-align: left; font-weight: 800;" class="coin-name">${esc(coin)}</td>
         <td class="${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</td>
         <td>${Math.abs(sizeNum).toLocaleString()}</td>
-        <td>${plainMoney(entryPx, 4)}</td>
-        <td>${plainMoney(markPx > 0 ? markPx : entryPx, 4)}</td>
-        <td>${plainMoney(Math.abs(posValue), 2)}</td>
-        <td class="${unPnl > 0 ? "text-positive" : unPnl < 0 ? "text-negative" : ""}">${money(unPnl, 2)}</td>
+        <td class="mobile-hide-col">${plainMoney(entryPx, 4)}</td>
+        <td class="live-price-cell">${plainMoney(currentMarkPx, 4)}</td>
+        <td>${plainMoney(liveNotional, 2)}</td>
+        <td class="${liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : ""}">${money(liveUnPnl, 2)}</td>
       </tr>
     `);
   });
@@ -430,7 +515,7 @@ function renderContracts() {
   }
 
   contractsBodyEl.innerHTML = rows.join("");
-  contractsMeta.textContent = `Displaying ${count} active perpetual contract(s).`;
+  contractsMeta.textContent = `Displaying ${count} active perpetual contract(s) • Live 5s Auto-Poller & WS active.`;
 }
 
 function renderDailyPnl() {
@@ -619,7 +704,6 @@ function renderTrades() {
   pdfBtn.disabled = false;
 
   updateMetrics();
-  renderContracts();
   renderDailyPnl();
   renderMonthlyPnl();
 }
@@ -632,6 +716,7 @@ window.addEventListener("DOMContentLoaded", () => {
     localStorage.removeItem(CACHE_FILLS_KEY);
     localStorage.removeItem(CACHE_FUNDING_KEY);
     localStorage.removeItem(CACHE_HOLDINGS_KEY);
+    localStorage.removeItem(CACHE_POSITIONS_KEY);
     localStorage.removeItem(CACHE_TIME_KEY);
     sessionStorage.clear();
     return;
@@ -640,16 +725,26 @@ window.addEventListener("DOMContentLoaded", () => {
   const savedFills = localStorage.getItem(CACHE_FILLS_KEY);
   const savedFunding = localStorage.getItem(CACHE_FUNDING_KEY);
   const savedHoldings = localStorage.getItem(CACHE_HOLDINGS_KEY);
+  const savedPositions = localStorage.getItem(CACHE_POSITIONS_KEY);
 
   if (savedFills) {
     try {
       fills = JSON.parse(savedFills);
       fundingHistory = savedFunding ? JSON.parse(savedFunding) : [];
       holdingsData = savedHoldings ? JSON.parse(savedHoldings) : null;
-      if (fills.length > 0) {
+      activePositions = savedPositions ? JSON.parse(savedPositions) : [];
+      if (fills.length > 0 || activePositions.length > 0) {
         updateCoinFilterOptions();
         renderTrades();
-        setStatus(`Loaded ${fills.length.toLocaleString()} persisted fill(s) from local storage.`, "success");
+        renderContracts();
+        if (activePositions.length > 0) {
+          const uniqueCoins = [...new Set(activePositions.map(p => (p.position || p).coin))];
+          initWebSocket(uniqueCoins);
+          if (walletEl.value.trim()) {
+            startFiveSecondPoller(walletEl.value.trim().toLowerCase());
+          }
+        }
+        setStatus(`Loaded persisted data from local storage.`, "success");
       }
     } catch (e) {
       console.warn("Failed to load persisted storage data:", e);
@@ -690,6 +785,7 @@ fetchBtn.addEventListener("click", async () => {
   fills = [];
   fundingHistory = [];
   holdingsData = null;
+  activePositions = [];
   currentPage = 1;
   resetMetrics();
 
@@ -700,25 +796,30 @@ fetchBtn.addEventListener("click", async () => {
     fills = accountData.fills;
     fundingHistory = accountData.funding;
     holdingsData = accountData.holdings;
+    activePositions = accountData.positions;
 
     localStorage.setItem(CACHE_FILLS_KEY, JSON.stringify(fills));
     localStorage.setItem(CACHE_FUNDING_KEY, JSON.stringify(fundingHistory));
     localStorage.setItem(CACHE_HOLDINGS_KEY, JSON.stringify(holdingsData));
+    localStorage.setItem(CACHE_POSITIONS_KEY, JSON.stringify(activePositions));
     localStorage.setItem(CACHE_TIME_KEY, Date.now());
-
-    sessionStorage.setItem("hl_cached_fills", JSON.stringify(fills));
-    sessionStorage.setItem("hl_cached_funding", JSON.stringify(fundingHistory));
-    sessionStorage.setItem("hl_cached_holdings", JSON.stringify(holdingsData));
 
     updateCoinFilterOptions();
     renderTrades();
+    renderContracts();
+
+    if (activePositions.length > 0) {
+      const uniqueCoins = [...new Set(activePositions.map(p => (p.position || p).coin))];
+      initWebSocket(uniqueCoins);
+      startFiveSecondPoller(wallet.toLowerCase());
+    }
 
     if (accountData.reachedGlobalLimit) {
       noticeEl.textContent = "Hyperliquid API returned maximum fill capacity (10,000). Older fills may be omitted.";
       noticeEl.classList.remove("hidden");
     }
 
-    setStatus(`Successfully fetched trades and active perpetual contracts.`, "success");
+    setStatus(`Successfully fetched trades and ${activePositions.length} active perpetual contract(s).`, "success");
   } catch (err) {
     console.error(err);
     setStatus("Error fetching data: " + (err?.message || "Check network connection or wallet address."), "error");
@@ -726,29 +827,6 @@ fetchBtn.addEventListener("click", async () => {
     fetchBtn.disabled = false;
   }
 });
-
-setInterval(async () => {
-  const wallet = walletEl.value.trim();
-  if (isAddress(wallet) && !fetchBtn.disabled) {
-    try {
-      const s = msStart(startEl.value), e = msEnd(endEl.value);
-      const accountData = await fetchAccountData(wallet, s, e);
-      fills = accountData.fills;
-      fundingHistory = accountData.funding;
-      holdingsData = accountData.holdings;
-
-      localStorage.setItem(CACHE_FILLS_KEY, JSON.stringify(fills));
-      localStorage.setItem(CACHE_FUNDING_KEY, JSON.stringify(fundingHistory));
-      localStorage.setItem(CACHE_HOLDINGS_KEY, JSON.stringify(holdingsData));
-      localStorage.setItem(CACHE_TIME_KEY, Date.now());
-
-      updateCoinFilterOptions();
-      renderTrades();
-    } catch (err) {
-      console.warn("Background auto-refresh failed:", err);
-    }
-  }
-}, 3600000);
 
 function csvEscape(v) {
   const s = String(v ?? "");
@@ -797,7 +875,7 @@ jsonBtn.addEventListener("click", () => {
   const targetFills = getFilteredFills();
   if (targetFills.length) {
     const mappedFills = targetFills.map(f => ({ ...f, sideFormatted: mapSide(f.side) }));
-    downloadBlob(JSON.stringify({ fills: mappedFills, fundingHistory, holdings: holdingsData }, null, 2), `hyperliquid-statement-${walletEl.value.trim().slice(0, 10)}.json`, "application/json");
+    downloadBlob(JSON.stringify({ fills: mappedFills, fundingHistory, holdings: holdingsData, positions: activePositions }, null, 2), `hyperliquid-statement-${walletEl.value.trim().slice(0, 10)}.json`, "application/json");
   }
 });
 
@@ -941,16 +1019,21 @@ allBtn.addEventListener("click", () => setPreset("30"));
 
 $("clearBtn").addEventListener("click", () => {
   walletEl.value = "";
+  if (pollTimer) clearInterval(pollTimer);
+  if (wsConnection) wsConnection.close();
   localStorage.removeItem(SAVED_WALLET_KEY);
   localStorage.removeItem(CACHE_FILLS_KEY);
   localStorage.removeItem(CACHE_FUNDING_KEY);
   localStorage.removeItem(CACHE_HOLDINGS_KEY);
+  localStorage.removeItem(CACHE_POSITIONS_KEY);
   localStorage.removeItem(CACHE_TIME_KEY);
   sessionStorage.clear();
   setPreset("30");
   fills = [];
   fundingHistory = [];
   holdingsData = null;
+  activePositions = [];
+  previousMetricsMap = {};
   pnlFilterSelect.value = "all";
   coinFilterSelect.innerHTML = '<option value="all">All Coins</option>';
   clearStatus();
