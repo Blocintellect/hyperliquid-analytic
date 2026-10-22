@@ -597,19 +597,19 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   }
 
   #panelContracts .coinglass-table td {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 6px 0;
-    border-bottom: 1px dashed var(--panel-border);
-    font-size: 12px;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 6px 0 !important;
+    border-bottom: 1px dashed var(--panel-border) !important;
+    font-size: 12px !important;
   }
 
   #panelContracts .coinglass-table td:last-child {
-    border-bottom: none;
+    border-bottom: none !important;
   }
 
-  /* Inject data labels dynamically using CSS content attributes for mobile card view */
+  /* Explicitly display all mobile labels including Entry Price */
   #panelContracts .coinglass-table td:nth-child(1):before { content: "Coin"; font-weight: 800; color: var(--text-muted); }
   #panelContracts .coinglass-table td:nth-child(2):before { content: "Position / Lev"; font-weight: 800; color: var(--text-muted); }
   #panelContracts .coinglass-table td:nth-child(3):before { content: "Size"; font-weight: 800; color: var(--text-muted); }
