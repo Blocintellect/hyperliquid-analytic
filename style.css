@@ -244,10 +244,10 @@ button {
 .status.success { background: var(--coinglass-green-bg); color: var(--coinglass-green); border: 1px solid var(--coinglass-green); }
 .hidden { display: none !important; }
 
-/* Metrics Grid - Mobile Responsive Grid */
+/* Metrics Grid */
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 10px;
   margin-bottom: 14px;
 }
@@ -313,7 +313,7 @@ button {
   cursor: pointer;
 }
 
-/* Tables */
+/* Desktop Tables */
 .table-panel { 
   overflow: hidden; 
   margin-bottom: 16px; 
@@ -353,19 +353,11 @@ h2 { margin: 0; font-size: 14px; font-weight: 700; }
 
 .table-wrap {
   width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  position: relative;
 }
-
-.table-wrap::-webkit-scrollbar { height: 6px; }
-.table-wrap::-webkit-scrollbar-track { background: var(--panel-bg); }
-.table-wrap::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 3px; }
 
 .coinglass-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 650px;
 }
 
 .coinglass-table th {
@@ -388,51 +380,25 @@ h2 { margin: 0; font-size: 14px; font-weight: 700; }
   text-align: right;
   white-space: nowrap;
   font-size: 11.5px;
-  transition: background-color 0.4s ease, color 0.3s ease;
+  transition: color 0.25s ease, background-color 0.25s ease;
 }
 
 .coinglass-table td:first-child, .coinglass-table td:nth-child(2) { text-align: left; }
 .coinglass-table tbody tr:hover { background: var(--hover-bg); }
 
-/* Value Flash Animations */
-@keyframes flashGreen {
-  0% { background-color: rgba(0, 184, 124, 0.35); }
-  100% { background-color: transparent; }
-}
-
-@keyframes flashRed {
-  0% { background-color: rgba(246, 70, 93, 0.35); }
-  100% { background-color: transparent; }
-}
-
-.flash-up { animation: flashGreen 1.2s ease-out; }
-.flash-down { animation: flashRed 1.2s ease-out; }
-
-/* Animated Rolling Number Styling */
+/* Smooth Rolling Number Animations */
 .rolling-number {
   display: inline-block;
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.25s ease;
-  will-change: transform;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+  will-change: transform, opacity;
 }
 
-.rolling-up {
-  animation: rollUp 0.35s ease-out;
+.value-up td {
+  color: var(--coinglass-green) !important;
 }
 
-.rolling-down {
-  animation: rollDown 0.35s ease-out;
-}
-
-@keyframes rollUp {
-  0% { transform: translateY(6px); opacity: 0.4; }
-  50% { transform: translateY(-3px); opacity: 0.8; }
-  100% { transform: translateY(0); opacity: 1; }
-}
-
-@keyframes rollDown {
-  0% { transform: translateY(-6px); opacity: 0.4; }
-  50% { transform: translateY(3px); opacity: 0.8; }
-  100% { transform: translateY(0); opacity: 1; }
+.value-down td {
+  color: var(--coinglass-red) !important;
 }
 
 .empty-row td { text-align: center !important; color: var(--text-muted); padding: 30px 0; }
@@ -551,7 +517,7 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 }
 .page-indicator { font-size: 11px; font-weight: 600; color: var(--text-muted); }
 
-/* Mobile Responsiveness Breakpoints & Card Transformation */
+/* Responsive Breakpoints & Vertical-Only Mobile View */
 @media (max-width: 1024px) {
   .metrics-grid { grid-template-columns: repeat(3, 1fr); }
   .control-row { grid-template-columns: 1fr; }
@@ -569,34 +535,30 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   .export-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; }
   .export-actions .pdf-export { grid-column: span 3; }
 
-  /* Transform Active Contracts Table into Mobile Cards */
-  #panelContracts .coinglass-table, 
-  #panelContracts .coinglass-table tbody, 
-  #panelContracts .coinglass-table tr, 
-  #panelContracts .coinglass-table td {
-    display: block;
+  /* Mobile Tables Stacked Vertically - No Horizontal Scrolling Required */
+  .coinglass-table, 
+  .coinglass-table tbody, 
+  .coinglass-table tr, 
+  .coinglass-table td {
+    display: block !important;
     width: 100% !important;
     text-align: left !important;
     white-space: normal !important;
   }
 
-  #panelContracts .coinglass-table thead {
-    display: none; /* Hide standard table headers on mobile */
+  .coinglass-table thead {
+    display: none !important; /* Hide original table header row on mobile */
   }
 
-  #panelContracts .coinglass-table tbody tr {
-    background: var(--input-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 8px;
-    margin-bottom: 12px;
-    padding: 12px;
+  .coinglass-table tbody tr {
+    background: var(--input-bg) !important;
+    border: 1px solid var(--panel-border) !important;
+    border-radius: 8px !important;
+    margin-bottom: 10px !important;
+    padding: 10px 12px !important;
   }
 
-  #panelContracts .coinglass-table tbody tr:hover {
-    background: var(--input-bg);
-  }
-
-  #panelContracts .coinglass-table td {
+  .coinglass-table td {
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
@@ -605,11 +567,11 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     font-size: 12px !important;
   }
 
-  #panelContracts .coinglass-table td:last-child {
+  .coinglass-table td:last-child {
     border-bottom: none !important;
   }
 
-  /* Explicitly display all mobile labels including Entry Price */
+  /* Dynamic Label Injection for Mobile View */
   #panelContracts .coinglass-table td:nth-child(1):before { content: "Coin"; font-weight: 800; color: var(--text-muted); }
   #panelContracts .coinglass-table td:nth-child(2):before { content: "Position / Lev"; font-weight: 800; color: var(--text-muted); }
   #panelContracts .coinglass-table td:nth-child(3):before { content: "Size"; font-weight: 800; color: var(--text-muted); }
@@ -621,8 +583,10 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 
 @media (max-width: 600px) {
   .metrics-grid { grid-template-columns: repeat(2, 1fr); }
-  .metrics-grid .metric-card:last-child { grid-column: span 2; }
   .actions-row { flex-direction: column; align-items: stretch; }
   .preset-btns { display: grid; grid-template-columns: 1fr 1fr; }
   .main-btns { display: grid; grid-template-columns: 2fr 1fr; }
 }
+
+.flash-green { color: var(--coinglass-green) !important; transition: color 0.3s ease; }
+.flash-red { color: var(--coinglass-red) !important; transition: color 0.3s ease; }

@@ -48,9 +48,10 @@ const walletEl = $("wallet"),
 let fills = [];
 let fundingHistory = [];
 let holdingsData = null;
+let xyzHoldingsData = null;
 let activePositions = [];
 let livePrices = {};
-let previousMetricsMap = {};
+let previousNumericValues = {}; // Track previous values for 1-second animations
 let wsConnection = null;
 let pollTimer = null;
 let currentPage = 1;
@@ -84,22 +85,10 @@ function switchTab(activeBtn, activePanel) {
   activePanel.classList.remove("hidden");
 }
 
-tabContractsBtn.addEventListener("click", () => {
-  switchTab(tabContractsBtn, panelContracts);
-  renderContracts();
-});
-tabTradesBtn.addEventListener("click", () => {
-  switchTab(tabTradesBtn, panelTrades);
-  renderTrades();
-});
-tabDailyBtn.addEventListener("click", () => {
-  switchTab(tabDailyBtn, panelDaily);
-  renderDailyPnl();
-});
-tabMonthlyBtn.addEventListener("click", () => {
-  switchTab(tabMonthlyBtn, panelMonthly);
-  renderMonthlyPnl();
-});
+tabContractsBtn.addEventListener("click", () => { switchTab(tabContractsBtn, panelContracts); renderContracts(); });
+tabTradesBtn.addEventListener("click", () => { switchTab(tabTradesBtn, panelTrades); renderTrades(); });
+tabDailyBtn.addEventListener("click", () => { switchTab(tabDailyBtn, panelDaily); renderDailyPnl(); });
+tabMonthlyBtn.addEventListener("click", () => { switchTab(tabMonthlyBtn, panelMonthly); renderMonthlyPnl(); });
 
 function mapSide(side) {
   if (!side) return "";
@@ -201,6 +190,10 @@ async function fetchActiveContractsOnly(cleanUser) {
       postInfo({ type: "clearinghouseState", user: cleanUser }).catch(() => null),
       postInfo({ type: "clearinghouseState", user: cleanUser, dex: "xyz" }).catch(() => null)
     ]);
+    
+    if (defaultData) holdingsData = defaultData;
+    if (xyzData) xyzHoldingsData = xyzData;
+
     const rawAssetPositions = [
       ...(defaultData?.assetPositions || []),
       ...(xyzData?.assetPositions || [])
@@ -221,6 +214,7 @@ function startFiveSecondPoller(cleanUser) {
       activePositions = freshPositions;
       localStorage.setItem(CACHE_POSITIONS_KEY, JSON.stringify(activePositions));
       renderContracts();
+      updateMetrics();
     }
   }, 5000);
 }
@@ -301,6 +295,9 @@ async function fetchAccountData(user, startMs, endMs) {
     fillsPromise, fundingPromise, holdingsPromise
   ]);
 
+  holdingsData = holdingsRes?.defaultData || null;
+  xyzHoldingsData = holdingsRes?.xyzData || null;
+
   const rawAssetPositions = [
     ...(holdingsRes?.defaultData?.assetPositions || []),
     ...(holdingsRes?.xyzData?.assetPositions || [])
@@ -361,6 +358,7 @@ function initWebSocket(coins) {
         if (!panelContracts.classList.contains("hidden")) {
           renderContracts();
         }
+        updateMetrics();
       }
     } catch (e) {
       console.error("WS message parse error:", e);
@@ -374,25 +372,105 @@ function initWebSocket(coins) {
   };
 }
 
-function setMetric(id, value, s = null) {
+// 1-Second Smooth Number Animation Loop with Color Transition (Green for up, Red for down)
+function animateNumber(elementId, targetVal, isCurrency = true, decimals = 2, isSigned = false) {
+  const el = $(elementId);
+  if (!el) return;
+
+  const startVal = previousNumericValues[elementId] !== undefined ? previousNumericValues[elementId] : targetVal;
+  previousNumericValues[elementId] = targetVal;
+
+  if (startVal === targetVal) {
+    el.textContent = isCurrency ? (isSigned ? money(targetVal, decimals) : plainMoney(targetVal, decimals)) : targetVal.toLocaleString();
+    return;
+  }
+
+  // Apply color flash class based on direction
+  el.classList.remove("flash-green", "flash-red");
+  if (targetVal > startVal) {
+    el.classList.add("flash-green");
+  } else if (targetVal < startVal) {
+    el.classList.add("flash-red");
+  }
+
+  const duration = 1000; // Exactly 1 second
+  const startTime = performance.now();
+
+  function updateStep(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    
+    // Ease-out smooth step function
+    const easeProgress = 1 - Math.pow(1 - progress, 3);
+    const currentVal = startVal + (targetVal - startVal) * easeProgress;
+
+    if (isCurrency) {
+      if (isSigned) {
+        el.textContent = money(currentVal, decimals);
+      } else {
+        el.textContent = plainMoney(currentVal, decimals);
+      }
+    } else {
+      el.textContent = Math.round(currentVal).toLocaleString();
+    }
+
+    if (progress < 1) {
+      requestAnimationFrame(updateStep);
+    } else {
+      previousNumericValues[elementId] = targetVal;
+      setTimeout(() => el.classList.remove("flash-green", "flash-red"), 600);
+    }
+  }
+
+  requestAnimationFrame(updateStep);
+}
+
+function setMetric(id, rawValue, s = null, isCurrency = true, decimals = 2, isSigned = false) {
   const e = $(id);
   if (!e) return;
-  e.textContent = value;
+
+  animateNumber(id, rawValue, isCurrency, decimals, isSigned);
+
   e.classList.remove("text-positive", "text-negative");
   if (s !== null) {
     if (s > 0) e.classList.add("text-positive");
     if (s < 0) e.classList.add("text-negative");
+  } else if (isSigned) {
+    if (rawValue > 0) e.classList.add("text-positive");
+    if (rawValue < 0) e.classList.add("text-negative");
   }
 }
 
 function resetMetrics() {
   ["mFills", "mPnl", "mFees", "mNet", "mWinRate", "mWalletHoldings"].forEach(id => {
-    setMetric(id, "—");
+    const e = $(id);
+    if (e) e.textContent = "—";
   });
+  previousNumericValues = {};
   csvBtn.disabled = true;
   jsonBtn.disabled = true;
   pdfBtn.disabled = true;
   paginationContainer.classList.add("hidden");
+}
+
+function calculateTotalUnrealizedPnl() {
+  if (!activePositions || activePositions.length === 0) return 0;
+  let totalUnPnl = 0;
+
+  activePositions.forEach(item => {
+    const pos = item.position || item;
+    if (!pos) return;
+    const sizeNum = num(pos.szi);
+    if (sizeNum === 0) return;
+
+    const coin = pos.coin || "PERP";
+    const entryPx = num(pos.entryPx);
+    const currentMarkPx = num(livePrices[coin]) || (sizeNum !== 0 ? Math.abs(num(pos.positionValue) / sizeNum) : entryPx);
+    const priceDiff = sizeNum > 0 ? (currentMarkPx - entryPx) : (entryPx - currentMarkPx);
+    totalUnPnl += priceDiff * Math.abs(sizeNum);
+  });
+
+  return totalUnPnl;
 }
 
 function updateMetrics() {
@@ -405,13 +483,12 @@ function updateMetrics() {
   fundingHistory.forEach(item => {
     const usdPayment = num(item.delta?.usdc);
     netFundingUsd += usdPayment;
-    if (usdPayment < 0) {
-      totalFundingPaid += Math.abs(usdPayment);
-    }
+    if (usdPayment < 0) totalFundingPaid += Math.abs(usdPayment);
   });
 
   const totalFees = tradingFees + totalFundingPaid + builderFees;
-  const netPnl = closedPnl - tradingFees - builderFees + netFundingUsd;
+  const currentUnrealizedPnl = calculateTotalUnrealizedPnl();
+  const netPnl = closedPnl - tradingFees - builderFees + netFundingUsd + currentUnrealizedPnl;
 
   $("modalTradingFee").textContent = plainMoney(tradingFees, 4);
   $("modalFundingFee").textContent = plainMoney(totalFundingPaid, 4);
@@ -423,17 +500,31 @@ function updateMetrics() {
   const winRate = tradesWithPnl.length > 0 ? (winningTrades.length / tradesWithPnl.length) * 100 : 0;
 
   let totalAccountVal = 0;
+
   if (holdingsData) {
-    const marginSummary = holdingsData.marginSummary || {};
-    totalAccountVal = num(marginSummary.accountValue || holdingsData.accountValue);
+    const margin = holdingsData.marginSummary || {};
+    const crossVal = num(margin.accountValue);
+    const withdrawable = num(holdingsData.withdrawable);
+    totalAccountVal += Math.max(crossVal, withdrawable);
+
+    if (Array.isArray(holdingsData.balances)) {
+      holdingsData.balances.forEach(b => {
+        totalAccountVal += num(b.total) * (num(livePrices[b.coin]) || 1);
+      });
+    }
   }
 
-  setMetric("mFills", fills.length.toLocaleString());
-  setMetric("mPnl", money(closedPnl, 2), closedPnl);
-  setMetric("mFees", plainMoney(totalFees, 2));
-  setMetric("mNet", money(netPnl, 2), netPnl);
-  setMetric("mWinRate", winRate.toFixed(1) + "%", winRate > 50 ? 1 : winRate < 50 ? -1 : 0);
-  setMetric("mWalletHoldings", plainMoney(totalAccountVal, 2));
+  if (xyzHoldingsData) {
+    const xyzMargin = xyzHoldingsData.marginSummary || {};
+    totalAccountVal += num(xyzMargin.accountValue);
+  }
+
+  setMetric("mFills", fills.length, null, false, 0, false);
+  setMetric("mPnl", closedPnl, closedPnl, true, 2, true);
+  setMetric("mFees", totalFees, null, true, 2, false);
+  setMetric("mNet", netPnl, netPnl, true, 2, true);
+  setMetric("mWinRate", winRate, winRate > 50 ? 1 : winRate < 50 ? -1 : 0, false, 1, false);
+  setMetric("mWalletHoldings", totalAccountVal, null, true, 2, false);
 }
 
 function updateCoinFilterOptions() {
@@ -486,29 +577,24 @@ function renderContracts() {
 
     totalUnrealizedPnl += liveUnPnl;
 
-    const prevPnl = previousMetricsMap[coin]?.pnl;
-    let animClass = "";
-    let rollDirection = "";
-    if (prevPnl !== undefined && prevPnl !== liveUnPnl) {
-      animClass = liveUnPnl > prevPnl ? "flash-up" : "flash-down";
-      rollDirection = liveUnPnl > prevPnl ? "rolling-up" : "rolling-down";
-    }
-    previousMetricsMap[coin] = { pnl: liveUnPnl, price: currentMarkPx };
-
     const levObj = pos.leverage;
     const leverageText = levObj && levObj.value ? ` (${levObj.value}x)` : "";
     const dirLabel = sizeNum > 0 ? `LONG${leverageText}` : `SHORT${leverageText}`;
 
+    // Unique element IDs for animated values in the contract table
+    const unPnlId = `contract-unpnl-${coin}`;
+    const pnlClass = liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : "";
+
     rows.push(`
-      <tr class="${animClass}">
+      <tr>
         <td style="text-align: left; font-weight: 800;" class="coin-name">${esc(coin)}</td>
         <td class="${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</td>
         <td>${Math.abs(sizeNum).toLocaleString()}</td>
-        <td class="mobile-hide-col">${plainMoney(entryPx, 4)}</td>
-        <td class="live-price-cell ${rollDirection}"><span class="rolling-number">${plainMoney(currentMarkPx, 4)}</span></td>
+        <td>${plainMoney(entryPx, 4)}</td>
+        <td>${plainMoney(currentMarkPx, 4)}</td>
         <td>${plainMoney(liveNotional, 2)}</td>
-        <td class="${liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : ""} ${rollDirection}">
-          <span class="rolling-number">${money(liveUnPnl, 2)}</span>
+        <td class="${pnlClass}">
+          <span id="${unPnlId}" class="contract-animated-pnl">${money(liveUnPnl, 2)}</span>
         </td>
       </tr>
     `);
@@ -521,9 +607,25 @@ function renderContracts() {
   }
 
   contractsBodyEl.innerHTML = rows.join("");
+
+  // Animate individual contract P&Ls and Total Unrealized P&L over 1 second
+  activePositions.forEach(item => {
+    const pos = item.position || item;
+    if (!pos) return;
+    const sizeNum = num(pos.szi);
+    if (sizeNum === 0) return;
+
+    const coin = pos.coin || "PERP";
+    const entryPx = num(pos.entryPx);
+    const currentMarkPx = num(livePrices[coin]) || (sizeNum !== 0 ? Math.abs(num(pos.positionValue) / sizeNum) : entryPx);
+    const liveUnPnl = (sizeNum > 0 ? (currentMarkPx - entryPx) : (entryPx - currentMarkPx)) * Math.abs(sizeNum);
+
+    animateNumber(`contract-unpnl-${coin}`, liveUnPnl, true, 2, true);
+  });
   
-  const pnlClass = totalUnrealizedPnl > 0 ? "text-positive" : totalUnrealizedPnl < 0 ? "text-negative" : "";
-  contractsMeta.innerHTML = `Displaying ${count} active contract(s) | Total Unrealized P&L: <strong class="${pnlClass}">${money(totalUnrealizedPnl, 2)}</strong>`;
+  const totalPnlClass = totalUnrealizedPnl > 0 ? "text-positive" : totalUnrealizedPnl < 0 ? "text-negative" : "";
+  contractsMeta.innerHTML = `Displaying ${count} active contract(s) | Total Unrealized P&L: <strong id="totalUnrealizedMeta" class="${totalPnlClass}">${money(totalUnrealizedPnl, 2)}</strong>`;
+  animateNumber("totalUnrealizedMeta", totalUnrealizedPnl, true, 2, true);
 }
 
 function renderDailyPnl() {
@@ -793,6 +895,7 @@ fetchBtn.addEventListener("click", async () => {
   fills = [];
   fundingHistory = [];
   holdingsData = null;
+  xyzHoldingsData = null;
   activePositions = [];
   currentPage = 1;
   resetMetrics();
@@ -1040,8 +1143,10 @@ $("clearBtn").addEventListener("click", () => {
   fills = [];
   fundingHistory = [];
   holdingsData = null;
+  xyzHoldingsData = null;
   activePositions = [];
   previousMetricsMap = {};
+  previousNumericValues = {};
   pnlFilterSelect.value = "all";
   coinFilterSelect.innerHTML = '<option value="all">All Coins</option>';
   clearStatus();
