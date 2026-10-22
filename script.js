@@ -460,12 +460,13 @@ function getFilteredFills() {
 function renderContracts() {
   if (!activePositions || activePositions.length === 0) {
     contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">No open perpetual positions currently active.</td></tr>';
-    contractsMeta.textContent = "0 active derivative contracts.";
+    contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
 
   const rows = [];
   let count = 0;
+  let totalUnrealizedPnl = 0;
 
   activePositions.forEach(item => {
     const pos = item.position || item;
@@ -483,11 +484,14 @@ function renderContracts() {
     const priceDiff = sizeNum > 0 ? (currentMarkPx - entryPx) : (entryPx - currentMarkPx);
     const liveUnPnl = priceDiff * Math.abs(sizeNum);
 
-    // Animation flash detection
+    totalUnrealizedPnl += liveUnPnl;
+
     const prevPnl = previousMetricsMap[coin]?.pnl;
     let animClass = "";
+    let rollDirection = "";
     if (prevPnl !== undefined && prevPnl !== liveUnPnl) {
       animClass = liveUnPnl > prevPnl ? "flash-up" : "flash-down";
+      rollDirection = liveUnPnl > prevPnl ? "rolling-up" : "rolling-down";
     }
     previousMetricsMap[coin] = { pnl: liveUnPnl, price: currentMarkPx };
 
@@ -501,21 +505,25 @@ function renderContracts() {
         <td class="${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</td>
         <td>${Math.abs(sizeNum).toLocaleString()}</td>
         <td class="mobile-hide-col">${plainMoney(entryPx, 4)}</td>
-        <td class="live-price-cell">${plainMoney(currentMarkPx, 4)}</td>
+        <td class="live-price-cell ${rollDirection}"><span class="rolling-number">${plainMoney(currentMarkPx, 4)}</span></td>
         <td>${plainMoney(liveNotional, 2)}</td>
-        <td class="${liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : ""}">${money(liveUnPnl, 2)}</td>
+        <td class="${liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : ""} ${rollDirection}">
+          <span class="rolling-number">${money(liveUnPnl, 2)}</span>
+        </td>
       </tr>
     `);
   });
 
   if (rows.length === 0) {
     contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">No open perpetual positions currently active.</td></tr>';
-    contractsMeta.textContent = "0 active derivative contracts.";
+    contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
 
   contractsBodyEl.innerHTML = rows.join("");
-  contractsMeta.textContent = `Displaying ${count} active perpetual contract(s) • Live 5s Auto-Poller & WS active.`;
+  
+  const pnlClass = totalUnrealizedPnl > 0 ? "text-positive" : totalUnrealizedPnl < 0 ? "text-negative" : "";
+  contractsMeta.innerHTML = `Displaying ${count} active contract(s) | Total Unrealized P&L: <strong class="${pnlClass}">${money(totalUnrealizedPnl, 2)}</strong>`;
 }
 
 function renderDailyPnl() {
