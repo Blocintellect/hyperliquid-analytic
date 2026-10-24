@@ -496,7 +496,7 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 }
 .page-indicator { font-size: 11px; font-weight: 600; color: var(--text-muted); }
 
-/* Responsive Breakpoints & Vertical-Only Mobile View */
+/* Responsive Breakpoints & Mobile Enhancements */
 @media (max-width: 1024px) {
   .metrics-grid { grid-template-columns: repeat(3, 1fr); }
   .control-row { grid-template-columns: 1fr; }
@@ -506,6 +506,21 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 
 @media (max-width: 768px) {
   body { padding: 8px 4px; }
+  
+  /* Force exactly 2 cards per line on mobile screens */
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px;
+  }
+  
+  .metric-card {
+    padding: 10px 8px;
+  }
+
+  .metric-card .value {
+    font-size: 13px;
+  }
+
   .topbar { flex-direction: column; align-items: stretch; }
   .header-right { width: 100%; justify-content: space-between; }
   .table-header { flex-direction: column; align-items: stretch; }
@@ -514,6 +529,15 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   .filter-dropdown-field select { width: 65%; }
   .export-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; }
   .export-actions .pdf-export { grid-column: span 3; }
+
+  /* Ensure clickable rows are fully responsive and touch-friendly */
+  .clickable-asset-row {
+    cursor: pointer;
+    -webkit-tap-highlight-color: rgba(0, 184, 124, 0.2);
+  }
+  .clickable-asset-row:active {
+    background: var(--hover-bg) !important;
+  }
 
   /* Mobile Tables Stacked Vertically - No Horizontal Scrolling Required */
   .coinglass-table, 
@@ -589,6 +613,14 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   #panelDaily .coinglass-table td:nth-child(6):before,
   #panelMonthly .coinglass-table td:nth-child(6):before { content: "Total Fills"; font-weight: 800; color: var(--text-muted); }
 
+  /* Asset Performance Breakdown Mobile Labels (for charts.html) */
+  #assetTableBody td:nth-child(1):before { content: "Coin / Asset"; font-weight: 800; color: var(--text-muted); }
+  #assetTableBody td:nth-child(2):before { content: "Closed P&L"; font-weight: 800; color: var(--text-muted); }
+  #assetTableBody td:nth-child(3):before { content: "Total Fees"; font-weight: 800; color: var(--text-muted); }
+  #assetTableBody td:nth-child(4):before { content: "Net P&L"; font-weight: 800; color: var(--text-muted); }
+  #assetTableBody td:nth-child(5):before { content: "Total Volume"; font-weight: 800; color: var(--text-muted); }
+  #assetTableBody td:nth-child(6):before { content: "Fills Count"; font-weight: 800; color: var(--text-muted); }
+
   /* Deposits & Withdrawals Mobile Labels */
   #panelDepositsWithdrawals .coinglass-table td:nth-child(1):before { content: "Date / Time"; font-weight: 800; color: var(--text-muted); }
   #panelDepositsWithdrawals .coinglass-table td:nth-child(2):before { content: "Type"; font-weight: 800; color: var(--text-muted); }
@@ -607,7 +639,6 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 }
 
 @media (max-width: 600px) {
-  .metrics-grid { grid-template-columns: repeat(2, 1fr); }
   .actions-row { flex-direction: column; align-items: stretch; }
   .preset-btns { display: grid; grid-template-columns: 1fr 1fr; }
   .main-btns { display: grid; grid-template-columns: 2fr 1fr; }

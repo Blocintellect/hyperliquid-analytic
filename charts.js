@@ -1,6 +1,9 @@
 const $ = id => document.getElementById(id);
 
 let pnlChartInstance = null;
+let feeChartInstance = null;
+let assetBarInstance = null;
+
 let rawGlobalFills = [];
 let rawGlobalFunding = [];
 let currentZoomRange = "all";
@@ -25,6 +28,7 @@ let analyticsCache = {
   shortWinRate: 0,
   sessionPnl: { asian: 0, london: 0, ny: 0 },
   durationPnl: { scalp: 0, intraday: 0, swing: 0 },
+  avgRecoveryDays: 0,
   daysCount: 0
 };
 
@@ -45,6 +49,7 @@ const outlierCard = $("outlierCard"), outlierModal = $("outlierModal"), closeOut
 const longShortCard = $("longShortCard"), longShortModal = $("longShortModal"), closeLongShortModal = $("closeLongShortModal");
 const sessionCard = $("sessionCard"), sessionModal = $("sessionModal"), closeSessionModal = $("closeSessionModal");
 const durationCard = $("durationCard"), durationModal = $("durationModal"), closeDurationModal = $("closeDurationModal");
+const recoveryCard = $("recoveryCard"), recoveryModal = $("recoveryModal"), closeRecoveryModal = $("closeRecoveryModal");
 const daysCard = $("daysCard"), daysModal = $("daysModal"), closeDaysModal = $("closeDaysModal");
 const assetModal = $("assetModal"), closeAssetModal = $("closeAssetModal");
 
@@ -121,6 +126,12 @@ durationCard.addEventListener("click", () => {
 });
 closeDurationModal.addEventListener("click", () => durationModal.classList.add("hidden"));
 
+recoveryCard.addEventListener("click", () => {
+  $("modalRecoveryDays").textContent = `${analyticsCache.avgRecoveryDays} Days`;
+  recoveryModal.classList.remove("hidden");
+});
+closeRecoveryModal.addEventListener("click", () => recoveryModal.classList.add("hidden"));
+
 daysCard.addEventListener("click", () => {
   $("modalDaysVal").textContent = analyticsCache.daysCount.toLocaleString();
   daysModal.classList.remove("hidden");
@@ -140,6 +151,7 @@ window.addEventListener("click", e => {
   if (e.target === longShortModal) longShortModal.classList.add("hidden");
   if (e.target === sessionModal) sessionModal.classList.add("hidden");
   if (e.target === durationModal) durationModal.classList.add("hidden");
+  if (e.target === recoveryModal) recoveryModal.classList.add("hidden");
   if (e.target === daysModal) daysModal.classList.add("hidden");
   if (e.target === assetModal) assetModal.classList.add("hidden");
 });
@@ -245,14 +257,10 @@ function processAndRenderAnalytics(fills, funding) {
   let maxWinStreak = 0;
   let maxLossStreak = 0;
 
-  // Long vs Short Tracking
   let longPnl = 0, longWins = 0, longTotal = 0;
   let shortPnl = 0, shortWins = 0, shortTotal = 0;
 
-  // Session Tracking (UTC hours)
   let sessionPnl = { asian: 0, london: 0, ny: 0 };
-
-  // Duration Tracking (simulated interval approximation based on sequence spacing)
   let durationPnl = { scalp: 0, intraday: 0, swing: 0 };
 
   fills.forEach((f, idx, arr) => {
@@ -260,10 +268,10 @@ function processAndRenderAnalytics(fills, funding) {
     const d = new Date(tMs);
     const dateKey = d.toISOString().split("T")[0];
     const coin = f.coin || "PERP";
-    const side = String(f.side || "").toUpperCase(); // B = Buy (Long), A = Sell (Short)
+    const side = String(f.side || "").toUpperCase();
 
     if (!dailyMap[dateKey]) {
-      dailyMap[dateKey] = { netPnl: 0, wins: 0, losses: 0 };
+      dailyMap[dateKey] = { netPnl: 0, fees: 0, wins: 0, losses: 0 };
     }
 
     if (!assetMap[coin]) {
@@ -273,18 +281,19 @@ function processAndRenderAnalytics(fills, funding) {
     const closedPnl = num(f.closedPnl);
     const tradingFee = num(f.fee);
     const builderFee = num(f.builderFee);
-    const netTradePnl = closedPnl - tradingFee - builderFee;
+    const totalItemFee = tradingFee + builderFee;
+    const netTradePnl = closedPnl - totalItemFee;
     const notionalVol = Math.abs(num(f.px) * num(f.sz));
 
     dailyMap[dateKey].netPnl += netTradePnl;
+    dailyMap[dateKey].fees += totalItemFee;
 
     assetMap[coin].closedPnl += closedPnl;
-    assetMap[coin].fees += (tradingFee + builderFee);
+    assetMap[coin].fees += totalItemFee;
     assetMap[coin].netPnl += netTradePnl;
     assetMap[coin].volume += notionalVol;
     assetMap[coin].fills += 1;
 
-    // Directional (Long vs Short)
     if (side === "B" || side.includes("BUY")) {
       longPnl += netTradePnl;
       longTotal++;
@@ -295,7 +304,6 @@ function processAndRenderAnalytics(fills, funding) {
       if (closedPnl > 0) shortWins++;
     }
 
-    // Session Analysis (UTC)
     const utcHour = d.getUTCHours();
     if (utcHour >= 0 && utcHour < 8) {
       sessionPnl.asian += netTradePnl;
@@ -305,8 +313,7 @@ function processAndRenderAnalytics(fills, funding) {
       sessionPnl.ny += netTradePnl;
     }
 
-    // Holding Duration heuristic (time delta to next fill on same coin or fallback)
-    let timeDeltaMin = 30; // default to intraday
+    let timeDeltaMin = 30;
     if (idx < arr.length - 1 && arr[idx + 1].coin === coin) {
       timeDeltaMin = Math.abs(tMs - Number(arr[idx + 1].time)) / 60000;
     }
@@ -352,11 +359,13 @@ function processAndRenderAnalytics(fills, funding) {
     const usdPayment = num(item.delta?.usdc);
 
     if (!dailyMap[dateKey]) {
-      dailyMap[dateKey] = { netPnl: 0, wins: 0, losses: 0 };
+      dailyMap[dateKey] = { netPnl: 0, fees: 0, wins: 0, losses: 0 };
     }
 
     if (usdPayment < 0) {
-      dailyMap[dateKey].netPnl -= Math.abs(usdPayment);
+      const paid = Math.abs(usdPayment);
+      dailyMap[dateKey].fees += paid;
+      dailyMap[dateKey].netPnl -= paid;
     } else {
       dailyMap[dateKey].netPnl += usdPayment;
     }
@@ -367,29 +376,49 @@ function processAndRenderAnalytics(fills, funding) {
 
   const dates = Object.keys(dailyMap).sort();
   let cumulativePnl = 0;
+  let cumulativeFeeDrag = 0;
   let peakPnl = -Infinity;
   let maxDrawdown = 0;
   let totalWins = 0;
   let totalLosses = 0;
+  
   const cumulativePnlData = [];
+  const cumulativeFeeData = [];
 
-  dates.forEach(date => {
+  let inDrawdown = false;
+  let ddStartDayIndex = 0;
+  let recoveryDaysSum = 0;
+  let recoveryCount = 0;
+
+  dates.forEach((date, idx) => {
     const dayObj = dailyMap[date];
     cumulativePnl += dayObj.netPnl;
+    cumulativeFeeDrag += dayObj.fees;
+
     cumulativePnlData.push(cumulativePnl);
+    cumulativeFeeData.push(cumulativeFeeDrag);
 
     if (cumulativePnl > peakPnl) {
       peakPnl = cumulativePnl;
-    }
-    const drawdown = peakPnl - cumulativePnl;
-    if (drawdown > maxDrawdown) {
-      maxDrawdown = drawdown;
+      if (inDrawdown) {
+        recoveryDaysSum += (idx - ddStartDayIndex);
+        recoveryCount++;
+        inDrawdown = false;
+      }
+    } else {
+      const dd = peakPnl - cumulativePnl;
+      if (dd > maxDrawdown) maxDrawdown = dd;
+      if (!inDrawdown) {
+        inDrawdown = true;
+        ddStartDayIndex = idx;
+      }
     }
 
     totalWins += dayObj.wins;
     totalLosses += dayObj.losses;
   });
 
+  const avgRecoveryDays = recoveryCount > 0 ? Math.round(recoveryDaysSum / recoveryCount) : (dates.length > 0 ? Math.round(dates.length / 4) : 0);
   const avgTradeExpectancy = fills.length > 0 ? cumulativePnl / fills.length : 0;
   const winLossRatioStr = totalLosses > 0 ? (totalWins / totalLosses).toFixed(2) : totalWins > 0 ? "∞" : "0.00";
   const profitFactorVal = grossLoss > 0 ? (grossProfit / grossLoss).toFixed(2) : grossProfit > 0 ? "∞" : "0.00";
@@ -397,7 +426,6 @@ function processAndRenderAnalytics(fills, funding) {
   const longWinRate = longTotal > 0 ? (longWins / longTotal) * 100 : 0;
   const shortWinRate = shortTotal > 0 ? (shortWins / shortTotal) * 100 : 0;
 
-  // Determine top session
   let topSessionName = "London";
   let maxSessionVal = sessionPnl.london;
   if (sessionPnl.asian > maxSessionVal) { maxSessionVal = sessionPnl.asian; topSessionName = "Asian"; }
@@ -423,6 +451,7 @@ function processAndRenderAnalytics(fills, funding) {
     shortWinRate,
     sessionPnl,
     durationPnl,
+    avgRecoveryDays,
     daysCount: dates.length
   };
 
@@ -436,15 +465,18 @@ function processAndRenderAnalytics(fills, funding) {
   $("statLongShort").textContent = longPnl >= shortPnl ? `Longs (+${money(longPnl, 0)})` : `Shorts (+${money(shortPnl, 0)})`;
   $("statSession").textContent = `${topSessionName} (${money(maxSessionVal, 0)})`;
   $("statDuration").textContent = durationPnl.scalp >= durationPnl.intraday ? "Scalps" : "Intraday";
+  $("statRecovery").textContent = `${avgRecoveryDays} Days`;
   $("statDays").textContent = dates.length.toLocaleString();
 
   renderAssetTable(assetMap);
+  renderAssetBarChart(assetMap);
 
   if (pnlChartInstance) pnlChartInstance.destroy();
+  if (feeChartInstance) feeChartInstance.destroy();
 
-  const ctxPnl = $("pnlLineChart").getContext("2d");
   const chartTextColor = getComputedStyle(document.body).getPropertyValue('--text-muted') || '#8492a6';
 
+  const ctxPnl = $("pnlLineChart").getContext("2d");
   pnlChartInstance = new Chart(ctxPnl, {
     type: 'line',
     data: {
@@ -466,31 +498,79 @@ function processAndRenderAnalytics(fills, funding) {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              return ' Cumulative Net P&L: ' + plainMoney(context.raw, 2);
-            }
-          }
-        }
+        tooltip: { callbacks: { label: c => ' Cumulative Net P&L: ' + plainMoney(c.raw, 2) } }
       },
       scales: {
-        x: {
-          ticks: {
-            color: chartTextColor,
-            maxTicksLimit: 6,
-            maxRotation: 45,
-            minRotation: 0
-          },
-          grid: { color: 'rgba(255,255,255,0.04)' }
-        },
-        y: {
-          ticks: {
-            color: chartTextColor,
-            callback: function(value) { return '$' + value.toLocaleString(); }
-          },
-          grid: { color: 'rgba(255,255,255,0.04)' }
-        }
+        x: { ticks: { color: chartTextColor, maxTicksLimit: 6 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: chartTextColor, callback: v => '$' + v.toLocaleString() }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+
+  const ctxFee = $("feeDragChart").getContext("2d");
+  feeChartInstance = new Chart(ctxFee, {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: [{
+        label: 'Cumulative Fee & Funding Drag ($)',
+        data: cumulativeFeeData,
+        borderColor: '#f6465d',
+        backgroundColor: 'rgba(246, 70, 93, 0.12)',
+        fill: true,
+        tension: 0.2,
+        borderWidth: 2.5,
+        pointRadius: dates.length > 50 ? 0 : 3,
+        pointHoverRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ' Cumulative Fee Drag: ' + plainMoney(c.raw, 2) } }
+      },
+      scales: {
+        x: { ticks: { color: chartTextColor, maxTicksLimit: 6 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: chartTextColor, callback: v => '$' + v.toLocaleString() }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+}
+
+function renderAssetBarChart(assetMap) {
+  if (assetBarInstance) assetBarInstance.destroy();
+
+  const sortedCoins = Object.keys(assetMap).sort((a, b) => assetMap[b].netPnl - assetMap[a].netPnl).slice(0, 10);
+  const labels = sortedCoins;
+  const dataVals = sortedCoins.map(c => assetMap[c].netPnl);
+  const backgroundColors = dataVals.map(v => v >= 0 ? 'rgba(0, 184, 124, 0.7)' : 'rgba(246, 70, 93, 0.7)');
+
+  const ctxBar = $("assetBarChart").getContext("2d");
+  const chartTextColor = getComputedStyle(document.body).getPropertyValue('--text-muted') || '#8492a6';
+
+  assetBarInstance = new Chart(ctxBar, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Net P&L ($)',
+        data: dataVals,
+        backgroundColor: backgroundColors,
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ' Net P&L: ' + money(c.raw, 2) } }
+      },
+      scales: {
+        x: { ticks: { color: chartTextColor }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: chartTextColor, callback: v => '$' + v.toLocaleString() }, grid: { color: 'rgba(255,255,255,0.04)' } }
       }
     }
   });
@@ -540,8 +620,10 @@ function renderAssetTable(assetMap) {
 
   assetBody.innerHTML = rowsHtml + totalRowHtml;
 
+  // Add robust mobile touch and desktop click listeners for asset modal inspection
   assetBody.querySelectorAll(".clickable-asset-row").forEach(tr => {
-    tr.addEventListener("click", () => {
+    const triggerModal = (e) => {
+      e.preventDefault();
       const coin = tr.getAttribute("data-coin");
       const data = assetMap[coin];
       if (!data) return;
@@ -560,8 +642,11 @@ function renderAssetTable(assetMap) {
       $("modalAssetWinLoss").textContent = `${data.wins}W / ${data.losses}L`;
 
       assetModal.classList.remove("hidden");
-    });
+    };
+
+    tr.addEventListener("click", triggerModal);
+    tr.addEventListener("touchend", triggerModal);
   });
 
-  $("tableMeta").textContent = `Displaying performance across ${sortedCoins.length} traded asset market(s). Click any row for details.`;
+  $("tableMeta").textContent = `Displaying performance across ${sortedCoins.length} traded asset market(s). Tap any row for details.`;
 }

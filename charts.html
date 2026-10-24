@@ -40,8 +40,8 @@
       </div>
     </section>
 
-    <!-- Expanded Summarized Analytics Insight Cards Grid (11 Cards) -->
-    <section class="metrics-grid" style="margin-bottom: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));">
+    <!-- Expanded Summarized Analytics Insight Cards Grid (12 Cards) -->
+    <section class="metrics-grid" style="margin-bottom: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
       <div class="metric-card interactive-card" id="peakCard" title="Click to view peak equity details">
         <span class="label">PEAK CUMULATIVE P&L ⓘ</span>
         <strong id="statPeak" class="value">—</strong>
@@ -91,6 +91,11 @@
         <span class="label">HOLDING DURATION ⓘ</span>
         <strong id="statDuration" class="value">—</strong>
         <span class="subtext">Scalp vs Intraday vs Swing</span>
+      </div>
+      <div class="metric-card interactive-card" id="recoveryCard" title="Click to view recovery duration">
+        <span class="label">AVG RECOVERY TIME ⓘ</span>
+        <strong id="statRecovery" class="value">—</strong>
+        <span class="subtext">Days to bounce back from DD</span>
       </div>
       <div class="metric-card interactive-card" id="daysCard" title="Click to view trading span timeline">
         <span class="label">TOTAL DAYS TRACKED ⓘ</span>
@@ -241,6 +246,19 @@
       </div>
     </div>
 
+    <div id="recoveryModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Drawdown Recovery Metrics</h3>
+          <button id="closeRecoveryModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Avg Recovery Days:</span> <strong id="modalRecoveryDays">0 Days</strong></div>
+          <p class="meta-info" style="margin-top: 10px;">Average calendar days required for equity to bounce back to previous high watermarks after entering a drawdown.</p>
+        </div>
+      </div>
+    </div>
+
     <div id="daysModal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -272,18 +290,44 @@
       </div>
     </div>
 
-    <!-- Main Cumulative P&L Progress Chart Panel -->
-    <section class="panel table-panel" style="padding: 20px; margin-bottom: 20px;">
-      <div class="table-header" style="padding: 0 0 14px 0; border-bottom: 1px solid var(--panel-border); margin-bottom: 16px;">
-        <div class="table-header-info">
-          <h2>Cumulative Net P&L Growth Curve</h2>
-          <p class="meta-info">Net realized profit minus all trading, funding, and builder fees compounded chronologically.</p>
+    <!-- Main Cumulative P&L & Fee Drag Growth Curve Panels -->
+    <div style="display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 20px;">
+      <section class="panel table-panel" style="padding: 20px;">
+        <div class="table-header" style="padding: 0 0 14px 0; border-bottom: 1px solid var(--panel-border); margin-bottom: 16px;">
+          <div class="table-header-info">
+            <h2>Cumulative Net P&L Growth Curve</h2>
+            <p class="meta-info">Net realized profit minus all trading, funding, and builder fees compounded chronologically.</p>
+          </div>
         </div>
-      </div>
-      <div style="position: relative; height: 380px; width: 100%;">
-        <canvas id="pnlLineChart"></canvas>
-      </div>
-    </section>
+        <div style="position: relative; height: 350px; width: 100%;">
+          <canvas id="pnlLineChart"></canvas>
+        </div>
+      </section>
+
+      <section class="panel table-panel" style="padding: 20px;">
+        <div class="table-header" style="padding: 0 0 14px 0; border-bottom: 1px solid var(--panel-border); margin-bottom: 16px;">
+          <div class="table-header-info">
+            <h2>Cumulative Fee & Funding Drag</h2>
+            <p class="meta-info">Total transactional commissions and funding payments accrued over time.</p>
+          </div>
+        </div>
+        <div style="position: relative; height: 260px; width: 100%;">
+          <canvas id="feeDragChart"></canvas>
+        </div>
+      </section>
+
+      <section class="panel table-panel" style="padding: 20px;">
+        <div class="table-header" style="padding: 0 0 14px 0; border-bottom: 1px solid var(--panel-border); margin-bottom: 16px;">
+          <div class="table-header-info">
+            <h2>Asset Net P&L Distribution</h2>
+            <p class="meta-info">Visual ranking of net performance across traded markets.</p>
+          </div>
+        </div>
+        <div style="position: relative; height: 300px; width: 100%;">
+          <canvas id="assetBarChart"></canvas>
+        </div>
+      </section>
+    </div>
 
     <!-- Asset Performance Breakdown Table -->
     <section class="panel table-panel">
