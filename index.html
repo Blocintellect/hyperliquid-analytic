@@ -11,6 +11,9 @@
   <!-- jsPDF & jsPDF-AutoTable for clean native multi-page PDF exporting -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- Chart.js for Professional Animated Pie/Doughnut Charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="dark-theme">
   <div class="app">
@@ -67,7 +70,7 @@
 
     <section id="limitNotice" class="notice hidden"></section>
 
-    <!-- Key Metrics Grid (All cards clickable) -->
+    <!-- Key Metrics Grid -->
     <section class="metrics-grid">
       <div class="metric-card interactive-card" id="fillsCard" title="Click to view total fills and volume breakdown">
         <span class="label">TOTAL FILLS ⓘ</span>
@@ -101,8 +104,7 @@
       </div>
     </section>
 
-    <!-- Detailed Breakdown Modals -->
-    <!-- 1. Fills Modal -->
+    <!-- Modals -->
     <div id="fillsModal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -116,7 +118,6 @@
       </div>
     </div>
 
-    <!-- 2. Net P&L Modal -->
     <div id="netPnlModal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -134,7 +135,6 @@
       </div>
     </div>
 
-    <!-- 3. Closed P&L Modal -->
     <div id="closedPnlModal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -150,7 +150,6 @@
       </div>
     </div>
 
-    <!-- 4. Fee Breakdown Modal -->
     <div id="feeModal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -167,7 +166,6 @@
       </div>
     </div>
 
-    <!-- 5. Win Rate Modal -->
     <div id="winRateModal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -184,7 +182,6 @@
       </div>
     </div>
 
-    <!-- 6. Wallet Holdings Modal -->
     <div id="holdingsModal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -211,7 +208,7 @@
         <option value="monthly">Monthly P&L Breakdown</option>
         <option value="depositsWithdrawals">Deposit & Withdraw (Transfers)</option>
         <option value="openOrders">Open Orders (TP / SL / Limit)</option>
-        <option value="walletDetails">Wallet Funds Details</option>
+        <option value="walletDetails">Wallet Funds Details & Charts</option>
       </select>
     </div>
 
@@ -300,7 +297,6 @@
           </tbody>
         </table>
       </div>
-      <!-- Pagination Controls -->
       <div id="paginationContainer" class="pagination-container hidden">
         <button id="prevPageBtn" class="secondary" disabled>← Previous</button>
         <span id="pageIndicator" class="page-indicator">Page 1 of 1</span>
@@ -424,7 +420,7 @@
       </div>
     </section>
 
-    <!-- Wallet Funds Details Panel -->
+    <!-- Wallet Funds Details & Animated Charts Panel -->
     <section id="panelWalletDetails" class="panel table-panel hidden">
       <div class="table-header">
         <div class="table-header-info">
@@ -433,37 +429,50 @@
         </div>
       </div>
       <div class="table-wrap" style="padding: 20px;">
-        <div class="wallet-details-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
-          <div class="metric-card" style="padding: 16px;">
-            <span class="label">ACCOUNT TOTAL VALUE</span>
-            <strong id="detAccountValue" class="value" style="font-size: 18px;">$0.00</strong>
-            <span class="subtext">Combined perp & spot equity</span>
+        <div class="wallet-layout-grid" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; align-items: center;">
+          
+          <!-- Left: Detailed Metrics Cards -->
+          <div class="wallet-details-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
+            <div class="metric-card" style="padding: 14px;">
+              <span class="label">ACCOUNT TOTAL VALUE</span>
+              <strong id="detAccountValue" class="value" style="font-size: 16px;">$0.00</strong>
+              <span class="subtext">Combined perp & spot</span>
+            </div>
+            <div class="metric-card" style="padding: 14px;">
+              <span class="label">PERPETUAL ACCOUNT VALUE</span>
+              <strong id="detPerpValue" class="value" style="font-size: 16px;">$0.00</strong>
+              <span class="subtext">Margin summary equity</span>
+            </div>
+            <div class="metric-card" style="padding: 14px;">
+              <span class="label">PERPS POSITION NOTIONAL</span>
+              <strong id="detPerpsPosValue" class="value" style="font-size: 16px;">$0.00</strong>
+              <span class="subtext">Active open notional</span>
+            </div>
+            <div class="metric-card" style="padding: 14px;">
+              <span class="label">WITHDRAWABLE BALANCE</span>
+              <strong id="detWithdrawable" class="value" style="font-size: 16px;">$0.00</strong>
+              <span class="subtext">Free collateral</span>
+            </div>
+            <div class="metric-card" style="padding: 14px;">
+              <span class="label">SPOT TOKEN BALANCES</span>
+              <strong id="detSpotValue" class="value" style="font-size: 16px;">$0.00</strong>
+              <span class="subtext">Spot holdings value</span>
+            </div>
+            <div class="metric-card" style="padding: 14px;">
+              <span class="label">TOTAL WALLET LEVERAGE</span>
+              <strong id="detLeverage" class="value" style="font-size: 16px;">0.00x</strong>
+              <span class="subtext">Aggregate leverage</span>
+            </div>
           </div>
-          <div class="metric-card" style="padding: 16px;">
-            <span class="label">PERPETUAL ACCOUNT VALUE</span>
-            <strong id="detPerpValue" class="value" style="font-size: 18px;">$0.00</strong>
-            <span class="subtext">Margin summary equity</span>
+
+          <!-- Right: Animated Doughnut Pie Chart Card -->
+          <div class="metric-card" style="padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px;">
+            <span class="label" style="margin-bottom: 12px; align-self: flex-start;">ASSET & MARGIN ALLOCATION RATIO</span>
+            <div style="position: relative; width: 100%; max-width: 260px; height: 260px;">
+              <canvas id="walletPieChart"></canvas>
+            </div>
           </div>
-          <div class="metric-card" style="padding: 16px;">
-            <span class="label">PERPS POSITION NOTIONAL VALUE</span>
-            <strong id="detPerpsPosValue" class="value" style="font-size: 18px;">$0.00</strong>
-            <span class="subtext">Total active open notional</span>
-          </div>
-          <div class="metric-card" style="padding: 16px;">
-            <span class="label">WITHDRAWABLE BALANCE</span>
-            <strong id="detWithdrawable" class="value" style="font-size: 18px;">$0.00</strong>
-            <span class="subtext">Free collateral available to withdraw</span>
-          </div>
-          <div class="metric-card" style="padding: 16px;">
-            <span class="label">SPOT TOKEN BALANCES</span>
-            <strong id="detSpotValue" class="value" style="font-size: 18px;">$0.00</strong>
-            <span class="subtext">Total valuation of spot holdings</span>
-          </div>
-          <div class="metric-card" style="padding: 16px;">
-            <span class="label">TOTAL WALLET LEVERAGE</span>
-            <strong id="detLeverage" class="value" style="font-size: 18px;">0.00x</strong>
-            <span class="subtext">Current aggregate position leverage</span>
-          </div>
+
         </div>
       </div>
     </section>

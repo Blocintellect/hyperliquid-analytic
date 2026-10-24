@@ -92,6 +92,7 @@ let livePrices = {};
 let previousNumericValues = {}; 
 let wsConnection = null;
 let pollTimer = null;
+let walletPieChartInstance = null;
 let currentPage = 1;
 const rowsPerPage = 50;
 
@@ -113,7 +114,6 @@ walletEl.addEventListener("input", () => {
   localStorage.setItem(SAVED_WALLET_KEY, walletEl.value.trim());
 });
 
-// Switch active view panel based on Dropdown selection
 function switchView(viewKey) {
   const panels = {
     contracts: panelContracts,
@@ -136,7 +136,10 @@ function switchView(viewKey) {
   if (viewKey === "monthly") renderMonthlyPnl();
   if (viewKey === "depositsWithdrawals") renderDepositsWithdrawals();
   if (viewKey === "openOrders") renderOpenOrders();
-  if (viewKey === "walletDetails") renderWalletDetails();
+  if (viewKey === "walletDetails") {
+    renderWalletDetails();
+    if (walletPieChartInstance) walletPieChartInstance.resize();
+  }
 }
 
 viewSelect.addEventListener("change", (e) => {
@@ -169,6 +172,7 @@ function applyTheme(theme) {
     themeLabel.textContent = "Light Mode";
   }
   localStorage.setItem(SAVED_THEME_KEY, theme);
+  if (walletPieChartInstance) renderWalletPieChart(walletPieChartInstance.data.datasets[0].data);
 }
 
 themeToggleBtn.addEventListener("click", () => {
@@ -194,7 +198,6 @@ async function setInceptionPreset() {
   endEl.value = formatDateInput(today);
 
   if (!isAddress(wallet)) {
-    // Default fallback to 1 year ago if no valid wallet entered yet
     const defaultStart = new Date();
     defaultStart.setFullYear(defaultStart.getFullYear() - 1);
     startEl.value = formatDateInput(defaultStart);
@@ -212,7 +215,6 @@ async function setInceptionPreset() {
     });
 
     if (Array.isArray(res) && res.length > 0) {
-      // Fills are returned newest first or oldest; let's find the absolute minimum timestamp
       let minTime = Date.now();
       res.forEach(f => {
         const t = Number(f.time);
@@ -649,7 +651,6 @@ function updateMetrics() {
     totalAccountVal += num(xyzMargin.accountValue);
   }
 
-  // Populate Modals
   const totalVol = targetFills.reduce((s, f) => s + Math.abs(num(f.px) * num(f.sz)), 0);
   $("modalTotalFills").textContent = targetFills.length.toLocaleString();
   $("modalTotalVol").textContent = plainMoney(totalVol, 2);
@@ -686,7 +687,6 @@ function updateMetrics() {
   $("modalSpotValue").textContent = plainMoney(spotVal, 2);
   $("modalTotalHoldings").textContent = plainMoney(totalAccountVal, 2);
 
-  // Set Metrics Grid Cards
   setMetric("mFills", targetFills.length, null, false, 0, false);
   setMetric("mPnl", closedPnl, closedPnl, true, 2, true);
   setMetric("mFees", totalFees, null, true, 2, false);
@@ -989,6 +989,69 @@ function renderOpenOrders() {
   openOrdersMeta.textContent = `Displaying ${openOrdersList.length} active open order(s).`;
 }
 
+function renderWalletPieChart(dataValues) {
+  const ctx = $("walletPieChart").getContext("2d");
+  const isLight = document.body.classList.contains("light-theme");
+  const textColor = isLight ? "#0f172a" : "#f0f4f8";
+
+  if (walletPieChartInstance) {
+    walletPieChartInstance.data.datasets[0].data = dataValues;
+    walletPieChartInstance.options.plugins.legend.labels.color = textColor;
+    walletPieChartInstance.update();
+    return;
+  }
+
+  walletPieChartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Perp Margin Value', 'Withdrawable Balance', 'Spot Token Balances', 'Active Open Notional'],
+      datasets: [{
+        data: dataValues,
+        backgroundColor: [
+          '#00b87c', // Coinglass Green
+          '#2962ff', // Coinglass Blue
+          '#8b5cf6', // Coinglass Purple
+          '#f59e0b'  // Amber
+        ],
+        borderWidth: 2,
+        borderColor: isLight ? '#ffffff' : '#121721',
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {
+        animateScale: true,
+        animateRotate: true,
+        duration: 1200
+      },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: textColor,
+            font: {
+              size: 10,
+              weight: 'bold',
+              family: 'inherit'
+            },
+            padding: 12,
+            boxWidth: 12
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return ` ${context.label}: $${context.raw.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
 function renderWalletDetails() {
   let perpVal = 0, spotVal = 0, withdrawable = 0, totalNotional = 0;
 
@@ -1030,6 +1093,14 @@ function renderWalletDetails() {
   $("detWithdrawable").textContent = plainMoney(withdrawable, 2);
   $("detSpotValue").textContent = plainMoney(spotVal, 2);
   $("detLeverage").textContent = totalLeverage.toFixed(2) + "x";
+
+  // Update Doughnut Chart
+  renderWalletPieChart([
+    Math.max(0, perpVal),
+    Math.max(0, withdrawable),
+    Math.max(0, spotVal),
+    Math.max(0, totalNotional)
+  ]);
 }
 
 function renderTrades() {
@@ -1460,7 +1531,7 @@ $("clearBtn").addEventListener("click", () => {
 });
 
 walletEl.addEventListener("keydown", e => { if (e.key === "Enter") fetchBtn.click(); });
-walletEl.addEventListener("blur", () => {
+walletEl.walletEl?.addEventListener?.("blur", () => {
   if (isAddress(walletEl.value.trim())) {
     setInceptionPreset();
   }
