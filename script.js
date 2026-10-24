@@ -989,7 +989,7 @@ $("downloadShareCardBtn")?.addEventListener("click", () => {
 
   ctx.fillStyle = "#00b87c";
   ctx.font = "bold 24px sans-serif";
-  ctx.fillText("HYPERLIQUID PRO INSTITUTIONAL STATEMENT", 80, 100);
+  ctx.fillText("HYPERLIQUID PRO STATEMENT", 80, 100);
 
   const targetFills = getFilteredFills();
   const closedPnl = targetFills.reduce((s, f) => s + num(f.closedPnl), 0);
