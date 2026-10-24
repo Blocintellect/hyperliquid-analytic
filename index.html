@@ -420,7 +420,7 @@
       </div>
     </section>
 
-    <!-- Wallet Funds Details & Animated Charts Panel -->
+    <!-- Wallet Funds Details & Stacked Animated Charts Panel -->
     <section id="panelWalletDetails" class="panel table-panel hidden">
       <div class="table-header">
         <div class="table-header-info">
@@ -428,11 +428,11 @@
           <p class="meta-info">Comprehensive breakdown of account equity, perpetual margins, and spot balances.</p>
         </div>
       </div>
-      <div class="table-wrap" style="padding: 20px;">
-        <div class="wallet-layout-grid" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; align-items: center;">
+      <div class="table-wrap" style="padding: 16px;">
+        <div class="wallet-layout-grid" style="display: grid; grid-template-columns: 1fr; gap: 16px;">
           
-          <!-- Left: Detailed Metrics Cards -->
-          <div class="wallet-details-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
+          <!-- Detailed Metrics Cards (2 columns on mobile, up to 3 on desktop) -->
+          <div class="wallet-details-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
             <div class="metric-card" style="padding: 14px;">
               <span class="label">ACCOUNT TOTAL VALUE</span>
               <strong id="detAccountValue" class="value" style="font-size: 16px;">$0.00</strong>
@@ -465,10 +465,10 @@
             </div>
           </div>
 
-          <!-- Right: Animated Doughnut Pie Chart Card -->
-          <div class="metric-card" style="padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px;">
+          <!-- Animated Doughnut Pie Chart Card (Stacked directly below) -->
+          <div class="metric-card" style="padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
             <span class="label" style="margin-bottom: 12px; align-self: flex-start;">ASSET & MARGIN ALLOCATION RATIO</span>
-            <div style="position: relative; width: 100%; max-width: 260px; height: 260px;">
+            <div style="position: relative; width: 100%; max-width: 300px; height: 280px; margin: 0 auto;">
               <canvas id="walletPieChart"></canvas>
             </div>
           </div>
