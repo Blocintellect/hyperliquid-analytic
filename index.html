@@ -19,7 +19,7 @@
       <div class="brand-title">
         <div class="logo-badge"><span class="logo-dot"></span> HYPERLIQUID PRO</div>
         <h1>Trade Statement Generator</h1>
-        <p class="subtitle">Trade execution history, P&L audit, and professional statement exports.</p>
+        <p class="subtitle">Trade execution history, P&L audit, wallet fund details, and professional statement exports.</p>
       </div>
       <div class="header-right">
         <a href="charts.html" class="secondary" style="text-decoration: none; display: flex; align-items: center; padding: 0 14px; height: 40px; font-weight: 700;">📊 View Charts</a>
@@ -51,7 +51,7 @@
 
       <div class="actions-row">
         <div class="preset-btns">
-          <button id="allBtn" class="secondary active">All (30D)</button>
+          <button id="allInceptionBtn" class="secondary active">All (Inception)</button>
           <button id="monthBtn" class="secondary">This Month</button>
           <button id="ytdBtn" class="secondary">Year to Date</button>
           <button id="todayBtn" class="secondary">Today</button>
@@ -201,12 +201,18 @@
       </div>
     </div>
 
-    <!-- View Toggle Tabs -->
-    <div class="view-tabs">
-      <button id="tabContractsBtn" class="view-tab active">Active Contracts</button>
-      <button id="tabTradesBtn" class="view-tab">Trade Executions</button>
-      <button id="tabDailyBtn" class="view-tab">Daily P&L Breakdown</button>
-      <button id="tabMonthlyBtn" class="view-tab">Monthly P&L Breakdown</button>
+    <!-- View Selection Dropdown -->
+    <div class="view-dropdown-container" style="margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">
+      <label for="viewSelect" style="font-size: 11px; font-weight: 800; color: var(--text-muted); white-space: nowrap;">SELECT VIEW:</label>
+      <select id="viewSelect" style="max-width: 320px; font-weight: 700; background: var(--panel-bg); color: var(--text-main);">
+        <option value="contracts">Active Contracts</option>
+        <option value="trades">Trade Executions</option>
+        <option value="daily">Daily P&L Breakdown</option>
+        <option value="monthly">Monthly P&L Breakdown</option>
+        <option value="depositsWithdrawals">Deposit & Withdraw (Transfers)</option>
+        <option value="openOrders">Open Orders (TP / SL / Limit)</option>
+        <option value="walletDetails">Wallet Funds Details</option>
+      </select>
     </div>
 
     <!-- Active Contracts Panel -->
@@ -357,6 +363,108 @@
             </tr>
           </tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- Deposits & Withdrawals Panel -->
+    <section id="panelDepositsWithdrawals" class="panel table-panel hidden">
+      <div class="table-header">
+        <div class="table-header-info">
+          <h2>Deposit & Withdrawal Ledger (In / Out)</h2>
+          <p id="depositsMeta" class="meta-info">Wallet transfers and funding deposits/withdrawals.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="coinglass-table">
+          <thead>
+            <tr>
+              <th style="text-align: left;">DATE / TIME</th>
+              <th>TYPE</th>
+              <th>TOKEN / ASSET</th>
+              <th>AMOUNT / VALUE</th>
+              <th>HASH / REF</th>
+            </tr>
+          </thead>
+          <tbody id="depositsBody">
+            <tr class="empty-row">
+              <td colspan="5">Enter a valid wallet address to view deposit & withdrawal history.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Open Orders Panel -->
+    <section id="panelOpenOrders" class="panel table-panel hidden">
+      <div class="table-header">
+        <div class="table-header-info">
+          <h2>Open Orders (Limit, TP & SL)</h2>
+          <p id="openOrdersMeta" class="meta-info">Resting open orders and triggers.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="coinglass-table">
+          <thead>
+            <tr>
+              <th style="text-align: left;">COIN</th>
+              <th>ORDER ID</th>
+              <th>TYPE / SIDE</th>
+              <th>LIMIT PRICE</th>
+              <th>TRIGGER PRICE</th>
+              <th>SIZE</th>
+              <th>REDUCE ONLY</th>
+            </tr>
+          </thead>
+          <tbody id="openOrdersBody">
+            <tr class="empty-row">
+              <td colspan="7">Enter a valid wallet address to view open orders.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Wallet Funds Details Panel -->
+    <section id="panelWalletDetails" class="panel table-panel hidden">
+      <div class="table-header">
+        <div class="table-header-info">
+          <h2>Wallet & Account Collateral Details</h2>
+          <p class="meta-info">Comprehensive breakdown of account equity, perpetual margins, and spot balances.</p>
+        </div>
+      </div>
+      <div class="table-wrap" style="padding: 20px;">
+        <div class="wallet-details-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+          <div class="metric-card" style="padding: 16px;">
+            <span class="label">ACCOUNT TOTAL VALUE</span>
+            <strong id="detAccountValue" class="value" style="font-size: 18px;">$0.00</strong>
+            <span class="subtext">Combined perp & spot equity</span>
+          </div>
+          <div class="metric-card" style="padding: 16px;">
+            <span class="label">PERPETUAL ACCOUNT VALUE</span>
+            <strong id="detPerpValue" class="value" style="font-size: 18px;">$0.00</strong>
+            <span class="subtext">Margin summary equity</span>
+          </div>
+          <div class="metric-card" style="padding: 16px;">
+            <span class="label">PERPS POSITION NOTIONAL VALUE</span>
+            <strong id="detPerpsPosValue" class="value" style="font-size: 18px;">$0.00</strong>
+            <span class="subtext">Total active open notional</span>
+          </div>
+          <div class="metric-card" style="padding: 16px;">
+            <span class="label">WITHDRAWABLE BALANCE</span>
+            <strong id="detWithdrawable" class="value" style="font-size: 18px;">$0.00</strong>
+            <span class="subtext">Free collateral available to withdraw</span>
+          </div>
+          <div class="metric-card" style="padding: 16px;">
+            <span class="label">SPOT TOKEN BALANCES</span>
+            <strong id="detSpotValue" class="value" style="font-size: 18px;">$0.00</strong>
+            <span class="subtext">Total valuation of spot holdings</span>
+          </div>
+          <div class="metric-card" style="padding: 16px;">
+            <span class="label">TOTAL WALLET LEVERAGE</span>
+            <strong id="detLeverage" class="value" style="font-size: 18px;">0.00x</strong>
+            <span class="subtext">Current aggregate position leverage</span>
+          </div>
+        </div>
       </div>
     </section>
 

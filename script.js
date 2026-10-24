@@ -13,14 +13,18 @@ const walletEl = $("wallet"),
       contractsBodyEl = $("contractsBody"),
       dailyBodyEl = $("dailyBody"),
       monthlyBodyEl = $("monthlyBody"),
+      depositsBodyEl = $("depositsBody"),
+      openOrdersBodyEl = $("openOrdersBody"),
       tableMeta = $("tableMeta"),
       contractsMeta = $("contractsMeta"),
       dailyMeta = $("dailyMeta"),
       monthlyMeta = $("monthlyMeta"),
+      depositsMeta = $("depositsMeta"),
+      openOrdersMeta = $("openOrdersMeta"),
       csvBtn = $("csvBtn"),
       jsonBtn = $("jsonBtn"),
       pdfBtn = $("pdfBtn"),
-      allBtn = $("allBtn"),
+      allInceptionBtn = $("allInceptionBtn"),
       monthBtn = $("monthBtn"),
       ytdBtn = $("ytdBtn"),
       todayBtn = $("todayBtn"),
@@ -29,14 +33,14 @@ const walletEl = $("wallet"),
       themeToggleBtn = $("themeToggleBtn"),
       themeIcon = $("themeIcon"),
       themeLabel = $("themeLabel"),
-      tabTradesBtn = $("tabTradesBtn"),
-      tabContractsBtn = $("tabContractsBtn"),
-      tabDailyBtn = $("tabDailyBtn"),
-      tabMonthlyBtn = $("tabMonthlyBtn"),
+      viewSelect = $("viewSelect"),
       panelTrades = $("panelTrades"),
       panelContracts = $("panelContracts"),
       panelDaily = $("panelDaily"),
       panelMonthly = $("panelMonthly"),
+      panelDepositsWithdrawals = $("panelDepositsWithdrawals"),
+      panelOpenOrders = $("panelOpenOrders"),
+      panelWalletDetails = $("panelWalletDetails"),
       prevPageBtn = $("prevPageBtn"),
       nextPageBtn = $("nextPageBtn"),
       pageIndicator = $("pageIndicator"),
@@ -79,6 +83,8 @@ window.addEventListener("click", e => {
 
 let fills = [];
 let fundingHistory = [];
+let ledgerUpdates = [];
+let openOrdersList = [];
 let holdingsData = null;
 let xyzHoldingsData = null;
 let activePositions = [];
@@ -93,6 +99,8 @@ const SAVED_WALLET_KEY = "hyperliquid_saved_wallet";
 const SAVED_THEME_KEY = "hyperliquid_theme";
 const CACHE_FILLS_KEY = "hyperliquid_persisted_fills";
 const CACHE_FUNDING_KEY = "hyperliquid_persisted_funding";
+const CACHE_LEDGER_KEY = "hyperliquid_persisted_ledger";
+const CACHE_ORDERS_KEY = "hyperliquid_persisted_orders";
 const CACHE_HOLDINGS_KEY = "hyperliquid_persisted_holdings";
 const CACHE_POSITIONS_KEY = "hyperliquid_persisted_positions";
 const CACHE_TIME_KEY = "hyperliquid_cache_timestamp";
@@ -105,18 +113,35 @@ walletEl.addEventListener("input", () => {
   localStorage.setItem(SAVED_WALLET_KEY, walletEl.value.trim());
 });
 
-function switchTab(activeBtn, activePanel) {
-  [tabTradesBtn, tabContractsBtn, tabDailyBtn, tabMonthlyBtn].forEach(b => b.classList.remove("active"));
-  [panelTrades, panelContracts, panelDaily, panelMonthly].forEach(p => p.classList.add("hidden"));
+// Switch active view panel based on Dropdown selection
+function switchView(viewKey) {
+  const panels = {
+    contracts: panelContracts,
+    trades: panelTrades,
+    daily: panelDaily,
+    monthly: panelMonthly,
+    depositsWithdrawals: panelDepositsWithdrawals,
+    openOrders: panelOpenOrders,
+    walletDetails: panelWalletDetails
+  };
 
-  activeBtn.classList.add("active");
-  activePanel.classList.remove("hidden");
+  Object.values(panels).forEach(p => p.classList.add("hidden"));
+  if (panels[viewKey]) {
+    panels[viewKey].classList.remove("hidden");
+  }
+
+  if (viewKey === "contracts") renderContracts();
+  if (viewKey === "trades") renderTrades();
+  if (viewKey === "daily") renderDailyPnl();
+  if (viewKey === "monthly") renderMonthlyPnl();
+  if (viewKey === "depositsWithdrawals") renderDepositsWithdrawals();
+  if (viewKey === "openOrders") renderOpenOrders();
+  if (viewKey === "walletDetails") renderWalletDetails();
 }
 
-tabContractsBtn.addEventListener("click", () => { switchTab(tabContractsBtn, panelContracts); renderContracts(); });
-tabTradesBtn.addEventListener("click", () => { switchTab(tabTradesBtn, panelTrades); renderTrades(); });
-tabDailyBtn.addEventListener("click", () => { switchTab(tabDailyBtn, panelDaily); renderDailyPnl(); });
-tabMonthlyBtn.addEventListener("click", () => { switchTab(tabMonthlyBtn, panelMonthly); renderMonthlyPnl(); });
+viewSelect.addEventListener("change", (e) => {
+  switchView(e.target.value);
+});
 
 function mapSide(side) {
   if (!side) return "";
@@ -160,12 +185,62 @@ function formatDateInput(d) {
   return `${year}-${month}-${day}`;
 }
 
+async function setInceptionPreset() {
+  const wallet = walletEl.value.trim();
+  [allInceptionBtn, monthBtn, ytdBtn, todayBtn].forEach(b => b && b.classList.remove("active"));
+  allInceptionBtn.classList.add("active");
+
+  const today = new Date();
+  endEl.value = formatDateInput(today);
+
+  if (!isAddress(wallet)) {
+    // Default fallback to 1 year ago if no valid wallet entered yet
+    const defaultStart = new Date();
+    defaultStart.setFullYear(defaultStart.getFullYear() - 1);
+    startEl.value = formatDateInput(defaultStart);
+    return;
+  }
+
+  try {
+    setStatus("Detecting wallet inception date...");
+    const res = await postInfo({
+      type: "userFillsByTime",
+      user: wallet.toLowerCase(),
+      startTime: 0,
+      endTime: Date.now(),
+      aggregateByTime: false
+    });
+
+    if (Array.isArray(res) && res.length > 0) {
+      // Fills are returned newest first or oldest; let's find the absolute minimum timestamp
+      let minTime = Date.now();
+      res.forEach(f => {
+        const t = Number(f.time);
+        if (t > 0 && t < minTime) minTime = t;
+      });
+      startEl.value = formatDateInput(new Date(minTime));
+      setStatus(`Detected wallet trading inception date: ${new Date(minTime).toLocaleDateString()}`, "success");
+    } else {
+      const defaultStart = new Date();
+      defaultStart.setMonth(defaultStart.getMonth() - 3);
+      startEl.value = formatDateInput(defaultStart);
+      clearStatus();
+    }
+  } catch (e) {
+    console.warn("Could not fetch inception date:", e);
+    const defaultStart = new Date();
+    defaultStart.setFullYear(defaultStart.getFullYear() - 1);
+    startEl.value = formatDateInput(defaultStart);
+    clearStatus();
+  }
+}
+
 function setPreset(k) {
   const n = new Date();
   const e = new Date(n);
   let s = new Date(n);
 
-  [allBtn, monthBtn, ytdBtn, todayBtn].forEach(b => b && b.classList.remove("active"));
+  [allInceptionBtn, monthBtn, ytdBtn, todayBtn].forEach(b => b && b.classList.remove("active"));
 
   if (k === "today") {
     s = new Date(n.getFullYear(), n.getMonth(), n.getDate());
@@ -177,15 +252,15 @@ function setPreset(k) {
     s = new Date(n.getFullYear(), 0, 1);
     if (ytdBtn) ytdBtn.classList.add("active");
   } else {
-    s.setDate(s.getDate() - 30);
-    if (allBtn) allBtn.classList.add("active");
+    setInceptionPreset();
+    return;
   }
 
   startEl.value = formatDateInput(s);
   endEl.value = formatDateInput(e);
 }
 
-setPreset("30");
+setInceptionPreset();
 
 function setStatus(m, t = "") {
   statusEl.textContent = m;
@@ -243,6 +318,7 @@ function startFiveSecondPoller(cleanUser) {
       localStorage.setItem(CACHE_POSITIONS_KEY, JSON.stringify(activePositions));
       renderContracts();
       updateMetrics();
+      renderWalletDetails();
     }
   }, 5000);
 }
@@ -306,6 +382,34 @@ async function fetchAccountData(user, startMs, endMs) {
     return [];
   })();
 
+  const ledgerPromise = (async () => {
+    try {
+      const ledgerData = await postInfo({
+        type: "userNonFundingLedgerUpdates",
+        user: cleanUser,
+        startTime: startMs,
+        endTime: endMs
+      });
+      if (Array.isArray(ledgerData)) return ledgerData;
+    } catch (e) {
+      console.warn("Ledger updates fetch warning:", e);
+    }
+    return [];
+  })();
+
+  const ordersPromise = (async () => {
+    try {
+      const ordersData = await postInfo({
+        type: "openOrders",
+        user: cleanUser
+      });
+      if (Array.isArray(ordersData)) return ordersData;
+    } catch (e) {
+      console.warn("Open orders fetch warning:", e);
+    }
+    return [];
+  })();
+
   const holdingsPromise = (async () => {
     try {
       const [defaultData, xyzData] = await Promise.all([
@@ -319,8 +423,8 @@ async function fetchAccountData(user, startMs, endMs) {
     }
   })();
 
-  const [fillsRes, fundingRes, holdingsRes] = await Promise.all([
-    fillsPromise, fundingPromise, holdingsPromise
+  const [fillsRes, fundingRes, ledgerRes, ordersRes, holdingsRes] = await Promise.all([
+    fillsPromise, fundingPromise, ledgerPromise, ordersPromise, holdingsPromise
   ]);
 
   holdingsData = holdingsRes?.defaultData || null;
@@ -334,6 +438,8 @@ async function fetchAccountData(user, startMs, endMs) {
   return {
     fills: fillsRes.result,
     funding: fundingRes,
+    ledger: ledgerRes,
+    orders: ordersRes,
     holdings: holdingsRes?.defaultData || null,
     positions: rawAssetPositions.filter(item => num(item.position?.szi) !== 0),
     reachedGlobalLimit: fillsRes.reachedGlobalLimit
@@ -387,6 +493,7 @@ function initWebSocket(coins) {
           renderContracts();
         }
         updateMetrics();
+        renderWalletDetails();
       }
     } catch (e) {
       console.error("WS message parse error:", e);
@@ -400,7 +507,6 @@ function initWebSocket(coins) {
   };
 }
 
-// 1-Second Smooth Number Animation Loop
 function animateNumber(elementId, targetVal, isCurrency = true, decimals = 2, isSigned = false) {
   const el = $(elementId);
   if (!el) return;
@@ -580,7 +686,7 @@ function updateMetrics() {
   $("modalSpotValue").textContent = plainMoney(spotVal, 2);
   $("modalTotalHoldings").textContent = plainMoney(totalAccountVal, 2);
 
-  // Set Metrics Grid Cards (mPnl is CLOSED P&L)
+  // Set Metrics Grid Cards
   setMetric("mFills", targetFills.length, null, false, 0, false);
   setMetric("mPnl", closedPnl, closedPnl, true, 2, true);
   setMetric("mFees", totalFees, null, true, 2, false);
@@ -820,6 +926,112 @@ function renderMonthlyPnl() {
   monthlyMeta.textContent = `Showing aggregated monthly performance across ${sortedKeys.length} month(s).`;
 }
 
+function renderDepositsWithdrawals() {
+  if (!ledgerUpdates || !ledgerUpdates.length) {
+    depositsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="5">No deposit or withdrawal ledger updates found for this timeframe.</td></tr>';
+    depositsMeta.textContent = "0 transfer records found.";
+    return;
+  }
+
+  depositsBodyEl.innerHTML = ledgerUpdates.map(item => {
+    const t = item.time || item.delta?.time;
+    const delta = item.delta || item;
+    const type = delta.type || "Transfer";
+    const usdcVal = num(delta.usdcValue || delta.amount || 0);
+    const token = delta.token || "USDC";
+    const hash = item.hash || "—";
+    const hasHash = hash && hash !== "null" && hash !== "0x0000000000000000000000000000000000000000000000000000000000000000";
+
+    const hashCell = hasHash 
+      ? `<a href="${EXPLORER_URL}${esc(hash)}" target="_blank" rel="noopener noreferrer" class="hash">${esc(hash)}</a>` 
+      : '—';
+
+    return `<tr>
+      <td style="text-align: left;">${esc(formatDate(t))}</td>
+      <td style="font-weight: 700;">${esc(type)}</td>
+      <td>${esc(token)}</td>
+      <td class="${usdcVal > 0 ? "text-positive" : usdcVal < 0 ? "text-negative" : ""}">${money(usdcVal, 2)}</td>
+      <td>${hashCell}</td>
+    </tr>`;
+  }).join("");
+
+  depositsMeta.textContent = `Displaying ${ledgerUpdates.length} deposit/withdrawal record(s).`;
+}
+
+function renderOpenOrders() {
+  if (!openOrdersList || !openOrdersList.length) {
+    openOrdersBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">No open orders (limit, TP/SL) currently resting.</td></tr>';
+    openOrdersMeta.textContent = "0 active open orders.";
+    return;
+  }
+
+  openOrdersBodyEl.innerHTML = openOrdersList.map(o => {
+    const coin = o.coin || "PERP";
+    const oid = o.oid || "—";
+    const side = mapSide(o.side);
+    const limitPx = plainMoney(o.limitPx, 4);
+    const triggerPx = o.triggerPx ? plainMoney(o.triggerPx, 4) : '—';
+    const sz = num(o.sz).toLocaleString();
+    const reduceOnly = o.reduceOnly ? "Yes" : "No";
+    const orderType = o.triggerCondition ? "Trigger (TP/SL)" : "Limit Order";
+
+    return `<tr>
+      <td style="text-align: left; font-weight: 800;" class="coin-name">${esc(coin)}</td>
+      <td>${esc(oid)}</td>
+      <td class="${o.side === 'B' ? "text-positive" : "text-negative"}">${esc(orderType)} (${esc(side)})</td>
+      <td>${limitPx}</td>
+      <td>${triggerPx}</td>
+      <td>${sz}</td>
+      <td>${reduceOnly}</td>
+    </tr>`;
+  }).join("");
+
+  openOrdersMeta.textContent = `Displaying ${openOrdersList.length} active open order(s).`;
+}
+
+function renderWalletDetails() {
+  let perpVal = 0, spotVal = 0, withdrawable = 0, totalNotional = 0;
+
+  if (holdingsData) {
+    const margin = holdingsData.marginSummary || {};
+    perpVal = num(margin.accountValue);
+    withdrawable = num(holdingsData.withdrawable);
+
+    if (Array.isArray(holdingsData.balances)) {
+      holdingsData.balances.forEach(b => {
+        spotVal += num(b.total) * (num(livePrices[b.coin]) || 1);
+      });
+    }
+  }
+
+  if (xyzHoldingsData) {
+    const xyzMargin = xyzHoldingsData.marginSummary || {};
+    perpVal += num(xyzMargin.accountValue);
+  }
+
+  if (activePositions && activePositions.length > 0) {
+    activePositions.forEach(item => {
+      const pos = item.position || item;
+      if (!pos) return;
+      const sizeNum = num(pos.szi);
+      if (sizeNum === 0) return;
+      const coin = pos.coin || "PERP";
+      const currentMarkPx = num(livePrices[coin]) || Math.abs(num(pos.positionValue) / sizeNum);
+      totalNotional += Math.abs(sizeNum * currentMarkPx);
+    });
+  }
+
+  const totalAccountValue = perpVal + spotVal;
+  const totalLeverage = perpVal > 0 ? (totalNotional / perpVal) : 0;
+
+  $("detAccountValue").textContent = plainMoney(totalAccountValue, 2);
+  $("detPerpValue").textContent = plainMoney(perpVal, 2);
+  $("detPerpsPosValue").textContent = plainMoney(totalNotional, 2);
+  $("detWithdrawable").textContent = plainMoney(withdrawable, 2);
+  $("detSpotValue").textContent = plainMoney(spotVal, 2);
+  $("detLeverage").textContent = totalLeverage.toFixed(2) + "x";
+}
+
 function renderTrades() {
   const displayFills = getFilteredFills();
 
@@ -885,6 +1097,8 @@ window.addEventListener("DOMContentLoaded", () => {
   if (isExpired) {
     localStorage.removeItem(CACHE_FILLS_KEY);
     localStorage.removeItem(CACHE_FUNDING_KEY);
+    localStorage.removeItem(CACHE_LEDGER_KEY);
+    localStorage.removeItem(CACHE_ORDERS_KEY);
     localStorage.removeItem(CACHE_HOLDINGS_KEY);
     localStorage.removeItem(CACHE_POSITIONS_KEY);
     localStorage.removeItem(CACHE_TIME_KEY);
@@ -894,6 +1108,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const savedFills = localStorage.getItem(CACHE_FILLS_KEY);
   const savedFunding = localStorage.getItem(CACHE_FUNDING_KEY);
+  const savedLedger = localStorage.getItem(CACHE_LEDGER_KEY);
+  const savedOrders = localStorage.getItem(CACHE_ORDERS_KEY);
   const savedHoldings = localStorage.getItem(CACHE_HOLDINGS_KEY);
   const savedPositions = localStorage.getItem(CACHE_POSITIONS_KEY);
 
@@ -901,12 +1117,17 @@ window.addEventListener("DOMContentLoaded", () => {
     try {
       fills = JSON.parse(savedFills);
       fundingHistory = savedFunding ? JSON.parse(savedFunding) : [];
+      ledgerUpdates = savedLedger ? JSON.parse(savedLedger) : [];
+      openOrdersList = savedOrders ? JSON.parse(savedOrders) : [];
       holdingsData = savedHoldings ? JSON.parse(savedHoldings) : null;
       activePositions = savedPositions ? JSON.parse(savedPositions) : [];
       if (fills.length > 0 || activePositions.length > 0) {
         updateCoinFilterOptions();
         renderTrades();
         renderContracts();
+        renderDepositsWithdrawals();
+        renderOpenOrders();
+        renderWalletDetails();
         if (activePositions.length > 0) {
           const uniqueCoins = [...new Set(activePositions.map(p => (p.position || p).coin))];
           initWebSocket(uniqueCoins);
@@ -954,6 +1175,8 @@ fetchBtn.addEventListener("click", async () => {
   fetchBtn.disabled = true;
   fills = [];
   fundingHistory = [];
+  ledgerUpdates = [];
+  openOrdersList = [];
   holdingsData = null;
   xyzHoldingsData = null;
   activePositions = [];
@@ -961,16 +1184,20 @@ fetchBtn.addEventListener("click", async () => {
   resetMetrics();
 
   try {
-    setStatus("Fetching trade statement and active perpetual contracts from Hyperliquid…");
+    setStatus("Fetching trade statement, deposits, open orders, and account state from Hyperliquid…");
 
     const accountData = await fetchAccountData(wallet, s, e);
     fills = accountData.fills;
     fundingHistory = accountData.funding;
+    ledgerUpdates = accountData.ledger;
+    openOrdersList = accountData.orders;
     holdingsData = accountData.holdings;
     activePositions = accountData.positions;
 
     localStorage.setItem(CACHE_FILLS_KEY, JSON.stringify(fills));
     localStorage.setItem(CACHE_FUNDING_KEY, JSON.stringify(fundingHistory));
+    localStorage.setItem(CACHE_LEDGER_KEY, JSON.stringify(ledgerUpdates));
+    localStorage.setItem(CACHE_ORDERS_KEY, JSON.stringify(openOrdersList));
     localStorage.setItem(CACHE_HOLDINGS_KEY, JSON.stringify(holdingsData));
     localStorage.setItem(CACHE_POSITIONS_KEY, JSON.stringify(activePositions));
     localStorage.setItem(CACHE_TIME_KEY, Date.now());
@@ -978,6 +1205,9 @@ fetchBtn.addEventListener("click", async () => {
     updateCoinFilterOptions();
     renderTrades();
     renderContracts();
+    renderDepositsWithdrawals();
+    renderOpenOrders();
+    renderWalletDetails();
 
     if (activePositions.length > 0) {
       const uniqueCoins = [...new Set(activePositions.map(p => (p.position || p).coin))];
@@ -990,7 +1220,7 @@ fetchBtn.addEventListener("click", async () => {
       noticeEl.classList.remove("hidden");
     }
 
-    setStatus(`Successfully fetched trades and ${activePositions.length} active perpetual contract(s).`, "success");
+    setStatus(`Successfully fetched data and ${activePositions.length} active perpetual contract(s).`, "success");
   } catch (err) {
     console.error(err);
     setStatus("Error fetching data: " + (err?.message || "Check network connection or wallet address."), "error");
@@ -1046,7 +1276,7 @@ jsonBtn.addEventListener("click", () => {
   const targetFills = getFilteredFills();
   if (targetFills.length) {
     const mappedFills = targetFills.map(f => ({ ...f, sideFormatted: mapSide(f.side) }));
-    downloadBlob(JSON.stringify({ fills: mappedFills, fundingHistory, holdings: holdingsData, positions: activePositions }, null, 2), `hyperliquid-statement-${walletEl.value.trim().slice(0, 10)}.json`, "application/json");
+    downloadBlob(JSON.stringify({ fills: mappedFills, fundingHistory, ledgerUpdates, openOrders: openOrdersList, holdings: holdingsData, positions: activePositions }, null, 2), `hyperliquid-statement-${walletEl.value.trim().slice(0, 10)}.json`, "application/json");
   }
 });
 
@@ -1186,7 +1416,7 @@ pdfBtn.addEventListener("click", generatePDF);
 todayBtn.addEventListener("click", () => setPreset("today"));
 monthBtn.addEventListener("click", () => setPreset("month"));
 ytdBtn.addEventListener("click", () => setPreset("ytd"));
-allBtn.addEventListener("click", () => setPreset("30"));
+allInceptionBtn.addEventListener("click", () => setInceptionPreset());
 
 $("clearBtn").addEventListener("click", () => {
   walletEl.value = "";
@@ -1195,17 +1425,20 @@ $("clearBtn").addEventListener("click", () => {
   localStorage.removeItem(SAVED_WALLET_KEY);
   localStorage.removeItem(CACHE_FILLS_KEY);
   localStorage.removeItem(CACHE_FUNDING_KEY);
+  localStorage.removeItem(CACHE_LEDGER_KEY);
+  localStorage.removeItem(CACHE_ORDERS_KEY);
   localStorage.removeItem(CACHE_HOLDINGS_KEY);
   localStorage.removeItem(CACHE_POSITIONS_KEY);
   localStorage.removeItem(CACHE_TIME_KEY);
   sessionStorage.clear();
-  setPreset("30");
+  setInceptionPreset();
   fills = [];
   fundingHistory = [];
+  ledgerUpdates = [];
+  openOrdersList = [];
   holdingsData = null;
   xyzHoldingsData = null;
   activePositions = [];
-  previousMetricsMap = {};
   previousNumericValues = {};
   pnlFilterSelect.value = "all";
   coinFilterSelect.innerHTML = '<option value="all">All Coins</option>';
@@ -1215,11 +1448,20 @@ $("clearBtn").addEventListener("click", () => {
   contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">Enter a valid wallet address to view active contracts.</td></tr>';
   dailyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">Enter a valid wallet address to view daily breakdown.</td></tr>';
   monthlyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">Enter a valid wallet address to view monthly breakdown.</td></tr>';
+  depositsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="5">Enter a valid wallet address to view deposit & withdrawal history.</td></tr>';
+  openOrdersBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">Enter a valid wallet address to view open orders.</td></tr>';
   tableMeta.textContent = "No data loaded.";
   contractsMeta.textContent = "No data loaded.";
   dailyMeta.textContent = "No data loaded.";
   monthlyMeta.textContent = "No data loaded.";
+  depositsMeta.textContent = "No data loaded.";
+  openOrdersMeta.textContent = "No data loaded.";
   resetMetrics();
 });
 
 walletEl.addEventListener("keydown", e => { if (e.key === "Enter") fetchBtn.click(); });
+walletEl.addEventListener("blur", () => {
+  if (isAddress(walletEl.value.trim())) {
+    setInceptionPreset();
+  }
+});
