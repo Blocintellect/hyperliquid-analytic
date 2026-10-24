@@ -1,23 +1,157 @@
-const API = "https://api.hyperliquid.xyz/info";
 const $ = id => document.getElementById(id);
 
-const walletEl = $("wallet"),
-      loadChartsBtn = $("loadChartsBtn"),
-      statusEl = $("status");
-
 let pnlChartInstance = null;
+let rawGlobalFills = [];
+let rawGlobalFunding = [];
+let currentZoomRange = "all";
 
-const SAVED_WALLET_KEY = "hyperliquid_saved_wallet";
+let analyticsCache = {
+  peakPnl: 0,
+  maxDrawdown: 0,
+  totalWins: 0,
+  totalLosses: 0,
+  grossProfit: 0,
+  grossLoss: 0,
+  winLossRatioStr: "0.00",
+  profitFactorVal: "0.00",
+  avgTradeExpectancy: 0,
+  maxWinStreak: 0,
+  maxLossStreak: 0,
+  bestTrade: { coin: "—", pnl: 0 },
+  worstTrade: { coin: "—", pnl: 0 },
+  longPnl: 0,
+  longWinRate: 0,
+  shortPnl: 0,
+  shortWinRate: 0,
+  sessionPnl: { asian: 0, london: 0, ny: 0 },
+  durationPnl: { scalp: 0, intraday: 0, swing: 0 },
+  daysCount: 0
+};
+
 const CACHE_FILLS_KEY = "hyperliquid_persisted_fills";
 const CACHE_FUNDING_KEY = "hyperliquid_persisted_funding";
 const CACHE_TIME_KEY = "hyperliquid_cache_timestamp";
 
-if (localStorage.getItem(SAVED_WALLET_KEY)) {
-  walletEl.value = localStorage.getItem(SAVED_WALLET_KEY);
-}
+const statusEl = $("status");
 
-walletEl.addEventListener("input", () => {
-  localStorage.setItem(SAVED_WALLET_KEY, walletEl.value.trim());
+// Modal Elements & Event Listeners
+const peakCard = $("peakCard"), peakModal = $("peakModal"), closePeakModal = $("closePeakModal");
+const ddCard = $("ddCard"), ddModal = $("ddModal"), closeDdModal = $("closeDdModal");
+const winLossCard = $("winLossCard"), winLossModal = $("winLossModal"), closeWinLossModal = $("closeWinLossModal");
+const profitFactorCard = $("profitFactorCard"), profitFactorModal = $("profitFactorModal"), closeProfitFactorModal = $("closeProfitFactorModal");
+const avgTradeCard = $("avgTradeCard"), avgTradeModal = $("avgTradeModal"), closeAvgTradeModal = $("closeAvgTradeModal");
+const streakCard = $("streakCard"), streakModal = $("streakModal"), closeStreakModal = $("closeStreakModal");
+const outlierCard = $("outlierCard"), outlierModal = $("outlierModal"), closeOutlierModal = $("closeOutlierModal");
+const longShortCard = $("longShortCard"), longShortModal = $("longShortModal"), closeLongShortModal = $("closeLongShortModal");
+const sessionCard = $("sessionCard"), sessionModal = $("sessionModal"), closeSessionModal = $("closeSessionModal");
+const durationCard = $("durationCard"), durationModal = $("durationModal"), closeDurationModal = $("closeDurationModal");
+const daysCard = $("daysCard"), daysModal = $("daysModal"), closeDaysModal = $("closeDaysModal");
+const assetModal = $("assetModal"), closeAssetModal = $("closeAssetModal");
+
+peakCard.addEventListener("click", () => {
+  $("modalPeakVal").textContent = money(analyticsCache.peakPnl, 2);
+  peakModal.classList.remove("hidden");
+});
+closePeakModal.addEventListener("click", () => peakModal.classList.add("hidden"));
+
+ddCard.addEventListener("click", () => {
+  $("modalDdVal").textContent = "−" + plainMoney(analyticsCache.maxDrawdown, 2);
+  ddModal.classList.remove("hidden");
+});
+closeDdModal.addEventListener("click", () => ddModal.classList.add("hidden"));
+
+winLossCard.addEventListener("click", () => {
+  $("modalWinsVal").textContent = analyticsCache.totalWins.toLocaleString();
+  $("modalLossesVal").textContent = analyticsCache.totalLosses.toLocaleString();
+  $("modalRatioVal").textContent = analyticsCache.winLossRatioStr;
+  winLossModal.classList.remove("hidden");
+});
+closeWinLossModal.addEventListener("click", () => winLossModal.classList.add("hidden"));
+
+profitFactorCard.addEventListener("click", () => {
+  $("modalGrossProfit").textContent = money(analyticsCache.grossProfit, 2);
+  $("modalGrossLoss").textContent = plainMoney(analyticsCache.grossLoss, 2);
+  $("modalPfVal").textContent = analyticsCache.profitFactorVal;
+  profitFactorModal.classList.remove("hidden");
+});
+closeProfitFactorModal.addEventListener("click", () => profitFactorModal.classList.add("hidden"));
+
+avgTradeCard.addEventListener("click", () => {
+  $("modalAvgVal").textContent = money(analyticsCache.avgTradeExpectancy, 2);
+  avgTradeModal.classList.remove("hidden");
+});
+closeAvgTradeModal.addEventListener("click", () => avgTradeModal.classList.add("hidden"));
+
+streakCard.addEventListener("click", () => {
+  $("modalMaxWinStreak").textContent = analyticsCache.maxWinStreak.toLocaleString() + " Wins";
+  $("modalMaxLossStreak").textContent = analyticsCache.maxLossStreak.toLocaleString() + " Losses";
+  streakModal.classList.remove("hidden");
+});
+closeStreakModal.addEventListener("click", () => streakModal.classList.add("hidden"));
+
+outlierCard.addEventListener("click", () => {
+  $("modalBestTrade").textContent = `${analyticsCache.bestTrade.coin}: ${money(analyticsCache.bestTrade.pnl, 2)}`;
+  $("modalWorstTrade").textContent = `${analyticsCache.worstTrade.coin}: ${money(analyticsCache.worstTrade.pnl, 2)}`;
+  outlierModal.classList.remove("hidden");
+});
+closeOutlierModal.addEventListener("click", () => outlierModal.classList.add("hidden"));
+
+longShortCard.addEventListener("click", () => {
+  $("modalLongPnl").textContent = money(analyticsCache.longPnl, 2);
+  $("modalLongWinRate").textContent = analyticsCache.longWinRate.toFixed(1) + "%";
+  $("modalShortPnl").textContent = money(analyticsCache.shortPnl, 2);
+  $("modalShortWinRate").textContent = analyticsCache.shortWinRate.toFixed(1) + "%";
+  longShortModal.classList.remove("hidden");
+});
+closeLongShortModal.addEventListener("click", () => longShortModal.classList.add("hidden"));
+
+sessionCard.addEventListener("click", () => {
+  $("modalAsianPnl").textContent = money(analyticsCache.sessionPnl.asian, 2);
+  $("modalLondonPnl").textContent = money(analyticsCache.sessionPnl.london, 2);
+  $("modalNyPnl").textContent = money(analyticsCache.sessionPnl.ny, 2);
+  sessionModal.classList.remove("hidden");
+});
+closeSessionModal.addEventListener("click", () => sessionModal.classList.add("hidden"));
+
+durationCard.addEventListener("click", () => {
+  $("modalScalpPnl").textContent = money(analyticsCache.durationPnl.scalp, 2);
+  $("modalIntradayPnl").textContent = money(analyticsCache.durationPnl.intraday, 2);
+  $("modalSwingPnl").textContent = money(analyticsCache.durationPnl.swing, 2);
+  durationModal.classList.remove("hidden");
+});
+closeDurationModal.addEventListener("click", () => durationModal.classList.add("hidden"));
+
+daysCard.addEventListener("click", () => {
+  $("modalDaysVal").textContent = analyticsCache.daysCount.toLocaleString();
+  daysModal.classList.remove("hidden");
+});
+closeDaysModal.addEventListener("click", () => daysModal.classList.add("hidden"));
+
+closeAssetModal.addEventListener("click", () => assetModal.classList.add("hidden"));
+
+window.addEventListener("click", e => {
+  if (e.target === peakModal) peakModal.classList.add("hidden");
+  if (e.target === ddModal) ddModal.classList.add("hidden");
+  if (e.target === winLossModal) winLossModal.classList.add("hidden");
+  if (e.target === profitFactorModal) profitFactorModal.classList.add("hidden");
+  if (e.target === avgTradeModal) avgTradeModal.classList.add("hidden");
+  if (e.target === streakModal) streakModal.classList.add("hidden");
+  if (e.target === outlierModal) outlierModal.classList.add("hidden");
+  if (e.target === longShortModal) longShortModal.classList.add("hidden");
+  if (e.target === sessionModal) sessionModal.classList.add("hidden");
+  if (e.target === durationModal) durationModal.classList.add("hidden");
+  if (e.target === daysModal) daysModal.classList.add("hidden");
+  if (e.target === assetModal) assetModal.classList.add("hidden");
+});
+
+// Zoom Date Range Button Listeners
+document.querySelectorAll("#zoomPresetBtns button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#zoomPresetBtns button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentZoomRange = btn.getAttribute("data-range");
+    applyDataZoomAndRender();
+  });
 });
 
 function setStatus(m, t = "") {
@@ -38,76 +172,16 @@ function esc(v) {
   return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-async function postInfo(body) {
-  const r = await fetch(API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
-  if (!r.ok) throw new Error(`Hyperliquid API status: ${r.status}`);
-  return r.json();
-}
-
-async function fetchAllData(user) {
-  const cleanUser = user.toLowerCase().trim();
-  const out = [], seen = new Set();
-  let cursor = Date.now() - (365 * 86400000);
-  const endMs = Date.now();
-  let pages = 0;
-
-  while (cursor <= endMs && pages < 20) {
-    const data = await postInfo({
-      type: "userFillsByTime",
-      user: cleanUser,
-      startTime: cursor,
-      endTime: endMs,
-      aggregateByTime: false
-    });
-
-    if (!Array.isArray(data) || data.length === 0) break;
-
-    for (const f of data) {
-      const key = [f.tid ?? "", f.hash ?? "", f.oid ?? "", f.time ?? ""].join("|");
-      if (!seen.has(key)) {
-        seen.add(key);
-        out.push(f);
-      }
-    }
-
-    const lt = Number(data.at(-1)?.time);
-    if (!Number.isFinite(lt) || lt <= cursor) break;
-    cursor = lt + 1;
-    pages++;
-  }
-
-  out.sort((a, b) => Number(a.time) - Number(b.time));
-
-  let funding = [];
-  try {
-    const fundData = await postInfo({
-      type: "userFunding",
-      user: cleanUser,
-      startTime: Date.now() - (365 * 86400000),
-      endTime: Date.now()
-    });
-    if (Array.isArray(fundData)) funding = fundData;
-  } catch (e) {
-    console.warn("Funding fetch warning:", e);
-  }
-
-  return { fills: out, funding };
-}
-
-// Auto-load persisted data on startup with 2-hour expiration wipe check
 window.addEventListener("DOMContentLoaded", () => {
   const cacheTime = Number(localStorage.getItem(CACHE_TIME_KEY) || 0);
-  const isExpired = (Date.now() - cacheTime) > 7200000; // 2 hours expiration
+  const isExpired = (Date.now() - cacheTime) > 7200000;
 
   if (isExpired) {
     localStorage.removeItem(CACHE_FILLS_KEY);
     localStorage.removeItem(CACHE_FUNDING_KEY);
     localStorage.removeItem(CACHE_TIME_KEY);
     sessionStorage.clear();
+    setStatus("Cached statement data has expired. Please fetch fresh data on the main statement page.", "error");
     return;
   }
 
@@ -120,60 +194,80 @@ window.addEventListener("DOMContentLoaded", () => {
       const fundingData = savedFunding ? JSON.parse(savedFunding) : [];
       
       if (fillsData.length > 0) {
-        processAndRenderAnalytics(fillsData, fundingData);
-        setStatus(`Loaded ${fillsData.length.toLocaleString()} persisted fill(s) instantly.`, "success");
+        fillsData.sort((a, b) => Number(a.time) - Number(b.time));
+        rawGlobalFills = fillsData;
+        rawGlobalFunding = fundingData;
+        applyDataZoomAndRender();
+        setStatus(`Successfully extracted and analyzed ${fillsData.length.toLocaleString()} trade fill(s) from main statement.`, "success");
+        return;
       }
     } catch (e) {
       console.warn("Error parsing persisted storage data:", e);
     }
   }
+
+  setStatus("No active statement data found. Please enter your wallet and click 'Fetch Data' on the main statement page first.", "error");
 });
 
-loadChartsBtn.addEventListener("click", async () => {
-  const wallet = walletEl.value.trim();
-  if (!/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
-    setStatus("Please enter a valid 42-character EVM address.", "error");
-    return;
+function applyDataZoomAndRender() {
+  if (!rawGlobalFills.length) return;
+
+  let cutoffTime = 0;
+  const now = Date.now();
+
+  if (currentZoomRange === "7d") {
+    cutoffTime = now - (7 * 86400000);
+  } else if (currentZoomRange === "30d") {
+    cutoffTime = now - (30 * 86400000);
+  } else if (currentZoomRange === "90d") {
+    cutoffTime = now - (90 * 86400000);
+  } else if (currentZoomRange === "ytd") {
+    cutoffTime = new Date(new Date().getFullYear(), 0, 1).getTime();
   }
 
-  loadChartsBtn.disabled = true;
-  setStatus("Fetching comprehensive trade history and performance metrics…");
+  const filteredFills = cutoffTime > 0 ? rawGlobalFills.filter(f => Number(f.time) >= cutoffTime) : rawGlobalFills;
+  const filteredFunding = cutoffTime > 0 ? rawGlobalFunding.filter(item => Number(item.time || item.delta?.time || 0) >= cutoffTime) : rawGlobalFunding;
 
-  try {
-    const accountData = await fetchAllData(wallet);
-    if (!accountData.fills.length) {
-      setStatus("No trade history found for this address.", "error");
-      loadChartsBtn.disabled = false;
-      return;
-    }
-
-    // Save with current timestamp for 2-hour wipe expiration policy
-    localStorage.setItem(CACHE_FILLS_KEY, JSON.stringify(accountData.fills));
-    localStorage.setItem(CACHE_FUNDING_KEY, JSON.stringify(accountData.funding));
-    localStorage.setItem(CACHE_TIME_KEY, Date.now());
-    
-    sessionStorage.setItem("hl_cached_fills", JSON.stringify(accountData.fills));
-    sessionStorage.setItem("hl_cached_funding", JSON.stringify(accountData.funding));
-
-    processAndRenderAnalytics(accountData.fills, accountData.funding);
-    setStatus(`Successfully generated analytics curve using ${accountData.fills.length.toLocaleString()} trade fill(s).`, "success");
-  } catch (err) {
-    console.error(err);
-    setStatus("Error generating charts: " + (err?.message || "Check network connection."), "error");
-  } finally {
-    loadChartsBtn.disabled = false;
-  }
-});
+  processAndRenderAnalytics(filteredFills, filteredFunding);
+}
 
 function processAndRenderAnalytics(fills, funding) {
   const dailyMap = {};
+  const assetMap = {};
+  let grossProfit = 0;
+  let grossLoss = 0;
 
-  fills.forEach(f => {
-    const d = new Date(Number(f.time));
+  let bestTrade = { coin: "—", pnl: -Infinity };
+  let worstTrade = { coin: "—", pnl: Infinity };
+
+  let currentWinStreak = 0;
+  let currentLossStreak = 0;
+  let maxWinStreak = 0;
+  let maxLossStreak = 0;
+
+  // Long vs Short Tracking
+  let longPnl = 0, longWins = 0, longTotal = 0;
+  let shortPnl = 0, shortWins = 0, shortTotal = 0;
+
+  // Session Tracking (UTC hours)
+  let sessionPnl = { asian: 0, london: 0, ny: 0 };
+
+  // Duration Tracking (simulated interval approximation based on sequence spacing)
+  let durationPnl = { scalp: 0, intraday: 0, swing: 0 };
+
+  fills.forEach((f, idx, arr) => {
+    const tMs = Number(f.time);
+    const d = new Date(tMs);
     const dateKey = d.toISOString().split("T")[0];
+    const coin = f.coin || "PERP";
+    const side = String(f.side || "").toUpperCase(); // B = Buy (Long), A = Sell (Short)
 
     if (!dailyMap[dateKey]) {
-      dailyMap[dateKey] = { closedPnl: 0, fees: 0, netPnl: 0, volume: 0, wins: 0, losses: 0, totalTrades: 0 };
+      dailyMap[dateKey] = { netPnl: 0, wins: 0, losses: 0 };
+    }
+
+    if (!assetMap[coin]) {
+      assetMap[coin] = { closedPnl: 0, fees: 0, netPnl: 0, volume: 0, fills: 0, wins: 0, losses: 0 };
     }
 
     const closedPnl = num(f.closedPnl);
@@ -182,14 +276,72 @@ function processAndRenderAnalytics(fills, funding) {
     const netTradePnl = closedPnl - tradingFee - builderFee;
     const notionalVol = Math.abs(num(f.px) * num(f.sz));
 
-    dailyMap[dateKey].closedPnl += closedPnl;
-    dailyMap[dateKey].fees += (tradingFee + builderFee);
     dailyMap[dateKey].netPnl += netTradePnl;
-    dailyMap[dateKey].volume += notionalVol;
-    dailyMap[dateKey].totalTrades += 1;
 
-    if (closedPnl > 0) dailyMap[dateKey].wins += 1;
-    if (closedPnl < 0) dailyMap[dateKey].losses += 1;
+    assetMap[coin].closedPnl += closedPnl;
+    assetMap[coin].fees += (tradingFee + builderFee);
+    assetMap[coin].netPnl += netTradePnl;
+    assetMap[coin].volume += notionalVol;
+    assetMap[coin].fills += 1;
+
+    // Directional (Long vs Short)
+    if (side === "B" || side.includes("BUY")) {
+      longPnl += netTradePnl;
+      longTotal++;
+      if (closedPnl > 0) longWins++;
+    } else {
+      shortPnl += netTradePnl;
+      shortTotal++;
+      if (closedPnl > 0) shortWins++;
+    }
+
+    // Session Analysis (UTC)
+    const utcHour = d.getUTCHours();
+    if (utcHour >= 0 && utcHour < 8) {
+      sessionPnl.asian += netTradePnl;
+    } else if (utcHour >= 8 && utcHour < 16) {
+      sessionPnl.london += netTradePnl;
+    } else {
+      sessionPnl.ny += netTradePnl;
+    }
+
+    // Holding Duration heuristic (time delta to next fill on same coin or fallback)
+    let timeDeltaMin = 30; // default to intraday
+    if (idx < arr.length - 1 && arr[idx + 1].coin === coin) {
+      timeDeltaMin = Math.abs(tMs - Number(arr[idx + 1].time)) / 60000;
+    }
+    if (timeDeltaMin < 15) {
+      durationPnl.scalp += netTradePnl;
+    } else if (timeDeltaMin <= 240) {
+      durationPnl.intraday += netTradePnl;
+    } else {
+      durationPnl.swing += netTradePnl;
+    }
+
+    if (netTradePnl > bestTrade.pnl) {
+      bestTrade = { coin, pnl: netTradePnl };
+    }
+    if (netTradePnl < worstTrade.pnl) {
+      worstTrade = { coin, pnl: netTradePnl };
+    }
+
+    if (closedPnl > 0) {
+      dailyMap[dateKey].wins += 1;
+      assetMap[coin].wins += 1;
+      grossProfit += closedPnl;
+
+      currentWinStreak++;
+      currentLossStreak = 0;
+      if (currentWinStreak > maxWinStreak) maxWinStreak = currentWinStreak;
+    } else if (closedPnl < 0) {
+      dailyMap[dateKey].losses += 1;
+      assetMap[coin].losses += 1;
+      grossLoss += Math.abs(closedPnl);
+
+      currentLossStreak++;
+      currentWinStreak = 0;
+      if (currentLossStreak > maxLossStreak) maxLossStreak = currentLossStreak;
+    }
   });
 
   funding.forEach(item => {
@@ -200,17 +352,18 @@ function processAndRenderAnalytics(fills, funding) {
     const usdPayment = num(item.delta?.usdc);
 
     if (!dailyMap[dateKey]) {
-      dailyMap[dateKey] = { closedPnl: 0, fees: 0, netPnl: 0, volume: 0, wins: 0, losses: 0, totalTrades: 0 };
+      dailyMap[dateKey] = { netPnl: 0, wins: 0, losses: 0 };
     }
 
     if (usdPayment < 0) {
-      const paid = Math.abs(usdPayment);
-      dailyMap[dateKey].fees += paid;
-      dailyMap[dateKey].netPnl -= paid;
+      dailyMap[dateKey].netPnl -= Math.abs(usdPayment);
     } else {
       dailyMap[dateKey].netPnl += usdPayment;
     }
   });
+
+  if (bestTrade.pnl === -Infinity) bestTrade = { coin: "—", pnl: 0 };
+  if (worstTrade.pnl === Infinity) worstTrade = { coin: "—", pnl: 0 };
 
   const dates = Object.keys(dailyMap).sort();
   let cumulativePnl = 0;
@@ -238,15 +391,54 @@ function processAndRenderAnalytics(fills, funding) {
   });
 
   const avgTradeExpectancy = fills.length > 0 ? cumulativePnl / fills.length : 0;
-  const winLossRatio = totalLosses > 0 ? (totalWins / totalLosses).toFixed(2) : totalWins > 0 ? "∞" : "0.00";
+  const winLossRatioStr = totalLosses > 0 ? (totalWins / totalLosses).toFixed(2) : totalWins > 0 ? "∞" : "0.00";
+  const profitFactorVal = grossLoss > 0 ? (grossProfit / grossLoss).toFixed(2) : grossProfit > 0 ? "∞" : "0.00";
+
+  const longWinRate = longTotal > 0 ? (longWins / longTotal) * 100 : 0;
+  const shortWinRate = shortTotal > 0 ? (shortWins / shortTotal) * 100 : 0;
+
+  // Determine top session
+  let topSessionName = "London";
+  let maxSessionVal = sessionPnl.london;
+  if (sessionPnl.asian > maxSessionVal) { maxSessionVal = sessionPnl.asian; topSessionName = "Asian"; }
+  if (sessionPnl.ny > maxSessionVal) { maxSessionVal = sessionPnl.ny; topSessionName = "New York"; }
+
+  analyticsCache = {
+    peakPnl,
+    maxDrawdown,
+    totalWins,
+    totalLosses,
+    grossProfit,
+    grossLoss,
+    winLossRatioStr: `${winLossRatioStr} (${totalWins}W / ${totalLosses}L)`,
+    profitFactorVal,
+    avgTradeExpectancy,
+    maxWinStreak,
+    maxLossStreak,
+    bestTrade,
+    worstTrade,
+    longPnl,
+    longWinRate,
+    shortPnl,
+    shortWinRate,
+    sessionPnl,
+    durationPnl,
+    daysCount: dates.length
+  };
 
   $("statPeak").textContent = money(peakPnl, 2);
   $("statMaxDD").textContent = "−" + plainMoney(maxDrawdown, 2);
-  $("statWinLoss").textContent = `${winLossRatio} (${totalWins}W / ${totalLosses}L)`;
+  $("statWinLoss").textContent = `${winLossRatioStr} (${totalWins}W / ${totalLosses}L)`;
+  $("statProfitFactor").textContent = profitFactorVal;
   $("statAvgTrade").textContent = money(avgTradeExpectancy, 2);
+  $("statStreak").textContent = `${maxWinStreak}W / ${maxLossStreak}L`;
+  $("statOutliers").textContent = `${bestTrade.coin} (+${money(bestTrade.pnl, 0)})`;
+  $("statLongShort").textContent = longPnl >= shortPnl ? `Longs (+${money(longPnl, 0)})` : `Shorts (+${money(shortPnl, 0)})`;
+  $("statSession").textContent = `${topSessionName} (${money(maxSessionVal, 0)})`;
+  $("statDuration").textContent = durationPnl.scalp >= durationPnl.intraday ? "Scalps" : "Intraday";
   $("statDays").textContent = dates.length.toLocaleString();
 
-  renderPeriodicTable(dailyMap);
+  renderAssetTable(assetMap);
 
   if (pnlChartInstance) pnlChartInstance.destroy();
 
@@ -304,39 +496,31 @@ function processAndRenderAnalytics(fills, funding) {
   });
 }
 
-function renderPeriodicTable(dailyMap) {
-  const periodBody = $("periodTableBody");
-  const sortedDates = Object.keys(dailyMap).sort().reverse();
+function renderAssetTable(assetMap) {
+  const assetBody = $("assetTableBody");
+  const sortedCoins = Object.keys(assetMap).sort((a, b) => assetMap[b].netPnl - assetMap[a].netPnl);
 
-  if (!sortedDates.length) {
-    periodBody.innerHTML = '<tr class="empty-row"><td colspan="6">No trading data available for periodic table.</td></tr>';
+  if (!sortedCoins.length) {
+    assetBody.innerHTML = '<tr class="empty-row"><td colspan="6">No asset trading data available for selected range.</td></tr>';
     return;
   }
 
-  const monthlyAgg = {};
-  sortedDates.forEach(dateStr => {
-    const d = new Date(dateStr);
-    const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const mLabel = d.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+  let totalClosedPnl = 0;
+  let totalFees = 0;
+  let totalNetPnl = 0;
+  let totalVolume = 0;
+  let totalFills = 0;
 
-    if (!monthlyAgg[mKey]) {
-      monthlyAgg[mKey] = { label: mLabel, closedPnl: 0, fees: 0, netPnl: 0, volume: 0, fills: 0 };
-    }
+  const rowsHtml = sortedCoins.map(coin => {
+    const row = assetMap[coin];
+    totalClosedPnl += row.closedPnl;
+    totalFees += row.fees;
+    totalNetPnl += row.netPnl;
+    totalVolume += row.volume;
+    totalFills += row.fills;
 
-    const dayObj = dailyMap[dateStr];
-    monthlyAgg[mKey].closedPnl += dayObj.closedPnl || 0;
-    monthlyAgg[mKey].fees += dayObj.fees || 0;
-    monthlyAgg[mKey].netPnl += dayObj.netPnl || 0;
-    monthlyAgg[mKey].volume += dayObj.volume || 0;
-    monthlyAgg[mKey].fills += dayObj.totalTrades || 0;
-  });
-
-  const sortedMonths = Object.keys(monthlyAgg).sort().reverse();
-
-  periodBody.innerHTML = sortedMonths.map(k => {
-    const row = monthlyAgg[k];
-    return `<tr>
-      <td style="text-align: left; font-weight: 800;">${esc(row.label)}</td>
+    return `<tr class="clickable-asset-row" style="cursor: pointer;" data-coin="${esc(coin)}">
+      <td style="text-align: left; font-weight: 800;" class="coin-name">${esc(coin)}</td>
       <td class="${row.closedPnl > 0 ? "text-positive" : row.closedPnl < 0 ? "text-negative" : ""}">${money(row.closedPnl, 2)}</td>
       <td>${plainMoney(row.fees, 2)}</td>
       <td class="${row.netPnl > 0 ? "text-positive" : row.netPnl < 0 ? "text-negative" : ""}">${money(row.netPnl, 2)}</td>
@@ -345,5 +529,39 @@ function renderPeriodicTable(dailyMap) {
     </tr>`;
   }).join("");
 
-  $("tableMeta").textContent = `Displaying performance across ${sortedMonths.length} active month(s).`;
+  const totalRowHtml = `<tr style="border-top: 2px solid var(--panel-border); font-weight: bold; background: rgba(255,255,255,0.02);">
+    <td style="text-align: left; font-weight: 900;">TOTAL / SUMMARY</td>
+    <td class="${totalClosedPnl > 0 ? "text-positive" : totalClosedPnl < 0 ? "text-negative" : ""}">${money(totalClosedPnl, 2)}</td>
+    <td>${plainMoney(totalFees, 2)}</td>
+    <td class="${totalNetPnl > 0 ? "text-positive" : totalNetPnl < 0 ? "text-negative" : ""}">${money(totalNetPnl, 2)}</td>
+    <td>${plainMoney(totalVolume, 2)}</td>
+    <td>${totalFills.toLocaleString()}</td>
+  </tr>`;
+
+  assetBody.innerHTML = rowsHtml + totalRowHtml;
+
+  assetBody.querySelectorAll(".clickable-asset-row").forEach(tr => {
+    tr.addEventListener("click", () => {
+      const coin = tr.getAttribute("data-coin");
+      const data = assetMap[coin];
+      if (!data) return;
+
+      $("modalAssetTitle").textContent = `${coin} — Performance Details`;
+      $("modalAssetClosedPnl").textContent = money(data.closedPnl, 2);
+      $("modalAssetClosedPnl").className = data.closedPnl >= 0 ? "text-positive" : "text-negative";
+      
+      $("modalAssetFees").textContent = plainMoney(data.fees, 2);
+      
+      $("modalAssetNetPnl").textContent = money(data.netPnl, 2);
+      $("modalAssetNetPnl").className = data.netPnl >= 0 ? "text-positive" : "text-negative";
+
+      $("modalAssetVolume").textContent = plainMoney(data.volume, 2);
+      $("modalAssetFills").textContent = data.fills.toLocaleString();
+      $("modalAssetWinLoss").textContent = `${data.wins}W / ${data.losses}L`;
+
+      assetModal.classList.remove("hidden");
+    });
+  });
+
+  $("tableMeta").textContent = `Displaying performance across ${sortedCoins.length} traded asset market(s). Click any row for details.`;
 }

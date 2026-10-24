@@ -26,50 +26,251 @@
       </div>
     </header>
 
-    <!-- Controls Panel -->
-    <section class="panel controls">
-      <div class="control-row">
-        <div class="field wallet-field" style="grid-column: span 3;">
-          <label for="wallet">QUICK LOAD WALLET ADDRESS</label>
-          <input id="wallet" type="text" autocomplete="off" spellcheck="false" placeholder="0x1234...abcd">
+    <!-- Status & Date Range Zoom Bar -->
+    <section class="panel controls" style="padding: 14px 20px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div id="status" class="status" style="margin: 0; padding: 0; background: none; border: none;">Automatically extracting analytics from your main statement data...</div>
+        <div class="preset-btns" id="zoomPresetBtns" style="display: flex; gap: 6px;">
+          <button class="secondary active" data-range="all">All Time</button>
+          <button class="secondary" data-range="7d">7D</button>
+          <button class="secondary" data-range="30d">30D</button>
+          <button class="secondary" data-range="90d">90D</button>
+          <button class="secondary" data-range="ytd">YTD</button>
         </div>
       </div>
-      <div class="actions-row">
-        <div class="main-btns" style="width: 100%;">
-          <button id="loadChartsBtn" class="btn-primary" style="width: 100%;">Render Performance Curve & Audit</button>
-        </div>
-      </div>
-      <div id="status" class="status hidden"></div>
     </section>
 
-    <!-- Summarized Analytics Insight Cards Grid -->
-    <section class="metrics-grid" style="margin-bottom: 16px;">
-      <div class="metric-card">
-        <span class="label">PEAK CUMULATIVE P&L</span>
+    <!-- Expanded Summarized Analytics Insight Cards Grid (11 Cards) -->
+    <section class="metrics-grid" style="margin-bottom: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));">
+      <div class="metric-card interactive-card" id="peakCard" title="Click to view peak equity details">
+        <span class="label">PEAK CUMULATIVE P&L ⓘ</span>
         <strong id="statPeak" class="value">—</strong>
         <span class="subtext">Highest equity watermark</span>
       </div>
-      <div class="metric-card">
-        <span class="label">MAX DRAWDOWN</span>
+      <div class="metric-card interactive-card" id="ddCard" title="Click to view max drawdown breakdown">
+        <span class="label">MAX DRAWDOWN ⓘ</span>
         <strong id="statMaxDD" class="value">—</strong>
         <span class="subtext">Peak-to-trough drop</span>
       </div>
-      <div class="metric-card">
-        <span class="label">WIN / LOSS RATIO</span>
+      <div class="metric-card interactive-card" id="winLossCard" title="Click to view win/loss fill ratio">
+        <span class="label">WIN / LOSS RATIO ⓘ</span>
         <strong id="statWinLoss" class="value">—</strong>
         <span class="subtext">Profitable vs Losing Fills</span>
       </div>
-      <div class="metric-card">
-        <span class="label">AVG TRADE NET P&L</span>
+      <div class="metric-card interactive-card" id="profitFactorCard" title="Click to view profit factor details">
+        <span class="label">PROFIT FACTOR ⓘ</span>
+        <strong id="statProfitFactor" class="value">—</strong>
+        <span class="subtext">Gross Profit ÷ Gross Loss</span>
+      </div>
+      <div class="metric-card interactive-card" id="avgTradeCard" title="Click to view trade expectancy">
+        <span class="label">AVG TRADE NET P&L ⓘ</span>
         <strong id="statAvgTrade" class="value">—</strong>
         <span class="subtext">Expectancy per fill</span>
       </div>
-      <div class="metric-card">
-        <span class="label">TOTAL DAYS TRACKED</span>
+      <div class="metric-card interactive-card" id="streakCard" title="Click to view streak details">
+        <span class="label">MAX STREAKS ⓘ</span>
+        <strong id="statStreak" class="value">—</strong>
+        <span class="subtext">Max consecutive wins / losses</span>
+      </div>
+      <div class="metric-card interactive-card" id="outlierCard" title="Click to view best/worst trades">
+        <span class="label">BEST / WORST FILL ⓘ</span>
+        <strong id="statOutliers" class="value">—</strong>
+        <span class="subtext">Single best & worst trade</span>
+      </div>
+      <div class="metric-card interactive-card" id="longShortCard" title="Click to view Long vs Short split">
+        <span class="label">LONG vs SHORT SPLIT ⓘ</span>
+        <strong id="statLongShort" class="value">—</strong>
+        <span class="subtext">Directional edge analysis</span>
+      </div>
+      <div class="metric-card interactive-card" id="sessionCard" title="Click to view session performance">
+        <span class="label">TOP TRADING SESSION ⓘ</span>
+        <strong id="statSession" class="value">—</strong>
+        <span class="subtext">Asian, London, or NY</span>
+      </div>
+      <div class="metric-card interactive-card" id="durationCard" title="Click to view holding time analysis">
+        <span class="label">HOLDING DURATION ⓘ</span>
+        <strong id="statDuration" class="value">—</strong>
+        <span class="subtext">Scalp vs Intraday vs Swing</span>
+      </div>
+      <div class="metric-card interactive-card" id="daysCard" title="Click to view trading span timeline">
+        <span class="label">TOTAL DAYS TRACKED ⓘ</span>
         <strong id="statDays" class="value">—</strong>
         <span class="subtext">Active trading span</span>
       </div>
     </section>
+
+    <!-- Modals for Metric Cards -->
+    <div id="peakModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Peak Equity Watermark</h3>
+          <button id="closePeakModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Highest Equity Watermark:</span> <strong id="modalPeakVal">$0.00</strong></div>
+          <p class="meta-info" style="margin-top: 10px;">Represents the maximum cumulative net profit milestone achieved across your selected timeframe.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="ddModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Maximum Drawdown Details</h3>
+          <button id="closeDdModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Peak-to-Trough Drop:</span> <strong id="modalDdVal">$0.00</strong></div>
+          <p class="meta-info" style="margin-top: 10px;">The largest single equity retracement from a previous high water mark down to a local low point.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="winLossModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Win / Loss Fill Breakdown</h3>
+          <button id="closeWinLossModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Total Winning Fills:</span> <strong id="modalWinsVal">0</strong></div>
+          <div class="fee-row"><span>Total Losing Fills:</span> <strong id="modalLossesVal">0</strong></div>
+          <hr class="modal-divider">
+          <div class="fee-row total"><span>Win / Loss Ratio:</span> <strong id="modalRatioVal">0.00</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="profitFactorModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Profit Factor Audit</h3>
+          <button id="closeProfitFactorModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Gross Profits:</span> <strong id="modalGrossProfit">$0.00</strong></div>
+          <div class="fee-row"><span>Gross Losses:</span> <strong id="modalGrossLoss">$0.00</strong></div>
+          <hr class="modal-divider">
+          <div class="fee-row total"><span>Profit Factor (Gross Win ÷ Gross Loss):</span> <strong id="modalPfVal">0.00</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="avgTradeModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Average Trade Expectancy</h3>
+          <button id="closeAvgTradeModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Expectancy per Fill:</span> <strong id="modalAvgVal">$0.00</strong></div>
+          <p class="meta-info" style="margin-top: 10px;">Calculated as total cumulative net profit divided by the total number of execution fills.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="streakModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Consecutive Streaks Analysis</h3>
+          <button id="closeStreakModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Max Winning Streak:</span> <strong id="modalMaxWinStreak" class="text-positive">0</strong></div>
+          <div class="fee-row"><span>Max Losing Streak:</span> <strong id="modalMaxLossStreak" class="text-negative">0</strong></div>
+          <p class="meta-info" style="margin-top: 10px;">Tracks consecutive profitable versus losing trade fills chronologically.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="outlierModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Best & Worst Trade Fills</h3>
+          <button id="closeOutlierModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Single Best Fill:</span> <strong id="modalBestTrade" class="text-positive">$0.00</strong></div>
+          <div class="fee-row"><span>Single Worst Fill:</span> <strong id="modalWorstTrade" class="text-negative">$0.00</strong></div>
+          <p class="meta-info" style="margin-top: 10px;">Identifies outlier fills that generated your largest single profit and largest single drawdown.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="longShortModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Long vs. Short Directional Split</h3>
+          <button id="closeLongShortModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Long Positions P&L:</span> <strong id="modalLongPnl">$0.00</strong></div>
+          <div class="fee-row"><span>Long Win Rate:</span> <strong id="modalLongWinRate">0%</strong></div>
+          <hr class="modal-divider">
+          <div class="fee-row"><span>Short Positions P&L:</span> <strong id="modalShortPnl">$0.00</strong></div>
+          <div class="fee-row"><span>Short Win Rate:</span> <strong id="modalShortWinRate">0%</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="sessionModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Trading Session Analysis (UTC)</h3>
+          <button id="closeSessionModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Asian Session (00:00 - 08:00 UTC):</span> <strong id="modalAsianPnl">$0.00</strong></div>
+          <div class="fee-row"><span>London Session (08:00 - 16:00 UTC):</span> <strong id="modalLondonPnl">$0.00</strong></div>
+          <div class="fee-row"><span>New York Session (13:00 - 21:00 UTC):</span> <strong id="modalNyPnl">$0.00</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="durationModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Holding Duration Performance</h3>
+          <button id="closeDurationModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Scalps (< 15 min):</span> <strong id="modalScalpPnl">$0.00</strong></div>
+          <div class="fee-row"><span>Intraday (15m - 4h):</span> <strong id="modalIntradayPnl">$0.00</strong></div>
+          <div class="fee-row"><span>Swing (> 4h):</span> <strong id="modalSwingPnl">$0.00</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="daysModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Trading Span Timeline</h3>
+          <button id="closeDaysModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Active Days Tracked:</span> <strong id="modalDaysVal">0</strong></div>
+          <p class="meta-info" style="margin-top: 10px;">The total number of unique calendar days where trading activity or funding payments took place.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Asset Details Drill-down Modal -->
+    <div id="assetModal" class="modal hidden">
+      <div class="modal-content" style="max-width: 550px;">
+        <div class="modal-header">
+          <h3 id="modalAssetTitle">Asset Performance Details</h3>
+          <button id="closeAssetModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Closed P&L:</span> <strong id="modalAssetClosedPnl">$0.00</strong></div>
+          <div class="fee-row"><span>Total Fees Paid:</span> <strong id="modalAssetFees">$0.00</strong></div>
+          <div class="fee-row"><span>Net P&L:</span> <strong id="modalAssetNetPnl">$0.00</strong></div>
+          <div class="fee-row"><span>Total Traded Volume:</span> <strong id="modalAssetVolume">$0.00</strong></div>
+          <div class="fee-row"><span>Total Fills Count:</span> <strong id="modalAssetFills">0</strong></div>
+          <div class="fee-row"><span>Win / Loss Breakdown:</span> <strong id="modalAssetWinLoss">0W / 0L</strong></div>
+        </div>
+      </div>
+    </div>
 
     <!-- Main Cumulative P&L Progress Chart Panel -->
     <section class="panel table-panel" style="padding: 20px; margin-bottom: 20px;">
@@ -84,29 +285,29 @@
       </div>
     </section>
 
-    <!-- Detailed Tabulated Performance Breakdown Table -->
+    <!-- Asset Performance Breakdown Table -->
     <section class="panel table-panel">
       <div class="table-header">
         <div class="table-header-info">
-          <h2>Periodic Performance Breakdown</h2>
-          <p id="tableMeta" class="meta-info">Aggregated period-by-period financial audit ledger.</p>
+          <h2>Asset Performance Breakdown (Click row to inspect)</h2>
+          <p id="tableMeta" class="meta-info">Aggregated net P&L, volume, and fill counts grouped by individual coin markets.</p>
         </div>
       </div>
       <div class="table-wrap">
         <table class="coinglass-table">
           <thead>
             <tr>
-              <th style="text-align: left;">PERIOD</th>
+              <th style="text-align: left;">COIN / ASSET</th>
               <th>CLOSED P&L</th>
               <th>TOTAL FEES</th>
               <th>NET P&L</th>
-              <th>VOLUME</th>
+              <th>TOTAL VOLUME</th>
               <th>FILLS COUNT</th>
             </tr>
           </thead>
-          <tbody id="periodTableBody">
+          <tbody id="assetTableBody">
             <tr class="empty-row">
-              <td colspan="6">Load a wallet address above to generate detailed periodic audit tables.</td>
+              <td colspan="6">No statement data found. Please fetch data on the main statement page first.</td>
             </tr>
           </tbody>
         </table>
