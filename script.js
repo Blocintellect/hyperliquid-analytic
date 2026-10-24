@@ -38,7 +38,11 @@ const walletEl = $("wallet"),
       panelContracts = $("panelContracts"),
       panelDaily = $("panelDaily"),
       panelMonthly = $("panelMonthly"),
+      panelPerformance = $("panelPerformance"),
       panelDepositsWithdrawals = $("panelDepositsWithdrawals"),
+      panelFeeCalculator = $("panelFeeCalculator"),
+      panelMultiWallet = $("panelMultiWallet"),
+      panelShareCard = $("panelShareCard"),
       panelOpenOrders = $("panelOpenOrders"),
       panelWalletDetails = $("panelWalletDetails"),
       prevPageBtn = $("prevPageBtn"),
@@ -93,11 +97,13 @@ let previousNumericValues = {};
 let wsConnection = null;
 let pollTimer = null;
 let walletPieChartInstance = null;
+let watchlist = [];
 let currentPage = 1;
 const rowsPerPage = 50;
 
 const SAVED_WALLET_KEY = "hyperliquid_saved_wallet";
 const SAVED_THEME_KEY = "hyperliquid_theme";
+const SAVED_WATCHLIST_KEY = "hyperliquid_watchlist";
 const CACHE_FILLS_KEY = "hyperliquid_persisted_fills";
 const CACHE_FUNDING_KEY = "hyperliquid_persisted_funding";
 const CACHE_LEDGER_KEY = "hyperliquid_persisted_ledger";
@@ -114,18 +120,80 @@ walletEl.addEventListener("input", () => {
   localStorage.setItem(SAVED_WALLET_KEY, walletEl.value.trim());
 });
 
+function loadWatchlist() {
+  try {
+    const saved = localStorage.getItem(SAVED_WATCHLIST_KEY);
+    watchlist = saved ? JSON.parse(saved) : [];
+  } catch (e) {
+    watchlist = [];
+  }
+  renderWatchlistUI();
+}
+
+function renderWatchlistUI() {
+  const container = $("watchlistContainer");
+  if (!container) return;
+
+  if (!watchlist.length) {
+    container.innerHTML = '<span style="color: var(--text-muted); font-size: 12px;">No saved watchlisted wallets yet.</span>';
+    return;
+  }
+
+  container.innerHTML = watchlist.map((item, idx) => `
+    <div style="display: flex; align-items: center; gap: 6px; background: var(--btn-secondary-bg); border: 1px solid var(--btn-secondary-border); padding: 6px 10px; border-radius: 6px;">
+      <span style="font-weight: 700; color: var(--coinglass-green); cursor: pointer;" onclick="loadWatchlistedWallet('${item.address}')">${esc(item.label)}</span>
+      <span style="font-size: 10px; color: var(--text-muted); font-family: monospace;">(${item.address.slice(0, 6)}...${item.address.slice(-4)})</span>
+      <button onclick="removeWatchlistItem(${idx})" style="background: none; border: none; color: var(--coinglass-red); cursor: pointer; font-weight: bold; padding: 0 4px;">✕</button>
+    </div>
+  `).join("");
+}
+
+window.loadWatchlistedWallet = function(addr) {
+  walletEl.value = addr;
+  localStorage.setItem(SAVED_WALLET_KEY, addr);
+  fetchBtn.click();
+};
+
+window.removeWatchlistItem = function(idx) {
+  watchlist.splice(idx, 1);
+  localStorage.setItem(SAVED_WATCHLIST_KEY, JSON.stringify(watchlist));
+  renderWatchlistUI();
+};
+
+$("saveWalletBtn")?.addEventListener("click", () => {
+  const label = $("watchLabelInput").value.trim() || "Account " + (watchlist.length + 1);
+  const address = $("watchAddressInput").value.trim();
+
+  if (!isAddress(address)) {
+    alert("Please enter a valid 42-character EVM address beginning with 0x.");
+    return;
+  }
+
+  watchlist.push({ label, address });
+  localStorage.setItem(SAVED_WATCHLIST_KEY, JSON.stringify(watchlist));
+  $("watchLabelInput").value = "";
+  $("watchAddressInput").value = "";
+  renderWatchlistUI();
+});
+
+loadWatchlist();
+
 function switchView(viewKey) {
   const panels = {
     contracts: panelContracts,
     trades: panelTrades,
     daily: panelDaily,
     monthly: panelMonthly,
+    performanceAnalytics: panelPerformance,
+    walletDetails: panelWalletDetails,
     depositsWithdrawals: panelDepositsWithdrawals,
-    openOrders: panelOpenOrders,
-    walletDetails: panelWalletDetails
+    feeCalculator: panelFeeCalculator,
+    multiWallet: panelMultiWallet,
+    shareCard: panelShareCard,
+    openOrders: panelOpenOrders
   };
 
-  Object.values(panels).forEach(p => p.classList.add("hidden"));
+  Object.values(panels).forEach(p => p && p.classList.add("hidden"));
   if (panels[viewKey]) {
     panels[viewKey].classList.remove("hidden");
   }
@@ -134,12 +202,15 @@ function switchView(viewKey) {
   if (viewKey === "trades") renderTrades();
   if (viewKey === "daily") renderDailyPnl();
   if (viewKey === "monthly") renderMonthlyPnl();
-  if (viewKey === "depositsWithdrawals") renderDepositsWithdrawals();
-  if (viewKey === "openOrders") renderOpenOrders();
+  if (viewKey === "performanceAnalytics") renderQuantMetrics();
   if (viewKey === "walletDetails") {
     renderWalletDetails();
     if (walletPieChartInstance) walletPieChartInstance.resize();
   }
+  if (viewKey === "depositsWithdrawals") renderDepositsWithdrawals();
+  if (viewKey === "feeCalculator") renderFeeCalculator();
+  if (viewKey === "shareCard") renderShareCardPreview();
+  if (viewKey === "openOrders") renderOpenOrders();
 }
 
 viewSelect.addEventListener("change", (e) => {
@@ -718,7 +789,7 @@ function getFilteredFills() {
 
 function renderContracts() {
   if (!activePositions || activePositions.length === 0) {
-    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">No open perpetual positions currently active.</td></tr>';
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="8">No open perpetual positions currently active.</td></tr>';
     contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
@@ -746,8 +817,24 @@ function renderContracts() {
     totalUnrealizedPnl += liveUnPnl;
 
     const levObj = pos.leverage;
-    const leverageText = levObj && levObj.value ? ` (${levObj.value}x)` : "";
+    const levValue = levObj && levObj.value ? levObj.value : 1;
+    const leverageText = ` (${levValue}x)`;
     const dirLabel = sizeNum > 0 ? `LONG${leverageText}` : `SHORT${leverageText}`;
+
+    // Estimated Liquidation Price Calculation
+    let estLiqPx = sizeNum > 0 ? entryPx * (1 - (1 / levValue) * 0.9) : entryPx * (1 + (1 / levValue) * 0.9);
+    estLiqPx = Math.max(0, estLiqPx);
+
+    const distancePercent = Math.abs((currentMarkPx - estLiqPx) / currentMarkPx) * 100;
+    let riskColor = "text-positive";
+    let riskLabel = "Safe (>20%)";
+    if (distancePercent < 5) {
+      riskColor = "text-negative";
+      riskLabel = "CRITICAL (<5%)";
+    } else if (distancePercent < 15) {
+      riskColor = "";
+      riskLabel = "Moderate (<15%)";
+    }
 
     const unPnlId = `contract-unpnl-${coin}`;
     const pnlClass = liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : "";
@@ -759,7 +846,8 @@ function renderContracts() {
         <td>${Math.abs(sizeNum).toLocaleString()}</td>
         <td>${plainMoney(entryPx, 4)}</td>
         <td>${plainMoney(currentMarkPx, 4)}</td>
-        <td>${plainMoney(liveNotional, 2)}</td>
+        <td>${plainMoney(estLiqPx, 4)}</td>
+        <td class="${riskColor}" style="font-weight: 700;">${riskLabel}</td>
         <td class="${pnlClass}">
           <span id="${unPnlId}" class="contract-animated-pnl">${money(liveUnPnl, 2)}</span>
         </td>
@@ -768,7 +856,7 @@ function renderContracts() {
   });
 
   if (rows.length === 0) {
-    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">No open perpetual positions currently active.</td></tr>';
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="8">No open perpetual positions currently active.</td></tr>';
     contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
@@ -793,6 +881,156 @@ function renderContracts() {
   contractsMeta.innerHTML = `Displaying ${count} active contract(s) | Total Unrealized P&L: <strong id="totalUnrealizedMeta" class="${totalPnlClass}">${money(totalUnrealizedPnl, 2)}</strong>`;
   animateNumber("totalUnrealizedMeta", totalUnrealizedPnl, true, 2, true);
 }
+
+function renderQuantMetrics() {
+  const targetFills = getFilteredFills();
+  const tradesWithPnl = targetFills.filter(f => num(f.closedPnl) !== 0);
+  
+  if (!tradesWithPnl.length) {
+    $("quantSharpe").textContent = "0.00";
+    $("quantSortino").textContent = "0.00";
+    $("quantDrawdown").textContent = "$0.00 (0.0%)";
+    $("quantProfitFactor").textContent = "0.00";
+    $("quantAvgWinLoss").textContent = "$0.00 / $0.00";
+    $("quantStreak").textContent = "0 Wins / 0 Losses";
+    return;
+  }
+
+  const pnlList = tradesWithPnl.map(f => num(f.closedPnl));
+  const meanPnl = pnlList.reduce((a, b) => a + b, 0) / pnlList.length;
+  
+  const variance = pnlList.reduce((sum, val) => sum + Math.pow(val - meanPnl, 2), 0) / pnlList.length;
+  const stdDev = Math.sqrt(variance) || 1;
+  const sharpe = (meanPnl / stdDev) * Math.sqrt(365);
+
+  const negativeReturns = pnlList.filter(val => val < 0);
+  const downsideVariance = negativeReturns.length > 0 ? negativeReturns.reduce((sum, val) => sum + Math.pow(val, 2), 0) / negativeReturns.length : 1;
+  const downsideDeviation = Math.sqrt(downsideVariance) || 1;
+  const sortino = (meanPnl / downsideDeviation) * Math.sqrt(365);
+
+  let peak = 0, trough = 0, maxDd = 0, runningSum = 0;
+  pnlList.forEach(p => {
+    runningSum += p;
+    if (runningSum > peak) { peak = runningSum; }
+    const dd = peak - runningSum;
+    if (dd > maxDd) { maxDd = dd; }
+  });
+
+  const grossProfit = tradesWithPnl.filter(f => num(f.closedPnl) > 0).reduce((s, f) => s + num(f.closedPnl), 0);
+  const grossLoss = Math.abs(tradesWithPnl.filter(f => num(f.closedPnl) < 0).reduce((s, f) => s + num(f.closedPnl), 0)) || 1;
+  const profitFactor = grossProfit / grossLoss;
+
+  const winningTrades = tradesWithPnl.filter(f => num(f.closedPnl) > 0);
+  const losingTrades = tradesWithPnl.filter(f => num(f.closedPnl) < 0);
+  const avgWin = winningTrades.length > 0 ? grossProfit / winningTrades.length : 0;
+  const avgLoss = losingTrades.length > 0 ? grossLoss / losingTrades.length : 0;
+
+  let maxWinStreak = 0, maxLossStreak = 0, curWin = 0, curLoss = 0;
+  tradesWithPnl.forEach(f => {
+    if (num(f.closedPnl) > 0) {
+      curWin++; curLoss = 0;
+      if (curWin > maxWinStreak) maxWinStreak = curWin;
+    } else if (num(f.closedPnl) < 0) {
+      curLoss++; curWin = 0;
+      if (curLoss > maxLossStreak) maxLossStreak = curLoss;
+    }
+  });
+
+  $("quantSharpe").textContent = sharpe.toFixed(2);
+  $("quantSortino").textContent = sortino.toFixed(2);
+  $("quantDrawdown").textContent = `-$${maxDd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  $("quantProfitFactor").textContent = profitFactor.toFixed(2);
+  $("quantAvgWinLoss").textContent = `${plainMoney(avgWin, 2)} / ${plainMoney(avgLoss, 2)}`;
+  $("quantStreak").textContent = `${maxWinStreak} Wins / ${maxLossStreak} Losses`;
+}
+
+function renderFeeCalculator() {
+  const targetFills = getFilteredFills();
+  const totalVol = targetFills.reduce((s, f) => s + Math.abs(num(f.px) * num(f.sz)), 0);
+  
+  $("feeCalcVol").textContent = plainMoney(totalVol, 2);
+
+  let tierText = "Tier 0 (0.010% Maker / 0.035% Taker)";
+  if (totalVol >= 100000000) {
+    tierText = "Tier 3+ VIP (0.000% Maker / 0.015% Taker)";
+  } else if (totalVol >= 10000000) {
+    tierText = "Tier 2 VIP (0.000% Maker / 0.022% Taker)";
+  } else if (totalVol >= 1000000) {
+    tierText = "Tier 1 VIP (0.005% Maker / 0.028% Taker)";
+  }
+
+  $("feeCalcTier").textContent = tierText;
+}
+
+function renderShareCardPreview() {
+  const targetFills = getFilteredFills();
+  const closedPnl = targetFills.reduce((s, f) => s + num(f.closedPnl), 0);
+  const winningTrades = targetFills.filter(f => num(f.closedPnl) > 0);
+  const winRate = targetFills.length > 0 ? (winningTrades.length / targetFills.length) * 100 : 0;
+  const totalVol = targetFills.reduce((s, f) => s + Math.abs(num(f.px) * num(f.sz)), 0);
+  const wallet = walletEl.value.trim() || "0x0000...0000";
+
+  $("shareCardWallet").textContent = wallet.length > 12 ? `${wallet.slice(0, 6)}...${wallet.slice(-4)}` : wallet;
+  $("shareCardPnl").textContent = money(closedPnl, 2);
+  $("shareCardPnl").className = closedPnl >= 0 ? "text-positive" : "text-negative";
+  $("shareCardFills").textContent = targetFills.length.toLocaleString();
+  $("shareCardWinRate").textContent = winRate.toFixed(1) + "%";
+  $("shareCardVol").textContent = plainMoney(totalVol, 2);
+}
+
+$("downloadShareCardBtn")?.addEventListener("click", () => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1200;
+  canvas.height = 630;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#0b0e14";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#00b87c";
+  ctx.font = "bold 24px sans-serif";
+  ctx.fillText("HYPERLIQUID PRO INSTITUTIONAL STATEMENT", 80, 100);
+
+  const targetFills = getFilteredFills();
+  const closedPnl = targetFills.reduce((s, f) => s + num(f.closedPnl), 0);
+  const winningTrades = targetFills.filter(f => num(f.closedPnl) > 0);
+  const winRate = targetFills.length > 0 ? (winningTrades.length / targetFills.length) * 100 : 0;
+  const totalVol = targetFills.reduce((s, f) => s + Math.abs(num(f.px) * num(f.sz)), 0);
+
+  ctx.fillStyle = "#8492a6";
+  ctx.font = "16px monospace";
+  ctx.fillText("WALLET: " + walletEl.value.trim(), 80, 140);
+
+  ctx.fillStyle = "#f0f4f8";
+  ctx.font = "18px sans-serif";
+  ctx.fillText("NET REALIZED P&L", 80, 220);
+
+  ctx.fillStyle = closedPnl >= 0 ? "#00b87c" : "#f6465d";
+  ctx.font = "bold 64px sans-serif";
+  ctx.fillText(money(closedPnl, 2), 80, 300);
+
+  ctx.fillStyle = "#121721";
+  ctx.fillRect(80, 380, 1040, 140);
+  ctx.strokeStyle = "#1e2638";
+  ctx.strokeRect(80, 380, 1040, 140);
+
+  ctx.fillStyle = "#8492a6";
+  ctx.font = "16px sans-serif";
+  ctx.fillText("TOTAL FILLS", 140, 435);
+  ctx.fillText("WIN RATE", 520, 435);
+  ctx.fillText("TOTAL VOLUME", 840, 435);
+
+  ctx.fillStyle = "#f0f4f8";
+  ctx.font = "bold 24px sans-serif";
+  ctx.fillText(targetFills.length.toLocaleString(), 140, 475);
+  ctx.fillText(winRate.toFixed(1) + "%", 520, 475);
+  ctx.fillText(plainMoney(totalVol, 2), 840, 475);
+
+  const link = document.createElement("a");
+  link.download = "hyperliquid-pnl-card.png";
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+});
 
 function renderDailyPnl() {
   if (!fills.length && !fundingHistory.length) {
@@ -1008,10 +1246,10 @@ function renderWalletPieChart(dataValues) {
       datasets: [{
         data: dataValues,
         backgroundColor: [
-          '#00b87c', // Coinglass Green
-          '#2962ff', // Coinglass Blue
-          '#8b5cf6', // Coinglass Purple
-          '#f59e0b'  // Amber
+          '#00b87c',
+          '#2962ff',
+          '#8b5cf6',
+          '#f59e0b'
         ],
         borderWidth: 2,
         borderColor: isLight ? '#ffffff' : '#121721',
@@ -1094,7 +1332,6 @@ function renderWalletDetails() {
   $("detSpotValue").textContent = plainMoney(spotVal, 2);
   $("detLeverage").textContent = totalLeverage.toFixed(2) + "x";
 
-  // Update Doughnut Chart
   renderWalletPieChart([
     Math.max(0, perpVal),
     Math.max(0, withdrawable),
@@ -1199,6 +1436,7 @@ window.addEventListener("DOMContentLoaded", () => {
         renderDepositsWithdrawals();
         renderOpenOrders();
         renderWalletDetails();
+        renderQuantMetrics();
         if (activePositions.length > 0) {
           const uniqueCoins = [...new Set(activePositions.map(p => (p.position || p).coin))];
           initWebSocket(uniqueCoins);
@@ -1279,6 +1517,7 @@ fetchBtn.addEventListener("click", async () => {
     renderDepositsWithdrawals();
     renderOpenOrders();
     renderWalletDetails();
+    renderQuantMetrics();
 
     if (activePositions.length > 0) {
       const uniqueCoins = [...new Set(activePositions.map(p => (p.position || p).coin))];
@@ -1516,7 +1755,7 @@ $("clearBtn").addEventListener("click", () => {
   clearStatus();
   noticeEl.classList.add("hidden");
   bodyEl.innerHTML = '<tr class="empty-row"><td colspan="12">Enter a valid wallet address to display trade history.</td></tr>';
-  contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">Enter a valid wallet address to view active contracts.</td></tr>';
+  contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="8">Enter a valid wallet address to view active contracts.</td></tr>';
   dailyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">Enter a valid wallet address to view daily breakdown.</td></tr>';
   monthlyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">Enter a valid wallet address to view monthly breakdown.</td></tr>';
   depositsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="5">Enter a valid wallet address to view deposit & withdrawal history.</td></tr>';
@@ -1531,8 +1770,3 @@ $("clearBtn").addEventListener("click", () => {
 });
 
 walletEl.addEventListener("keydown", e => { if (e.key === "Enter") fetchBtn.click(); });
-walletEl.walletEl?.addEventListener?.("blur", () => {
-  if (isAddress(walletEl.value.trim())) {
-    setInceptionPreset();
-  }
-});

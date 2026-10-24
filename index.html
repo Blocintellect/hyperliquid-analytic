@@ -22,7 +22,7 @@
       <div class="brand-title">
         <div class="logo-badge"><span class="logo-dot"></span> HYPERLIQUID PRO</div>
         <h1>Trade Statement Generator</h1>
-        <p class="subtitle">Trade execution history, P&L audit, wallet fund details, and professional statement exports.</p>
+        <p class="subtitle">Trade execution history, P&L audit, quant analytics, risk monitoring, and social sharing.</p>
       </div>
       <div class="header-right">
         <a href="charts.html" class="secondary" style="text-decoration: none; display: flex; align-items: center; padding: 0 14px; height: 40px; font-weight: 700;">📊 View Charts</a>
@@ -198,26 +198,30 @@
       </div>
     </div>
 
-    <!-- View Selection Dropdown -->
-    <div class="view-dropdown-container" style="margin-bottom: 12px; display: flex; align-items: center; gap: 10px;">
+    <!-- Expanded View Selection Dropdown -->
+    <div class="view-dropdown-container" style="margin-bottom: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
       <label for="viewSelect" style="font-size: 11px; font-weight: 800; color: var(--text-muted); white-space: nowrap;">SELECT VIEW:</label>
-      <select id="viewSelect" style="max-width: 320px; font-weight: 700; background: var(--panel-bg); color: var(--text-main);">
-        <option value="contracts">Active Contracts</option>
-        <option value="trades">Trade Executions</option>
-        <option value="daily">Daily P&L Breakdown</option>
-        <option value="monthly">Monthly P&L Breakdown</option>
-        <option value="depositsWithdrawals">Deposit & Withdraw (Transfers)</option>
+      <select id="viewSelect" style="max-width: 360px; font-weight: 700; background: var(--panel-bg); color: var(--text-main);">
+        <option value="contracts">Active Contracts & Liquidation Risk</option>
         <option value="openOrders">Open Orders (TP / SL / Limit)</option>
-        <option value="walletDetails">Wallet Funds Details & Charts</option>
+        <option value="trades">Trade Executions</option>
+        <option value="daily">Daily Profit & Loss Breakdown</option>
+        <option value="monthly">Monthly Profit & Loss Breakdown</option>
+        <option value="performanceAnalytics">Quant Metrics (Sharpe, Drawdown, Profit Factor)</option>
+        <option value="walletDetails">Wallet Funds Details & Allocation Charts</option>
+        <option value="depositsWithdrawals">Deposit & Withdraw (Transfers)</option>
+        <option value="feeCalculator">VIP Fee Tiers & Rebate Calculator</option>
+        <option value="multiWallet">Multi-Wallet Manager & Watchlist</option>
+        <option value="shareCard">Generate Social P&L Card</option>
       </select>
     </div>
 
-    <!-- Active Contracts Panel -->
+    <!-- 1. Active Contracts Panel (with Liquidation Risk) -->
     <section id="panelContracts" class="panel table-panel">
       <div class="table-header">
         <div class="table-header-info">
-          <h2>Active Perpetual Contracts</h2>
-          <p id="contractsMeta" class="meta-info">Open derivative positions and contracts with live feeds.</p>
+          <h2>Active Perpetual Contracts & Liquidation Risk</h2>
+          <p id="contractsMeta" class="meta-info">Open derivative positions with live risk gauges.</p>
         </div>
       </div>
       <div class="table-wrap">
@@ -229,20 +233,21 @@
               <th>SIZE</th>
               <th>ENTRY PRICE</th>
               <th>MARK PRICE</th>
-              <th>NOTIONAL VALUE</th>
+              <th>EST. LIQ. PRICE</th>
+              <th>RISK PROXIMITY</th>
               <th>UNREALIZED P&L</th>
             </tr>
           </thead>
           <tbody id="contractsBody">
             <tr class="empty-row">
-              <td colspan="7">Enter a valid wallet address to view active contracts.</td>
+              <td colspan="8">Enter a valid wallet address to view active contracts.</td>
             </tr>
           </tbody>
         </table>
       </div>
     </section>
 
-    <!-- Trade History Panel -->
+    <!-- 2. Trade History Panel -->
     <section id="panelTrades" class="panel table-panel hidden">
       <div class="table-header">
         <div class="table-header-info">
@@ -304,7 +309,7 @@
       </div>
     </section>
 
-    <!-- Daily P&L Panel -->
+    <!-- 3. Daily P&L Panel -->
     <section id="panelDaily" class="panel table-panel hidden">
       <div class="table-header">
         <div class="table-header-info">
@@ -333,7 +338,7 @@
       </div>
     </section>
 
-    <!-- Monthly P&L Panel -->
+    <!-- 4. Monthly P&L Panel -->
     <section id="panelMonthly" class="panel table-panel hidden">
       <div class="table-header">
         <div class="table-header-info">
@@ -362,65 +367,51 @@
       </div>
     </section>
 
-    <!-- Deposits & Withdrawals Panel -->
-    <section id="panelDepositsWithdrawals" class="panel table-panel hidden">
+    <!-- 5. Quantitative Performance Analytics Panel -->
+    <section id="panelPerformance" class="panel table-panel hidden">
       <div class="table-header">
         <div class="table-header-info">
-          <h2>Deposit & Withdrawal Ledger (In / Out)</h2>
-          <p id="depositsMeta" class="meta-info">Wallet transfers and funding deposits/withdrawals.</p>
+          <h2>Quantitative Performance Metrics</h2>
+          <p class="meta-info">Advanced statistical edge audit (Sharpe, Sortino, Drawdown, Profit Factor).</p>
         </div>
       </div>
-      <div class="table-wrap">
-        <table class="coinglass-table">
-          <thead>
-            <tr>
-              <th style="text-align: left;">DATE / TIME</th>
-              <th>TYPE</th>
-              <th>TOKEN / ASSET</th>
-              <th>AMOUNT / VALUE</th>
-              <th>HASH / REF</th>
-            </tr>
-          </thead>
-          <tbody id="depositsBody">
-            <tr class="empty-row">
-              <td colspan="5">Enter a valid wallet address to view deposit & withdrawal history.</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="table-wrap" style="padding: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+          <div class="metric-card" style="padding: 16px;">
+            <span class="label">SHARPE RATIO</span>
+            <strong id="quantSharpe" class="value" style="font-size: 18px;">—</strong>
+            <span class="subtext">Risk-adjusted return metric</span>
+          </div>
+          <div class="metric-card" style="padding: 16px;">
+            <span class="label">SORTINO RATIO</span>
+            <strong id="quantSortino" class="value" style="font-size: 18px;">—</strong>
+            <span class="subtext">Downside risk-adjusted return</span>
+          </div>
+          <div class="metric-card" style="padding: 16px;">
+            <span class="label">MAX DRAWDOWN (%)</span>
+            <strong id="quantDrawdown" class="value text-negative" style="font-size: 18px;">—</strong>
+            <span class="subtext">Peak-to-trough equity decline</span>
+          </div>
+          <div class="metric-card" style="padding: 16px;">
+            <span class="label">PROFIT FACTOR</span>
+            <strong id="quantProfitFactor" class="value" style="font-size: 18px;">—</strong>
+            <span class="subtext">Gross Profit ÷ Gross Loss</span>
+          </div>
+          <div class="metric-card" style="padding: 16px;">
+            <span class="label">AVG WIN vs AVG LOSS</span>
+            <strong id="quantAvgWinLoss" class="value" style="font-size: 18px;">—</strong>
+            <span class="subtext">Expectancy ratio</span>
+          </div>
+          <div class="metric-card" style="padding: 16px;">
+            <span class="label">CONSECUTIVE STREAK</span>
+            <strong id="quantStreak" class="value" style="font-size: 18px;">—</strong>
+            <span class="subtext">Max wins / losses in a row</span>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- Open Orders Panel -->
-    <section id="panelOpenOrders" class="panel table-panel hidden">
-      <div class="table-header">
-        <div class="table-header-info">
-          <h2>Open Orders (Limit, TP & SL)</h2>
-          <p id="openOrdersMeta" class="meta-info">Resting open orders and triggers.</p>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table class="coinglass-table">
-          <thead>
-            <tr>
-              <th style="text-align: left;">COIN</th>
-              <th>ORDER ID</th>
-              <th>TYPE / SIDE</th>
-              <th>LIMIT PRICE</th>
-              <th>TRIGGER PRICE</th>
-              <th>SIZE</th>
-              <th>REDUCE ONLY</th>
-            </tr>
-          </thead>
-          <tbody id="openOrdersBody">
-            <tr class="empty-row">
-              <td colspan="7">Enter a valid wallet address to view open orders.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Wallet Funds Details & Stacked Animated Charts Panel -->
+    <!-- 6. Wallet Funds Details & Animated Charts Panel -->
     <section id="panelWalletDetails" class="panel table-panel hidden">
       <div class="table-header">
         <div class="table-header-info">
@@ -472,6 +463,132 @@
           </div>
 
         </div>
+      </div>
+    </section>
+
+    <!-- 7. Deposits & Withdrawals Panel -->
+    <section id="panelDepositsWithdrawals" class="panel table-panel hidden">
+      <div class="table-header">
+        <div class="table-header-info">
+          <h2>Deposit & Withdrawal Ledger (In / Out)</h2>
+          <p id="depositsMeta" class="meta-info">Wallet transfers and funding deposits/withdrawals.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="coinglass-table">
+          <thead>
+            <tr>
+              <th style="text-align: left;">DATE / TIME</th>
+              <th>TYPE</th>
+              <th>TOKEN / ASSET</th>
+              <th>AMOUNT / VALUE</th>
+              <th>HASH / REF</th>
+            </tr>
+          </thead>
+          <tbody id="depositsBody">
+            <tr class="empty-row">
+              <td colspan="5">Enter a valid wallet address to view deposit & withdrawal history.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 8. VIP Fee Tiers & Rebate Calculator Panel -->
+    <section id="panelFeeCalculator" class="panel table-panel hidden">
+      <div class="table-header">
+        <div class="table-header-info">
+          <h2>VIP Fee Tiers & Rebate Calculator</h2>
+          <p class="meta-info">Evaluate 30-day rolling volume tiers and commission discounts.</p>
+        </div>
+      </div>
+      <div class="table-wrap" style="padding: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; align-items: center;">
+          <div class="metric-card" style="padding: 18px;">
+            <span class="label">CURRENT 30D ROLLING VOLUME</span>
+            <strong id="feeCalcVol" class="value" style="font-size: 20px;">$0.00</strong>
+            <span class="subtext">Based on active date range</span>
+          </div>
+          <div class="metric-card" style="padding: 18px;">
+            <span class="label">ESTIMATED VIP TIER / RATE</span>
+            <strong id="feeCalcTier" class="value text-positive" style="font-size: 20px;">Tier 0 (0.010% / 0.035%)</strong>
+            <span class="subtext">Maker / Taker commission structure</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9. Multi-Wallet Manager & Watchlist Panel -->
+    <section id="panelMultiWallet" class="panel table-panel hidden">
+      <div class="table-header">
+        <div class="table-header-info">
+          <h2>Multi-Wallet Manager & Watchlist</h2>
+          <p class="meta-info">Save and label multiple wallet addresses for instant switching.</p>
+        </div>
+      </div>
+      <div class="table-wrap" style="padding: 20px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;">
+          <input id="watchLabelInput" type="text" placeholder="Wallet Label (e.g., Main Scalper)" style="max-width: 240px;">
+          <input id="watchAddressInput" type="text" placeholder="0x... Wallet Address" style="flex: 1; min-width: 280px;">
+          <button id="saveWalletBtn" class="btn-primary">Save to Watchlist</button>
+        </div>
+        <div id="watchlistContainer" style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <span style="color: var(--text-muted); font-size: 12px;">No saved watchlisted wallets yet.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10. Social Share Card Generator Panel -->
+    <section id="panelShareCard" class="panel table-panel hidden">
+      <div class="table-header">
+        <div class="table-header-info">
+          <h2>Social P&L Card Generator</h2>
+          <p class="meta-info">Export clean, branded performance graphics for X/Twitter & Telegram.</p>
+        </div>
+      </div>
+      <div class="table-wrap" style="padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px;">
+        <div style="background: #0b0e14; border: 1px solid #1e2638; border-radius: 12px; padding: 24px; width: 100%; max-width: 500px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+          <div style="color: #00b87c; font-weight: 800; letter-spacing: 2px; font-size: 12px; margin-bottom: 8px;">HYPERLIQUID PRO AUDIT</div>
+          <h3 id="shareCardWallet" style="color: #f0f4f8; font-size: 14px; margin-bottom: 16px; font-family: monospace;">0x0000...0000</h3>
+          <div style="font-size: 11px; color: #8492a6; margin-bottom: 4px;">NET REALIZED PERFORMANCE</div>
+          <div id="shareCardPnl" style="font-size: 28px; font-weight: 800; color: #00b87c; margin-bottom: 16px;">$0.00</div>
+          <div style="display: flex; justify-content: space-around; border-top: 1px solid #1e2638; padding-top: 12px; font-size: 12px; color: #8492a6;">
+            <div>Fills: <strong id="shareCardFills" style="color: #f0f4f8;">0</strong></div>
+            <div>Win Rate: <strong id="shareCardWinRate" style="color: #f0f4f8;">0%</strong></div>
+            <div>Volume: <strong id="shareCardVol" style="color: #f0f4f8;">$0.00</strong></div>
+          </div>
+        </div>
+        <button id="downloadShareCardBtn" class="btn-primary">Download Share Card (PNG)</button>
+      </div>
+    </section>
+
+    <!-- Open Orders Panel -->
+    <section id="panelOpenOrders" class="panel table-panel hidden">
+      <div class="table-header">
+        <div class="table-header-info">
+          <h2>Open Orders (Limit, TP & SL)</h2>
+          <p id="openOrdersMeta" class="meta-info">Resting open orders and triggers.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="coinglass-table">
+          <thead>
+            <tr>
+              <th style="text-align: left;">COIN</th>
+              <th>ORDER ID</th>
+              <th>TYPE / SIDE</th>
+              <th>LIMIT PRICE</th>
+              <th>TRIGGER PRICE</th>
+              <th>SIZE</th>
+              <th>REDUCE ONLY</th>
+            </tr>
+          </thead>
+          <tbody id="openOrdersBody">
+            <tr class="empty-row">
+              <td colspan="7">Enter a valid wallet address to view open orders.</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
 

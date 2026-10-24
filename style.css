@@ -519,7 +519,7 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   }
 
   .coinglass-table thead {
-    display: none !important; /* Hide original table header row on mobile */
+    display: none !important;
   }
 
   .coinglass-table tbody tr {
@@ -549,8 +549,9 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   #panelContracts .coinglass-table td:nth-child(3):before { content: "Size"; font-weight: 800; color: var(--text-muted); }
   #panelContracts .coinglass-table td:nth-child(4):before { content: "Entry Price"; font-weight: 800; color: var(--text-muted); }
   #panelContracts .coinglass-table td:nth-child(5):before { content: "Mark Price"; font-weight: 800; color: var(--text-muted); }
-  #panelContracts .coinglass-table td:nth-child(6):before { content: "Notional Value"; font-weight: 800; color: var(--text-muted); }
-  #panelContracts .coinglass-table td:nth-child(7):before { content: "Unrealized P&L"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(6):before { content: "Est. Liq. Price"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(7):before { content: "Risk Proximity"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(8):before { content: "Unrealized P&L"; font-weight: 800; color: var(--text-muted); }
 
   /* Daily & Monthly P&L Mobile Labels */
   #panelDaily .coinglass-table td:nth-child(1):before,
