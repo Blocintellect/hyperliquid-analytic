@@ -37,13 +37,45 @@ const walletEl = $("wallet"),
       panelContracts = $("panelContracts"),
       panelDaily = $("panelDaily"),
       panelMonthly = $("panelMonthly"),
-      feeCard = $("feeCard"),
-      feeModal = $("feeModal"),
-      closeModalBtn = $("closeModalBtn"),
       prevPageBtn = $("prevPageBtn"),
       nextPageBtn = $("nextPageBtn"),
       pageIndicator = $("pageIndicator"),
       paginationContainer = $("paginationContainer");
+
+// Modal Elements
+const fillsCard = $("fillsCard"), fillsModal = $("fillsModal"), closeFillsModal = $("closeFillsModal");
+const netPnlCard = $("netPnlCard"), netPnlModal = $("netPnlModal"), closeNetModal = $("closeNetModal");
+const closedPnlCard = $("closedPnlCard"), closedPnlModal = $("closedPnlModal"), closeClosedModal = $("closeClosedModal");
+const feeCard = $("feeCard"), feeModal = $("feeModal"), closeModalBtn = $("closeModalBtn");
+const winRateCard = $("winRateCard"), winRateModal = $("winRateModal"), closeWinModal = $("closeWinModal");
+const holdingsCard = $("holdingsCard"), holdingsModal = $("holdingsModal"), closeHoldingsModal = $("closeHoldingsModal");
+
+fillsCard.addEventListener("click", () => fillsModal.classList.remove("hidden"));
+closeFillsModal.addEventListener("click", () => fillsModal.classList.add("hidden"));
+
+netPnlCard.addEventListener("click", () => netPnlModal.classList.remove("hidden"));
+closeNetModal.addEventListener("click", () => netPnlModal.classList.add("hidden"));
+
+closedPnlCard.addEventListener("click", () => closedPnlModal.classList.remove("hidden"));
+closeClosedModal.addEventListener("click", () => closedPnlModal.classList.add("hidden"));
+
+feeCard.addEventListener("click", () => feeModal.classList.remove("hidden"));
+closeModalBtn.addEventListener("click", () => feeModal.classList.add("hidden"));
+
+winRateCard.addEventListener("click", () => winRateModal.classList.remove("hidden"));
+closeWinModal.addEventListener("click", () => winRateModal.classList.add("hidden"));
+
+holdingsCard.addEventListener("click", () => holdingsModal.classList.remove("hidden"));
+closeHoldingsModal.addEventListener("click", () => holdingsModal.classList.add("hidden"));
+
+window.addEventListener("click", e => { 
+  if (e.target === feeModal) feeModal.classList.add("hidden");
+  if (e.target === fillsModal) fillsModal.classList.add("hidden");
+  if (e.target === netPnlModal) netPnlModal.classList.add("hidden");
+  if (e.target === closedPnlModal) closedPnlModal.classList.add("hidden");
+  if (e.target === winRateModal) winRateModal.classList.add("hidden");
+  if (e.target === holdingsModal) holdingsModal.classList.add("hidden");
+});
 
 let fills = [];
 let fundingHistory = [];
@@ -51,7 +83,7 @@ let holdingsData = null;
 let xyzHoldingsData = null;
 let activePositions = [];
 let livePrices = {};
-let previousNumericValues = {}; // Track previous values for 1-second animations
+let previousNumericValues = {}; 
 let wsConnection = null;
 let pollTimer = null;
 let currentPage = 1;
@@ -72,10 +104,6 @@ if (localStorage.getItem(SAVED_WALLET_KEY)) {
 walletEl.addEventListener("input", () => {
   localStorage.setItem(SAVED_WALLET_KEY, walletEl.value.trim());
 });
-
-feeCard.addEventListener("click", () => feeModal.classList.remove("hidden"));
-closeModalBtn.addEventListener("click", () => feeModal.classList.add("hidden"));
-window.addEventListener("click", e => { if (e.target === feeModal) feeModal.classList.add("hidden"); });
 
 function switchTab(activeBtn, activePanel) {
   [tabTradesBtn, tabContractsBtn, tabDailyBtn, tabMonthlyBtn].forEach(b => b.classList.remove("active"));
@@ -372,7 +400,7 @@ function initWebSocket(coins) {
   };
 }
 
-// 1-Second Smooth Number Animation Loop with Color Transition (Green for up, Red for down)
+// 1-Second Smooth Number Animation Loop
 function animateNumber(elementId, targetVal, isCurrency = true, decimals = 2, isSigned = false) {
   const el = $(elementId);
   if (!el) return;
@@ -385,7 +413,6 @@ function animateNumber(elementId, targetVal, isCurrency = true, decimals = 2, is
     return;
   }
 
-  // Apply color flash class based on direction
   el.classList.remove("flash-green", "flash-red");
   if (targetVal > startVal) {
     el.classList.add("flash-green");
@@ -393,14 +420,13 @@ function animateNumber(elementId, targetVal, isCurrency = true, decimals = 2, is
     el.classList.add("flash-red");
   }
 
-  const duration = 1000; // Exactly 1 second
+  const duration = 1000; 
   const startTime = performance.now();
 
   function updateStep(currentTime) {
     const elapsed = currentTime - startTime;
     const progress = Math.min(elapsed / duration, 1);
     
-    // Ease-out smooth step function
     const easeProgress = 1 - Math.pow(1 - progress, 3);
     const currentVal = startVal + (targetVal - startVal) * easeProgress;
 
@@ -474,9 +500,10 @@ function calculateTotalUnrealizedPnl() {
 }
 
 function updateMetrics() {
-  const closedPnl = fills.reduce((s, f) => s + num(f.closedPnl), 0);
-  const tradingFees = fills.reduce((s, f) => s + num(f.fee), 0);
-  const builderFees = fills.reduce((s, f) => s + num(f.builderFee), 0);
+  const targetFills = getFilteredFills();
+  const closedPnl = targetFills.reduce((s, f) => s + num(f.closedPnl), 0);
+  const tradingFees = targetFills.reduce((s, f) => s + num(f.fee), 0);
+  const builderFees = targetFills.reduce((s, f) => s + num(f.builderFee), 0);
   
   let netFundingUsd = 0;
   let totalFundingPaid = 0;
@@ -490,27 +517,24 @@ function updateMetrics() {
   const currentUnrealizedPnl = calculateTotalUnrealizedPnl();
   const netPnl = closedPnl - tradingFees - builderFees + netFundingUsd + currentUnrealizedPnl;
 
-  $("modalTradingFee").textContent = plainMoney(tradingFees, 4);
-  $("modalFundingFee").textContent = plainMoney(totalFundingPaid, 4);
-  $("modalBuilderFee").textContent = plainMoney(builderFees, 4);
-  $("modalTotalFee").textContent = plainMoney(totalFees, 4);
-
-  const tradesWithPnl = fills.filter(f => num(f.closedPnl) !== 0);
+  const tradesWithPnl = targetFills.filter(f => num(f.closedPnl) !== 0);
   const winningTrades = tradesWithPnl.filter(f => num(f.closedPnl) > 0);
   const winRate = tradesWithPnl.length > 0 ? (winningTrades.length / tradesWithPnl.length) * 100 : 0;
 
   let totalAccountVal = 0;
+  let perpAccountVal = 0, withdrawableVal = 0, spotVal = 0;
 
   if (holdingsData) {
     const margin = holdingsData.marginSummary || {};
-    const crossVal = num(margin.accountValue);
-    const withdrawable = num(holdingsData.withdrawable);
-    totalAccountVal += Math.max(crossVal, withdrawable);
+    perpAccountVal = num(margin.accountValue);
+    withdrawableVal = num(holdingsData.withdrawable);
+    totalAccountVal += Math.max(perpAccountVal, withdrawableVal);
 
     if (Array.isArray(holdingsData.balances)) {
       holdingsData.balances.forEach(b => {
-        totalAccountVal += num(b.total) * (num(livePrices[b.coin]) || 1);
+        spotVal += num(b.total) * (num(livePrices[b.coin]) || 1);
       });
+      totalAccountVal += spotVal;
     }
   }
 
@@ -519,7 +543,45 @@ function updateMetrics() {
     totalAccountVal += num(xyzMargin.accountValue);
   }
 
-  setMetric("mFills", fills.length, null, false, 0, false);
+  // Populate Modals
+  const totalVol = targetFills.reduce((s, f) => s + Math.abs(num(f.px) * num(f.sz)), 0);
+  $("modalTotalFills").textContent = targetFills.length.toLocaleString();
+  $("modalTotalVol").textContent = plainMoney(totalVol, 2);
+
+  $("netModalClosed").textContent = money(closedPnl, 2);
+  $("netModalUnrealized").textContent = money(currentUnrealizedPnl, 2);
+  $("netModalFunding").textContent = money(netFundingUsd, 2);
+  $("netModalFees").textContent = plainMoney(totalFees, 2);
+  $("netModalTotal").textContent = money(netPnl, 2);
+
+  const winningTradesList = tradesWithPnl.filter(f => num(f.closedPnl) > 0);
+  const losingTradesList = tradesWithPnl.filter(f => num(f.closedPnl) < 0);
+  const evenTradesList = tradesWithPnl.filter(f => num(f.closedPnl) === 0);
+  
+  const grossProfit = winningTradesList.reduce((s, f) => s + num(f.closedPnl), 0);
+  const grossLoss = losingTradesList.reduce((s, f) => s + num(f.closedPnl), 0);
+
+  $("modalGrossProfit").textContent = money(grossProfit, 2);
+  $("modalGrossLoss").textContent = money(grossLoss, 2);
+  $("modalNetClosedPnl").textContent = money(closedPnl, 2);
+
+  $("modalTradingFee").textContent = plainMoney(tradingFees, 4);
+  $("modalFundingFee").textContent = plainMoney(totalFundingPaid, 4);
+  $("modalBuilderFee").textContent = plainMoney(builderFees, 4);
+  $("modalTotalFee").textContent = plainMoney(totalFees, 4);
+
+  $("modalWinningFills").textContent = winningTradesList.length.toLocaleString();
+  $("modalLosingFills").textContent = losingTradesList.length.toLocaleString();
+  $("modalEvenFills").textContent = evenTradesList.length.toLocaleString();
+  $("modalWinRateVal").textContent = winRate.toFixed(1) + "%";
+
+  $("modalPerpValue").textContent = plainMoney(perpAccountVal, 2);
+  $("modalWithdrawable").textContent = plainMoney(withdrawableVal, 2);
+  $("modalSpotValue").textContent = plainMoney(spotVal, 2);
+  $("modalTotalHoldings").textContent = plainMoney(totalAccountVal, 2);
+
+  // Set Metrics Grid Cards (mPnl is CLOSED P&L)
+  setMetric("mFills", targetFills.length, null, false, 0, false);
   setMetric("mPnl", closedPnl, closedPnl, true, 2, true);
   setMetric("mFees", totalFees, null, true, 2, false);
   setMetric("mNet", netPnl, netPnl, true, 2, true);
@@ -581,7 +643,6 @@ function renderContracts() {
     const leverageText = levObj && levObj.value ? ` (${levObj.value}x)` : "";
     const dirLabel = sizeNum > 0 ? `LONG${leverageText}` : `SHORT${leverageText}`;
 
-    // Unique element IDs for animated values in the contract table
     const unPnlId = `contract-unpnl-${coin}`;
     const pnlClass = liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : "";
 
@@ -608,7 +669,6 @@ function renderContracts() {
 
   contractsBodyEl.innerHTML = rows.join("");
 
-  // Animate individual contract P&Ls and Total Unrealized P&L over 1 second
   activePositions.forEach(item => {
     const pos = item.position || item;
     if (!pos) return;
@@ -862,8 +922,8 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-pnlFilterSelect.addEventListener("change", () => { currentPage = 1; renderTrades(); });
-coinFilterSelect.addEventListener("change", () => { currentPage = 1; renderTrades(); });
+pnlFilterSelect.addEventListener("change", () => { currentPage = 1; updateMetrics(); renderTrades(); });
+coinFilterSelect.addEventListener("change", () => { currentPage = 1; updateMetrics(); renderTrades(); });
 
 prevPageBtn.addEventListener("click", () => { if (currentPage > 1) { currentPage--; renderTrades(); } });
 nextPageBtn.addEventListener("click", () => {

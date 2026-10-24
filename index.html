@@ -67,20 +67,20 @@
 
     <section id="limitNotice" class="notice hidden"></section>
 
-    <!-- Key Metrics Grid -->
+    <!-- Key Metrics Grid (All cards clickable) -->
     <section class="metrics-grid">
-      <div class="metric-card">
-        <span class="label">TOTAL FILLS</span>
+      <div class="metric-card interactive-card" id="fillsCard" title="Click to view total fills and volume breakdown">
+        <span class="label">TOTAL FILLS ⓘ</span>
         <strong id="mFills" class="value">—</strong>
         <span class="subtext">Execution count</span>
       </div>
-      <div class="metric-card">
-        <span class="label">NET P&L</span>
+      <div class="metric-card interactive-card" id="netPnlCard" title="Click to view Net P&L components">
+        <span class="label">NET P&L ⓘ</span>
         <strong id="mNet" class="value">—</strong>
         <span class="subtext">Closed PnL - Total Fees + Funding</span>
       </div>
-      <div class="metric-card">
-        <span class="label">CLOSED P&L</span>
+      <div class="metric-card interactive-card" id="closedPnlCard" title="Click to view realized trades performance">
+        <span class="label">CLOSED P&L ⓘ</span>
         <strong id="mPnl" class="value">—</strong>
         <span class="subtext">Realized trades</span>
       </div>
@@ -89,19 +89,68 @@
         <strong id="mFees" class="value">—</strong>
         <span class="subtext">Trading, funding & builder</span>
       </div>
-      <div class="metric-card">
-        <span class="label">WIN RATE</span>
+      <div class="metric-card interactive-card" id="winRateCard" title="Click to view win/loss ratio details">
+        <span class="label">WIN RATE ⓘ</span>
         <strong id="mWinRate" class="value">—</strong>
         <span class="subtext">Profitable fills</span>
       </div>
-      <div class="metric-card">
-        <span class="label">WALLET HOLDINGS</span>
+      <div class="metric-card interactive-card" id="holdingsCard" title="Click to view account equity and balance details">
+        <span class="label">WALLET HOLDINGS ⓘ</span>
         <strong id="mWalletHoldings" class="value">—</strong>
         <span class="subtext">Account balance & collateral</span>
       </div>
     </section>
 
-    <!-- Fee Breakdown Modal (Hidden by default) -->
+    <!-- Detailed Breakdown Modals -->
+    <!-- 1. Fills Modal -->
+    <div id="fillsModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Total Fills & Volume Summary</h3>
+          <button id="closeFillsModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Total Execution Fills:</span> <strong id="modalTotalFills">0</strong></div>
+          <div class="fee-row"><span>Total Trading Volume:</span> <strong id="modalTotalVol">$0.00</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Net P&L Modal -->
+    <div id="netPnlModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Net P&L Formula Breakdown</h3>
+          <button id="closeNetModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Realized Closed P&L:</span> <strong id="netModalClosed">$0.00</strong></div>
+          <div class="fee-row"><span>Unrealized Active P&L:</span> <strong id="netModalUnrealized">$0.00</strong></div>
+          <div class="fee-row"><span>Net Funding Payments:</span> <strong id="netModalFunding">$0.00</strong></div>
+          <div class="fee-row"><span>Total Deducted Fees:</span> <strong id="netModalFees">$0.00</strong></div>
+          <hr class="modal-divider">
+          <div class="fee-row total"><span>Final Net P&L:</span> <strong id="netModalTotal">$0.00</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Closed P&L Modal -->
+    <div id="closedPnlModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Realized Trades Performance</h3>
+          <button id="closeClosedModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Profitable Trades P&L:</span> <strong id="modalGrossProfit">$0.00</strong></div>
+          <div class="fee-row"><span>Losing Trades P&L:</span> <strong id="modalGrossLoss">$0.00</strong></div>
+          <hr class="modal-divider">
+          <div class="fee-row total"><span>Total Closed P&L:</span> <strong id="modalNetClosedPnl">$0.00</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Fee Breakdown Modal -->
     <div id="feeModal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -118,7 +167,41 @@
       </div>
     </div>
 
-    <!-- View Toggle Tabs (Active Contracts set as default landing tab) -->
+    <!-- 5. Win Rate Modal -->
+    <div id="winRateModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Win / Loss Ratio Audit</h3>
+          <button id="closeWinModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Winning Fills:</span> <strong id="modalWinningFills">0</strong></div>
+          <div class="fee-row"><span>Losing Fills:</span> <strong id="modalLosingFills">0</strong></div>
+          <div class="fee-row"><span>Break-even Fills:</span> <strong id="modalEvenFills">0</strong></div>
+          <hr class="modal-divider">
+          <div class="fee-row total"><span>Overall Win Rate:</span> <strong id="modalWinRateVal">0%</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. Wallet Holdings Modal -->
+    <div id="holdingsModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Account Equity & Collateral</h3>
+          <button id="closeHoldingsModal" class="btn-ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Perpetual Account Value:</span> <strong id="modalPerpValue">$0.00</strong></div>
+          <div class="fee-row"><span>Withdrawable Balance:</span> <strong id="modalWithdrawable">$0.00</strong></div>
+          <div class="fee-row"><span>Spot Token Balances:</span> <strong id="modalSpotValue">$0.00</strong></div>
+          <hr class="modal-divider">
+          <div class="fee-row total"><span>Total Wallet Holdings:</span> <strong id="modalTotalHoldings">$0.00</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Toggle Tabs -->
     <div class="view-tabs">
       <button id="tabContractsBtn" class="view-tab active">Active Contracts</button>
       <button id="tabTradesBtn" class="view-tab">Trade Executions</button>
@@ -126,7 +209,7 @@
       <button id="tabMonthlyBtn" class="view-tab">Monthly P&L Breakdown</button>
     </div>
 
-    <!-- Active Contracts Panel (Landing Tab - Visible by default) -->
+    <!-- Active Contracts Panel -->
     <section id="panelContracts" class="panel table-panel">
       <div class="table-header">
         <div class="table-header-info">
@@ -156,7 +239,7 @@
       </div>
     </section>
 
-    <!-- Trade History Panel (Hidden by default) -->
+    <!-- Trade History Panel -->
     <section id="panelTrades" class="panel table-panel hidden">
       <div class="table-header">
         <div class="table-header-info">
@@ -219,7 +302,7 @@
       </div>
     </section>
 
-    <!-- Daily P&L Panel (Hidden by default) -->
+    <!-- Daily P&L Panel -->
     <section id="panelDaily" class="panel table-panel hidden">
       <div class="table-header">
         <div class="table-header-info">
@@ -248,7 +331,7 @@
       </div>
     </section>
 
-    <!-- Monthly P&L Panel (Hidden by default) -->
+    <!-- Monthly P&L Panel -->
     <section id="panelMonthly" class="panel table-panel hidden">
       <div class="table-header">
         <div class="table-header-info">
