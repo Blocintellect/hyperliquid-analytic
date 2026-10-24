@@ -104,7 +104,7 @@ const rowsPerPage = 50;
 const SAVED_WALLET_KEY = "hyperliquid_saved_wallet";
 const SAVED_THEME_KEY = "hyperliquid_theme";
 const SAVED_WATCHLIST_KEY = "hyperliquid_watchlist";
-const SAVED_VIEW_KEY = "hyperliquid_selected_view"; // Added key for View dropdown
+const SAVED_VIEW_KEY = "hyperliquid_selected_view";
 const CACHE_FILLS_KEY = "hyperliquid_persisted_fills";
 const CACHE_FUNDING_KEY = "hyperliquid_persisted_funding";
 const CACHE_LEDGER_KEY = "hyperliquid_persisted_ledger";
@@ -121,7 +121,6 @@ walletEl.addEventListener("input", () => {
   localStorage.setItem(SAVED_WALLET_KEY, walletEl.value.trim());
 });
 
-// Restore saved view from localStorage on load if valid
 const savedView = localStorage.getItem(SAVED_VIEW_KEY);
 if (savedView && viewSelect.querySelector(`option[value="${savedView}"]`)) {
   viewSelect.value = savedView;
@@ -223,7 +222,7 @@ function switchView(viewKey) {
 
 viewSelect.addEventListener("change", (e) => {
   const selectedView = e.target.value;
-  localStorage.setItem(SAVED_VIEW_KEY, selectedView); // Save dropdown value to localStorage
+  localStorage.setItem(SAVED_VIEW_KEY, selectedView);
   switchView(selectedView);
 });
 
@@ -831,7 +830,6 @@ function renderContracts() {
     const leverageText = ` (${levValue}x)`;
     const dirLabel = sizeNum > 0 ? `LONG${leverageText}` : `SHORT${leverageText}`;
 
-    // Estimated Liquidation Price Calculation
     let estLiqPx = sizeNum > 0 ? entryPx * (1 - (1 / levValue) * 0.9) : entryPx * (1 + (1 / levValue) * 0.9);
     estLiqPx = Math.max(0, estLiqPx);
 
@@ -918,7 +916,7 @@ function renderQuantMetrics() {
   const downsideDeviation = Math.sqrt(downsideVariance) || 1;
   const sortino = (meanPnl / downsideDeviation) * Math.sqrt(365);
 
-  let peak = 0, trough = 0, maxDd = 0, runningSum = 0;
+  let peak = 0, maxDd = 0, runningSum = 0;
   pnlList.forEach(p => {
     runningSum += p;
     if (runningSum > peak) { peak = runningSum; }
@@ -1342,6 +1340,65 @@ function renderWalletDetails() {
   $("detSpotValue").textContent = plainMoney(spotVal, 2);
   $("detLeverage").textContent = totalLeverage.toFixed(2) + "x";
 
+  // --- Calculate Daily, Monthly, and Yearly Average Net P&L ---
+  const dailyMap = {};
+  const monthlyMap = {};
+  const yearlyMap = {};
+
+  fills.forEach(f => {
+    const d = new Date(Number(f.time));
+    const dateKey = d.toISOString().split("T")[0];
+    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const yearKey = `${d.getFullYear()}`;
+
+    const netItemPnl = num(f.closedPnl) - num(f.fee) - num(f.builderFee);
+
+    dailyMap[dateKey] = (dailyMap[dateKey] || 0) + netItemPnl;
+    monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + netItemPnl;
+    yearlyMap[yearKey] = (yearlyMap[yearKey] || 0) + netItemPnl;
+  });
+
+  fundingHistory.forEach(item => {
+    const timeVal = item.time || item.delta?.time;
+    if (!timeVal) return;
+    const d = new Date(Number(timeVal));
+    const dateKey = d.toISOString().split("T")[0];
+    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const yearKey = `${d.getFullYear()}`;
+
+    const usdPayment = num(item.delta?.usdc);
+
+    dailyMap[dateKey] = (dailyMap[dateKey] || 0) + usdPayment;
+    monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + usdPayment;
+    yearlyMap[yearKey] = (yearlyMap[yearKey] || 0) + usdPayment;
+  });
+
+  const dailyValues = Object.values(dailyMap);
+  const monthlyValues = Object.values(monthlyMap);
+  const yearlyValues = Object.values(yearlyMap);
+
+  const avgDailyPnl = dailyValues.length ? dailyValues.reduce((a, b) => a + b, 0) / dailyValues.length : 0;
+  const avgMonthlyPnl = monthlyValues.length ? monthlyValues.reduce((a, b) => a + b, 0) / monthlyValues.length : 0;
+  const avgYearlyPnl = yearlyValues.length ? yearlyValues.reduce((a, b) => a + b, 0) / yearlyValues.length : 0;
+
+  const detAvgDailyEl = $("detAvgDailyPnl");
+  const detAvgMonthlyEl = $("detAvgMonthlyPnl");
+  const detAvgYearlyEl = $("detAvgYearlyPnl");
+
+  if (detAvgDailyEl) {
+    detAvgDailyEl.textContent = money(avgDailyPnl, 2);
+    detAvgDailyEl.className = "value " + (avgDailyPnl > 0 ? "text-positive" : avgDailyPnl < 0 ? "text-negative" : "");
+  }
+  if (detAvgMonthlyEl) {
+    detAvgMonthlyEl.textContent = money(avgMonthlyPnl, 2);
+    detAvgMonthlyEl.className = "value " + (avgMonthlyPnl > 0 ? "text-positive" : avgMonthlyPnl < 0 ? "text-negative" : "");
+  }
+  if (detAvgYearlyEl) {
+    detAvgYearlyEl.textContent = money(avgYearlyPnl, 2);
+    detAvgYearlyEl.className = "value " + (avgYearlyPnl > 0 ? "text-positive" : avgYearlyPnl < 0 ? "text-negative" : "");
+  }
+  // -------------------------------------------------------------
+
   renderWalletPieChart([
     Math.max(0, perpVal),
     Math.max(0, withdrawable),
@@ -1742,10 +1799,8 @@ $("clearBtn").addEventListener("click", () => {
   walletEl.value = "";
   if (pollTimer) clearInterval(pollTimer);
   if (wsConnection) wsConnection.close();
-  
-  // Clear all saved keys including SAVED_VIEW_KEY
   localStorage.removeItem(SAVED_WALLET_KEY);
-  localStorage.removeItem(SAVED_VIEW_KEY); // <-- Cleared on click
+  localStorage.removeItem(SAVED_VIEW_KEY);
   localStorage.removeItem(CACHE_FILLS_KEY);
   localStorage.removeItem(CACHE_FUNDING_KEY);
   localStorage.removeItem(CACHE_LEDGER_KEY);
@@ -1754,10 +1809,8 @@ $("clearBtn").addEventListener("click", () => {
   localStorage.removeItem(CACHE_POSITIONS_KEY);
   localStorage.removeItem(CACHE_TIME_KEY);
   sessionStorage.clear();
-  
   setInceptionPreset();
   
-  // Reset view dropdown to default
   viewSelect.value = "contracts";
   switchView("contracts");
 
