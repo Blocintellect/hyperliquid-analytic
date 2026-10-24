@@ -104,6 +104,7 @@ const rowsPerPage = 50;
 const SAVED_WALLET_KEY = "hyperliquid_saved_wallet";
 const SAVED_THEME_KEY = "hyperliquid_theme";
 const SAVED_WATCHLIST_KEY = "hyperliquid_watchlist";
+const SAVED_VIEW_KEY = "hyperliquid_selected_view"; // Added key for View dropdown
 const CACHE_FILLS_KEY = "hyperliquid_persisted_fills";
 const CACHE_FUNDING_KEY = "hyperliquid_persisted_funding";
 const CACHE_LEDGER_KEY = "hyperliquid_persisted_ledger";
@@ -119,6 +120,13 @@ if (localStorage.getItem(SAVED_WALLET_KEY)) {
 walletEl.addEventListener("input", () => {
   localStorage.setItem(SAVED_WALLET_KEY, walletEl.value.trim());
 });
+
+// Restore saved view from localStorage on load if valid
+const savedView = localStorage.getItem(SAVED_VIEW_KEY);
+if (savedView && viewSelect.querySelector(`option[value="${savedView}"]`)) {
+  viewSelect.value = savedView;
+  switchView(savedView);
+}
 
 function loadWatchlist() {
   try {
@@ -214,7 +222,9 @@ function switchView(viewKey) {
 }
 
 viewSelect.addEventListener("change", (e) => {
-  switchView(e.target.value);
+  const selectedView = e.target.value;
+  localStorage.setItem(SAVED_VIEW_KEY, selectedView); // Save dropdown value to localStorage
+  switchView(selectedView);
 });
 
 function mapSide(side) {
@@ -1732,7 +1742,10 @@ $("clearBtn").addEventListener("click", () => {
   walletEl.value = "";
   if (pollTimer) clearInterval(pollTimer);
   if (wsConnection) wsConnection.close();
+  
+  // Clear all saved keys including SAVED_VIEW_KEY
   localStorage.removeItem(SAVED_WALLET_KEY);
+  localStorage.removeItem(SAVED_VIEW_KEY); // <-- Cleared on click
   localStorage.removeItem(CACHE_FILLS_KEY);
   localStorage.removeItem(CACHE_FUNDING_KEY);
   localStorage.removeItem(CACHE_LEDGER_KEY);
@@ -1741,7 +1754,13 @@ $("clearBtn").addEventListener("click", () => {
   localStorage.removeItem(CACHE_POSITIONS_KEY);
   localStorage.removeItem(CACHE_TIME_KEY);
   sessionStorage.clear();
+  
   setInceptionPreset();
+  
+  // Reset view dropdown to default
+  viewSelect.value = "contracts";
+  switchView("contracts");
+
   fills = [];
   fundingHistory = [];
   ledgerUpdates = [];
