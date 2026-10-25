@@ -35,8 +35,44 @@ let analyticsCache = {
 const CACHE_FILLS_KEY = "hyperliquid_persisted_fills";
 const CACHE_FUNDING_KEY = "hyperliquid_persisted_funding";
 const CACHE_TIME_KEY = "hyperliquid_cache_timestamp";
+const SAVED_THEME_KEY = "hyperliquid_theme";
 
 const statusEl = $("status");
+
+// Theme Initialization & Toggle Listeners
+function initTheme() {
+  const currentTheme = localStorage.getItem(SAVED_THEME_KEY) || "dark";
+  applyTheme(currentTheme);
+}
+
+function applyTheme(theme) {
+  const themeIcon = $("themeIcon");
+  const themeLabel = $("themeLabel");
+
+  if (theme === "light") {
+    document.body.classList.remove("dark-theme");
+    document.body.classList.add("light-theme");
+    if (themeIcon) themeIcon.textContent = "🌙";
+    if (themeLabel) themeLabel.textContent = "Dark Mode";
+  } else {
+    document.body.classList.remove("light-theme");
+    document.body.classList.add("dark-theme");
+    if (themeIcon) themeIcon.textContent = "☀️";
+    if (themeLabel) themeLabel.textContent = "Light Mode";
+  }
+  localStorage.setItem(SAVED_THEME_KEY, theme);
+  
+  if (rawGlobalFills.length > 0) {
+    applyDataZoomAndRender();
+  }
+}
+
+$("themeToggleBtn")?.addEventListener("click", () => {
+  const isLight = document.body.classList.contains("light-theme");
+  applyTheme(isLight ? "dark" : "light");
+});
+
+initTheme();
 
 // Modal Elements & Event Listeners
 const peakCard = $("peakCard"), peakModal = $("peakModal"), closePeakModal = $("closePeakModal");
@@ -620,7 +656,6 @@ function renderAssetTable(assetMap) {
 
   assetBody.innerHTML = rowsHtml + totalRowHtml;
 
-  // Add robust mobile touch and desktop click listeners for asset modal inspection
   assetBody.querySelectorAll(".clickable-asset-row").forEach(tr => {
     const triggerModal = (e) => {
       e.preventDefault();

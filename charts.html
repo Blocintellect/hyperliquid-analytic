@@ -11,7 +11,7 @@
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="dark-theme">
+<body>
   <div class="app">
     <!-- Header / Topbar -->
     <header class="topbar">
@@ -22,6 +22,9 @@
       </div>
       <div class="header-right">
         <a href="index.html" class="secondary" style="text-decoration: none; display: flex; align-items: center; padding: 0 14px; height: 40px; font-weight: 700;">← Back to Statement</a>
+        <button id="themeToggleBtn" class="theme-toggle-btn" title="Toggle Theme">
+          <span id="themeIcon">☀️</span> <span id="themeLabel">Light Mode</span>
+        </button>
         <div class="security-tag"><span class="icon">🔒</span> PUBLIC ADDRESS</div>
       </div>
     </header>
