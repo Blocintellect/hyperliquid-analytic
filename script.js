@@ -113,13 +113,46 @@ const CACHE_HOLDINGS_KEY = "hyperliquid_persisted_holdings";
 const CACHE_POSITIONS_KEY = "hyperliquid_persisted_positions";
 const CACHE_TIME_KEY = "hyperliquid_cache_timestamp";
 
-if (localStorage.getItem(SAVED_WALLET_KEY)) {
-  walletEl.value = localStorage.getItem(SAVED_WALLET_KEY);
+// Helper for masking addresses securely
+function maskAddress(addr) {
+  const clean = String(addr || "").trim();
+  if (!clean || clean.length < 10) return clean;
+  return `${clean.slice(0, 6)}••••${clean.slice(-4)}`;
 }
 
-walletEl.addEventListener("input", () => {
-  localStorage.setItem(SAVED_WALLET_KEY, walletEl.value.trim());
+let actualWalletValue = "";
+
+if (localStorage.getItem(SAVED_WALLET_KEY)) {
+  actualWalletValue = localStorage.getItem(SAVED_WALLET_KEY);
+  walletEl.value = maskAddress(actualWalletValue);
+}
+
+walletEl.addEventListener("focus", () => {
+  if (actualWalletValue) walletEl.value = actualWalletValue;
 });
+
+walletEl.addEventListener("blur", () => {
+  if (actualWalletValue) walletEl.value = maskAddress(actualWalletValue);
+});
+
+walletEl.addEventListener("input", () => {
+  actualWalletValue = walletEl.value.trim();
+  localStorage.setItem(SAVED_WALLET_KEY, actualWalletValue);
+});
+
+// Copy wallet address button handler
+const copyWalletBtn = $("copyWalletBtn");
+if (copyWalletBtn) {
+  copyWalletBtn.addEventListener("click", () => {
+    const valToCopy = actualWalletValue || walletEl.value.trim();
+    if (!valToCopy) return;
+    navigator.clipboard.writeText(valToCopy).then(() => {
+      const originalText = copyWalletBtn.textContent;
+      copyWalletBtn.textContent = "Copied!";
+      setTimeout(() => { copyWalletBtn.textContent = originalText; }, 1500);
+    });
+  });
+}
 
 const savedView = localStorage.getItem(SAVED_VIEW_KEY);
 if (savedView && viewSelect.querySelector(`option[value="${savedView}"]`)) {
@@ -149,7 +182,7 @@ function renderWatchlistUI() {
   container.innerHTML = watchlist.map((item, idx) => `
     <tr>
       <td style="font-weight: 700; color: var(--coinglass-green);">${esc(item.label)}</td>
-      <td style="font-family: monospace; color: var(--text-muted);">${esc(item.address)}</td>
+      <td style="font-family: monospace; color: var(--text-muted);">${esc(maskAddress(item.address))}</td>
       <td style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
         <button class="secondary" style="height: 30px; padding: 0 10px; font-size: 11px;" onclick="loadWatchlistedWallet('${item.address}')">Load</button>
         <button class="btn-ghost" style="height: 30px; padding: 0 8px; color: var(--coinglass-red);" onclick="removeWatchlistItem(${idx})">✕</button>
@@ -159,7 +192,8 @@ function renderWatchlistUI() {
 }
 
 window.loadWatchlistedWallet = function(addr) {
-  walletEl.value = addr;
+  actualWalletValue = addr;
+  walletEl.value = maskAddress(addr);
   localStorage.setItem(SAVED_WALLET_KEY, addr);
   fetchBtn.click();
 };
@@ -273,7 +307,7 @@ function formatDateInput(d) {
 }
 
 async function setInceptionPreset() {
-  const wallet = walletEl.value.trim();
+  const wallet = actualWalletValue || walletEl.value.trim();
   [allInceptionBtn, monthBtn, ytdBtn, todayBtn].forEach(b => b && b.classList.remove("active"));
   allInceptionBtn.classList.add("active");
 
@@ -391,7 +425,7 @@ function clearStatus() {
   statusEl.textContent = "";
 }
 
-function isAddress(v) { return /^0x[a-fA-F0-9]{40}$/.test(v.trim()); }
+function isAddress(v) { return /^0x[a-fA-F0-9]{40}$/.test(String(v).trim()); }
 function msStart(v) { return new Date(v + "T00:00:00").getTime(); }
 function msEnd(v) { return new Date(v + "T23:59:59.999").getTime(); }
 
@@ -1071,9 +1105,9 @@ function renderShareCardPreview() {
   const winningTrades = targetFills.filter(f => num(f.closedPnl) > 0);
   const winRate = targetFills.length > 0 ? (winningTrades.length / targetFills.length) * 100 : 0;
   const totalVol = targetFills.reduce((s, f) => s + Math.abs(num(f.px) * num(f.sz)), 0);
-  const wallet = walletEl.value.trim() || "0x0000...0000";
+  const wallet = actualWalletValue || walletEl.value.trim() || "0x0000...0000";
 
-  $("shareCardWallet").textContent = wallet.length > 12 ? `${wallet.slice(0, 6)}...${wallet.slice(-4)}` : wallet;
+  $("shareCardWallet").textContent = maskAddress(wallet);
   $("shareCardPnl").textContent = money(closedPnl, 2);
   $("shareCardPnl").className = closedPnl >= 0 ? "text-positive" : "text-negative";
   $("shareCardFills").textContent = targetFills.length.toLocaleString();
@@ -1102,7 +1136,7 @@ $("downloadShareCardBtn")?.addEventListener("click", () => {
 
   ctx.fillStyle = "#8492a6";
   ctx.font = "16px monospace";
-  ctx.fillText("WALLET: " + walletEl.value.trim(), 80, 140);
+  ctx.fillText("WALLET: " + maskAddress(actualWalletValue || walletEl.value.trim()), 80, 140);
 
   ctx.fillStyle = "#f0f4f8";
   ctx.font = "18px sans-serif";
@@ -1625,8 +1659,9 @@ window.addEventListener("DOMContentLoaded", () => {
         if (activePositions.length > 0) {
           const uniqueCoins = [...new Set(activePositions.map(p => (p.position || p).coin))];
           initWebSocket(uniqueCoins);
-          if (walletEl.value.trim()) {
-            startFiveSecondPoller(walletEl.value.trim().toLowerCase());
+          const currentWallet = actualWalletValue || walletEl.value.trim();
+          if (currentWallet) {
+            startFiveSecondPoller(currentWallet.toLowerCase());
           }
         }
         setStatus(`Loaded persisted data from local storage.`, "success");
@@ -1650,7 +1685,7 @@ fetchBtn.addEventListener("click", async () => {
   clearStatus();
   noticeEl.classList.add("hidden");
 
-  const wallet = walletEl.value.trim();
+  const wallet = actualWalletValue || walletEl.value.trim();
   if (!isAddress(wallet)) {
     setStatus("Please enter a valid 42-character EVM address beginning with 0x.", "error");
     return;
@@ -1765,16 +1800,18 @@ function downloadBlob(content, name, type) {
 
 csvBtn.addEventListener("click", () => {
   const targetFills = getFilteredFills();
+  const currentWallet = actualWalletValue || walletEl.value.trim();
   if (targetFills.length) {
-    downloadBlob(toCSV(targetFills), `hyperliquid-statement-${walletEl.value.trim().slice(0, 10)}.csv`, "text/csv;charset=utf-8");
+    downloadBlob(toCSV(targetFills), `hyperliquid-statement-${currentWallet.slice(0, 10)}.csv`, "text/csv;charset=utf-8");
   }
 });
 
 jsonBtn.addEventListener("click", () => {
   const targetFills = getFilteredFills();
+  const currentWallet = actualWalletValue || walletEl.value.trim();
   if (targetFills.length) {
     const mappedFills = targetFills.map(f => ({ ...f, sideFormatted: mapSide(f.side) }));
-    downloadBlob(JSON.stringify({ fills: mappedFills, fundingHistory, ledgerUpdates, openOrders: openOrdersList, holdings: holdingsData, positions: activePositions }, null, 2), `hyperliquid-statement-${walletEl.value.trim().slice(0, 10)}.json`, "application/json");
+    downloadBlob(JSON.stringify({ fills: mappedFills, fundingHistory, ledgerUpdates, openOrders: openOrdersList, holdings: holdingsData, positions: activePositions }, null, 2), `hyperliquid-statement-${currentWallet.slice(0, 10)}.json`, "application/json");
   }
 });
 
@@ -1794,7 +1831,7 @@ function generatePDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF("landscape", "pt", "a4");
 
-    const wallet = walletEl.value.trim();
+    const wallet = actualWalletValue || walletEl.value.trim();
     const totalPnl = targetFills.reduce((s, f) => s + num(f.closedPnl), 0);
     const tradingFees = targetFills.reduce((s, f) => s + num(f.fee), 0);
     const builderFees = targetFills.reduce((s, f) => s + num(f.builderFee), 0);
@@ -1923,6 +1960,7 @@ $("zoomYtdBtn")?.addEventListener("click", () => setPreset("ytd"));
 $("zoomAllBtn")?.addEventListener("click", () => setInceptionPreset());
 
 $("clearBtn").addEventListener("click", () => {
+  actualWalletValue = "";
   walletEl.value = "";
   if (pollTimer) clearInterval(pollTimer);
   if (wsConnection) wsConnection.close();

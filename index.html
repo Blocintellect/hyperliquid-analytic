@@ -37,7 +37,10 @@
       <div class="control-row">
         <div class="field wallet-field">
           <label for="wallet">HYPERLIQUID WALLET ADDRESS</label>
-          <input id="wallet" type="text" autocomplete="off" spellcheck="false" placeholder="0x1234...abcd">
+          <div style="display: flex; gap: 8px;">
+            <input id="wallet" type="text" autocomplete="off" spellcheck="false" placeholder="0x1234...abcd" style="flex: 1;">
+            <button id="copyWalletBtn" class="secondary" style="height: 42px; padding: 0 12px; white-space: nowrap;" title="Copy Full Address">Copy</button>
+          </div>
         </div>
         <div class="date-group">
           <div class="field date-field">

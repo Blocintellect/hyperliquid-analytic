@@ -207,7 +207,6 @@ input:focus, select:focus {
   gap: 10px;
 }
 
-/* Updated preset buttons container to stay in one clean row like charts webpage */
 .preset-btns {
   display: flex;
   gap: 6px;
@@ -579,7 +578,6 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     text-align: center !important;
   }
 
-  /* Completely disable pointer events and interaction on desktop-specific asset table rows for mobile view */
   .clickable-asset-row {
     cursor: default !important;
     pointer-events: none !important;
@@ -681,7 +679,6 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 
 @media (max-width: 600px) {
   .actions-row { flex-direction: column; align-items: stretch; }
-  /* Notice: removed grid stacking for preset-btns so it stays in one horizontal row */
   .main-btns { display: grid; grid-template-columns: 2fr 1fr; }
 }
 
