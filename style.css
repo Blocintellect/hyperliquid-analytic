@@ -126,7 +126,7 @@ h1 {
 
 .security-tag {
   background: var(--btn-secondary-bg);
-  border: 1px solid var(--btn-secondary-border);
+  border: 1px solid var(--panel-border);
   color: var(--text-muted);
   padding: 8px 10px;
   border-radius: 6px;
@@ -207,7 +207,23 @@ input:focus, select:focus {
   gap: 10px;
 }
 
-.preset-btns, .main-btns {
+/* Updated preset buttons container to stay in one clean row like charts webpage */
+.preset-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.preset-btns button {
+  flex: 1 1 auto;
+  min-width: 42px;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.main-btns {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -665,7 +681,7 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 
 @media (max-width: 600px) {
   .actions-row { flex-direction: column; align-items: stretch; }
-  .preset-btns { display: grid; grid-template-columns: 1fr 1fr; }
+  /* Notice: removed grid stacking for preset-btns so it stays in one horizontal row */
   .main-btns { display: grid; grid-template-columns: 2fr 1fr; }
 }
 
