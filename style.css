@@ -135,6 +135,21 @@ h1 {
   white-space: nowrap;
 }
 
+.bottom-security-tag {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 24px 0 12px 0;
+  padding: 10px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
 /* Panels */
 .panel {
   background: var(--panel-bg);
@@ -279,7 +294,6 @@ button {
   color: var(--text-muted);
 }
 
-/* Fix for Fee Calculator Tier Overflow on Mobile */
 #feeCalcTier {
   word-break: break-word;
   overflow-wrap: break-word;
@@ -342,7 +356,11 @@ button {
 h2 { margin: 0; font-size: 14px; font-weight: 700; }
 .meta-info { margin: 3px 0 0; color: var(--text-muted); font-size: 10px; }
 
-.export-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.export-actions { 
+  display: flex; 
+  gap: 6px; 
+  flex-wrap: nowrap; 
+}
 
 .btn-export {
   height: 36px;
@@ -351,6 +369,7 @@ h2 { margin: 0; font-size: 14px; font-weight: 700; }
   background: var(--btn-secondary-bg);
   border: 1px solid var(--panel-border);
   color: var(--text-main);
+  white-space: nowrap;
 }
 .btn-export:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -394,20 +413,19 @@ h2 { margin: 0; font-size: 14px; font-weight: 700; }
 .coinglass-table td:first-child, .coinglass-table td:nth-child(2) { text-align: left; }
 .coinglass-table tbody tr:hover { background: var(--hover-bg); }
 
-/* Smooth Rolling Number Animations */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 .rolling-number {
   display: inline-block;
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
   will-change: transform, opacity;
 }
 
-.value-up td {
-  color: var(--coinglass-green) !important;
-}
-
-.value-down td {
-  color: var(--coinglass-red) !important;
-}
+.value-up td { color: var(--coinglass-green) !important; }
+.value-down td { color: var(--coinglass-red) !important; }
 
 .empty-row td { text-align: center !important; color: var(--text-muted); padding: 30px 0; }
 
@@ -442,7 +460,6 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   text-align: center;
 }
 
-/* Interactive Fee Card & Modal */
 .interactive-card { cursor: pointer; transition: border-color 0.15s ease; }
 .interactive-card:hover { border-color: var(--coinglass-blue); }
 
@@ -456,6 +473,7 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   z-index: 1000;
   padding: 16px;
 }
+
 .modal-content {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
@@ -464,6 +482,7 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   max-width: 100%;
   padding: 18px;
 }
+
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -472,7 +491,9 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   border-bottom: 1px solid var(--panel-border);
   padding-bottom: 8px;
 }
+
 .modal-header h3 { margin: 0; font-size: 13px; font-weight: 700; }
+
 .fee-row {
   display: flex;
   justify-content: space-between;
@@ -480,11 +501,11 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   font-size: 12px;
   color: var(--text-muted);
 }
+
 .fee-row strong { color: var(--text-main); }
 .fee-row.total { font-size: 13px; font-weight: 700; color: var(--text-main); margin-top: 6px; }
 .modal-divider { border: 0; border-top: 1px solid var(--panel-border); margin: 10px 0; }
 
-/* Pagination Controls */
 .pagination-container {
   display: flex;
   justify-content: space-between;
@@ -507,7 +528,6 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 @media (max-width: 768px) {
   body { padding: 8px 4px; }
   
-  /* Force exactly 2 cards per line on mobile screens */
   .metrics-grid {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 8px;
@@ -527,19 +547,28 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   .filter-export-container { flex-direction: column; align-items: stretch; }
   .filter-dropdown-field { width: 100%; justify-content: space-between; }
   .filter-dropdown-field select { width: 65%; }
-  .export-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; }
-  .export-actions .pdf-export { grid-column: span 3; }
 
-  /* Ensure clickable rows are fully responsive and touch-friendly */
+  .export-actions { 
+    display: flex !important; 
+    width: 100% !important;
+    gap: 6px !important;
+    justify-content: space-between !important;
+  }
+
+  .export-actions .btn-export {
+    flex: 1 1 0px !important;
+    min-width: 0 !important;
+    padding: 0 4px !important;
+    font-size: 10px !important;
+    text-align: center !important;
+  }
+
+  /* Completely disable pointer events and interaction on desktop-specific asset table rows for mobile view */
   .clickable-asset-row {
-    cursor: pointer;
-    -webkit-tap-highlight-color: rgba(0, 184, 124, 0.2);
-  }
-  .clickable-asset-row:active {
-    background: var(--hover-bg) !important;
+    cursor: default !important;
+    pointer-events: none !important;
   }
 
-  /* Mobile Tables Stacked Vertically - No Horizontal Scrolling Required */
   .coinglass-table, 
   .coinglass-table tbody, 
   .coinglass-table tr, 
@@ -575,17 +604,17 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     border-bottom: none !important;
   }
 
-  /* Dynamic Label Injections for Mobile View */
   #panelContracts .coinglass-table td:nth-child(1):before { content: "Coin"; font-weight: 800; color: var(--text-muted); }
   #panelContracts .coinglass-table td:nth-child(2):before { content: "Position / Lev"; font-weight: 800; color: var(--text-muted); }
   #panelContracts .coinglass-table td:nth-child(3):before { content: "Size"; font-weight: 800; color: var(--text-muted); }
-  #panelContracts .coinglass-table td:nth-child(4):before { content: "Entry Price"; font-weight: 800; color: var(--text-muted); }
-  #panelContracts .coinglass-table td:nth-child(5):before { content: "Mark Price"; font-weight: 800; color: var(--text-muted); }
-  #panelContracts .coinglass-table td:nth-child(6):before { content: "Est. Liq. Price"; font-weight: 800; color: var(--text-muted); }
-  #panelContracts .coinglass-table td:nth-child(7):before { content: "Risk Proximity"; font-weight: 800; color: var(--text-muted); }
-  #panelContracts .coinglass-table td:nth-child(8):before { content: "Unrealized P&L"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(4):before { content: "Position Value"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(5):before { content: "Margin Used"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(6):before { content: "Entry Price"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(7):before { content: "Mark Price"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(8):before { content: "Est. Liq. Price"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(9):before { content: "Risk Proximity"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(10):before { content: "Unrealized P&L"; font-weight: 800; color: var(--text-muted); }
 
-  /* Trade Executions Mobile Labels Injection */
   #panelTrades .coinglass-table td:nth-child(1):before { content: "Date / Time"; font-weight: 800; color: var(--text-muted); }
   #panelTrades .coinglass-table td:nth-child(2):before { content: "Coin"; font-weight: 800; color: var(--text-muted); }
   #panelTrades .coinglass-table td:nth-child(3):before { content: "Dir"; font-weight: 800; color: var(--text-muted); }
@@ -599,7 +628,6 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   #panelTrades .coinglass-table td:nth-child(11):before { content: "Order ID"; font-weight: 800; color: var(--text-muted); }
   #panelTrades .coinglass-table td:nth-child(12):before { content: "Hash"; font-weight: 800; color: var(--text-muted); }
 
-  /* Daily & Monthly P&L Mobile Labels */
   #panelDaily .coinglass-table td:nth-child(1):before,
   #panelMonthly .coinglass-table td:nth-child(1):before { content: "Period / Date"; font-weight: 800; color: var(--text-muted); }
   #panelDaily .coinglass-table td:nth-child(2):before,
@@ -613,7 +641,6 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   #panelDaily .coinglass-table td:nth-child(6):before,
   #panelMonthly .coinglass-table td:nth-child(6):before { content: "Total Fills"; font-weight: 800; color: var(--text-muted); }
 
-  /* Asset Performance Breakdown Mobile Labels (for charts.html) */
   #assetTableBody td:nth-child(1):before { content: "Coin / Asset"; font-weight: 800; color: var(--text-muted); }
   #assetTableBody td:nth-child(2):before { content: "Closed P&L"; font-weight: 800; color: var(--text-muted); }
   #assetTableBody td:nth-child(3):before { content: "Total Fees"; font-weight: 800; color: var(--text-muted); }
@@ -621,14 +648,12 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   #assetTableBody td:nth-child(5):before { content: "Total Volume"; font-weight: 800; color: var(--text-muted); }
   #assetTableBody td:nth-child(6):before { content: "Fills Count"; font-weight: 800; color: var(--text-muted); }
 
-  /* Deposits & Withdrawals Mobile Labels */
   #panelDepositsWithdrawals .coinglass-table td:nth-child(1):before { content: "Date / Time"; font-weight: 800; color: var(--text-muted); }
   #panelDepositsWithdrawals .coinglass-table td:nth-child(2):before { content: "Type"; font-weight: 800; color: var(--text-muted); }
   #panelDepositsWithdrawals .coinglass-table td:nth-child(3):before { content: "Token / Asset"; font-weight: 800; color: var(--text-muted); }
   #panelDepositsWithdrawals .coinglass-table td:nth-child(4):before { content: "Amount / Value"; font-weight: 800; color: var(--text-muted); }
   #panelDepositsWithdrawals .coinglass-table td:nth-child(5):before { content: "Hash / Ref"; font-weight: 800; color: var(--text-muted); }
 
-  /* Open Orders Mobile Labels */
   #panelOpenOrders .coinglass-table td:nth-child(1):before { content: "Coin"; font-weight: 800; color: var(--text-muted); }
   #panelOpenOrders .coinglass-table td:nth-child(2):before { content: "Order ID"; font-weight: 800; color: var(--text-muted); }
   #panelOpenOrders .coinglass-table td:nth-child(3):before { content: "Type / Side"; font-weight: 800; color: var(--text-muted); }

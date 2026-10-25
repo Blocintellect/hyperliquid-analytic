@@ -39,7 +39,6 @@ const SAVED_THEME_KEY = "hyperliquid_theme";
 
 const statusEl = $("status");
 
-// Theme Initialization & Toggle Listeners
 function initTheme() {
   const currentTheme = localStorage.getItem(SAVED_THEME_KEY) || "dark";
   applyTheme(currentTheme);
@@ -74,7 +73,6 @@ $("themeToggleBtn")?.addEventListener("click", () => {
 
 initTheme();
 
-// Modal Elements & Event Listeners
 const peakCard = $("peakCard"), peakModal = $("peakModal"), closePeakModal = $("closePeakModal");
 const ddCard = $("ddCard"), ddModal = $("ddModal"), closeDdModal = $("closeDdModal");
 const winLossCard = $("winLossCard"), winLossModal = $("winLossModal"), closeWinLossModal = $("closeWinLossModal");
@@ -89,92 +87,92 @@ const recoveryCard = $("recoveryCard"), recoveryModal = $("recoveryModal"), clos
 const daysCard = $("daysCard"), daysModal = $("daysModal"), closeDaysModal = $("closeDaysModal");
 const assetModal = $("assetModal"), closeAssetModal = $("closeAssetModal");
 
-peakCard.addEventListener("click", () => {
+peakCard?.addEventListener("click", () => {
   $("modalPeakVal").textContent = money(analyticsCache.peakPnl, 2);
   peakModal.classList.remove("hidden");
 });
-closePeakModal.addEventListener("click", () => peakModal.classList.add("hidden"));
+closePeakModal?.addEventListener("click", () => peakModal.classList.add("hidden"));
 
-ddCard.addEventListener("click", () => {
+ddCard?.addEventListener("click", () => {
   $("modalDdVal").textContent = "−" + plainMoney(analyticsCache.maxDrawdown, 2);
   ddModal.classList.remove("hidden");
 });
-closeDdModal.addEventListener("click", () => ddModal.classList.add("hidden"));
+closeDdModal?.addEventListener("click", () => ddModal.classList.add("hidden"));
 
-winLossCard.addEventListener("click", () => {
+winLossCard?.addEventListener("click", () => {
   $("modalWinsVal").textContent = analyticsCache.totalWins.toLocaleString();
   $("modalLossesVal").textContent = analyticsCache.totalLosses.toLocaleString();
   $("modalRatioVal").textContent = analyticsCache.winLossRatioStr;
   winLossModal.classList.remove("hidden");
 });
-closeWinLossModal.addEventListener("click", () => winLossModal.classList.add("hidden"));
+closeWinLossModal?.addEventListener("click", () => winLossModal.classList.add("hidden"));
 
-profitFactorCard.addEventListener("click", () => {
+profitFactorCard?.addEventListener("click", () => {
   $("modalGrossProfit").textContent = money(analyticsCache.grossProfit, 2);
   $("modalGrossLoss").textContent = plainMoney(analyticsCache.grossLoss, 2);
   $("modalPfVal").textContent = analyticsCache.profitFactorVal;
   profitFactorModal.classList.remove("hidden");
 });
-closeProfitFactorModal.addEventListener("click", () => profitFactorModal.classList.add("hidden"));
+closeProfitFactorModal?.addEventListener("click", () => profitFactorModal.classList.add("hidden"));
 
-avgTradeCard.addEventListener("click", () => {
+avgTradeCard?.addEventListener("click", () => {
   $("modalAvgVal").textContent = money(analyticsCache.avgTradeExpectancy, 2);
   avgTradeModal.classList.remove("hidden");
 });
-closeAvgTradeModal.addEventListener("click", () => avgTradeModal.classList.add("hidden"));
+closeAvgTradeModal?.addEventListener("click", () => avgTradeModal.classList.add("hidden"));
 
-streakCard.addEventListener("click", () => {
+streakCard?.addEventListener("click", () => {
   $("modalMaxWinStreak").textContent = analyticsCache.maxWinStreak.toLocaleString() + " Wins";
   $("modalMaxLossStreak").textContent = analyticsCache.maxLossStreak.toLocaleString() + " Losses";
   streakModal.classList.remove("hidden");
 });
-closeStreakModal.addEventListener("click", () => streakModal.classList.add("hidden"));
+closeStreakModal?.addEventListener("click", () => streakModal.classList.add("hidden"));
 
-outlierCard.addEventListener("click", () => {
+outlierCard?.addEventListener("click", () => {
   $("modalBestTrade").textContent = `${analyticsCache.bestTrade.coin}: ${money(analyticsCache.bestTrade.pnl, 2)}`;
   $("modalWorstTrade").textContent = `${analyticsCache.worstTrade.coin}: ${money(analyticsCache.worstTrade.pnl, 2)}`;
   outlierModal.classList.remove("hidden");
 });
-closeOutlierModal.addEventListener("click", () => outlierModal.classList.add("hidden"));
+closeOutlierModal?.addEventListener("click", () => outlierModal.classList.add("hidden"));
 
-longShortCard.addEventListener("click", () => {
+longShortCard?.addEventListener("click", () => {
   $("modalLongPnl").textContent = money(analyticsCache.longPnl, 2);
   $("modalLongWinRate").textContent = analyticsCache.longWinRate.toFixed(1) + "%";
   $("modalShortPnl").textContent = money(analyticsCache.shortPnl, 2);
   $("modalShortWinRate").textContent = analyticsCache.shortWinRate.toFixed(1) + "%";
   longShortModal.classList.remove("hidden");
 });
-closeLongShortModal.addEventListener("click", () => longShortModal.classList.add("hidden"));
+closeLongShortModal?.addEventListener("click", () => longShortModal.classList.add("hidden"));
 
-sessionCard.addEventListener("click", () => {
+sessionCard?.addEventListener("click", () => {
   $("modalAsianPnl").textContent = money(analyticsCache.sessionPnl.asian, 2);
   $("modalLondonPnl").textContent = money(analyticsCache.sessionPnl.london, 2);
   $("modalNyPnl").textContent = money(analyticsCache.sessionPnl.ny, 2);
   sessionModal.classList.remove("hidden");
 });
-closeSessionModal.addEventListener("click", () => sessionModal.classList.add("hidden"));
+closeSessionModal?.addEventListener("click", () => sessionModal.classList.add("hidden"));
 
-durationCard.addEventListener("click", () => {
+durationCard?.addEventListener("click", () => {
   $("modalScalpPnl").textContent = money(analyticsCache.durationPnl.scalp, 2);
   $("modalIntradayPnl").textContent = money(analyticsCache.durationPnl.intraday, 2);
   $("modalSwingPnl").textContent = money(analyticsCache.durationPnl.swing, 2);
   durationModal.classList.remove("hidden");
 });
-closeDurationModal.addEventListener("click", () => durationModal.classList.add("hidden"));
+closeDurationModal?.addEventListener("click", () => durationModal.classList.add("hidden"));
 
-recoveryCard.addEventListener("click", () => {
+recoveryCard?.addEventListener("click", () => {
   $("modalRecoveryDays").textContent = `${analyticsCache.avgRecoveryDays} Days`;
   recoveryModal.classList.remove("hidden");
 });
-closeRecoveryModal.addEventListener("click", () => recoveryModal.classList.add("hidden"));
+closeRecoveryModal?.addEventListener("click", () => recoveryModal.classList.add("hidden"));
 
-daysCard.addEventListener("click", () => {
+daysCard?.addEventListener("click", () => {
   $("modalDaysVal").textContent = analyticsCache.daysCount.toLocaleString();
   daysModal.classList.remove("hidden");
 });
-closeDaysModal.addEventListener("click", () => daysModal.classList.add("hidden"));
+closeDaysModal?.addEventListener("click", () => daysModal.classList.add("hidden"));
 
-closeAssetModal.addEventListener("click", () => assetModal.classList.add("hidden"));
+closeAssetModal?.addEventListener("click", () => assetModal.classList.add("hidden"));
 
 window.addEventListener("click", e => {
   if (e.target === peakModal) peakModal.classList.add("hidden");
@@ -192,7 +190,6 @@ window.addEventListener("click", e => {
   if (e.target === assetModal) assetModal.classList.add("hidden");
 });
 
-// Zoom Date Range Button Listeners
 document.querySelectorAll("#zoomPresetBtns button").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll("#zoomPresetBtns button").forEach(b => b.classList.remove("active"));
@@ -203,6 +200,7 @@ document.querySelectorAll("#zoomPresetBtns button").forEach(btn => {
 });
 
 function setStatus(m, t = "") {
+  if (!statusEl) return;
   statusEl.textContent = m;
   statusEl.className = "status" + (t ? " " + t : "");
   statusEl.classList.remove("hidden");
@@ -491,18 +489,18 @@ function processAndRenderAnalytics(fills, funding) {
     daysCount: dates.length
   };
 
-  $("statPeak").textContent = money(peakPnl, 2);
-  $("statMaxDD").textContent = "−" + plainMoney(maxDrawdown, 2);
-  $("statWinLoss").textContent = `${winLossRatioStr} (${totalWins}W / ${totalLosses}L)`;
-  $("statProfitFactor").textContent = profitFactorVal;
-  $("statAvgTrade").textContent = money(avgTradeExpectancy, 2);
-  $("statStreak").textContent = `${maxWinStreak}W / ${maxLossStreak}L`;
-  $("statOutliers").textContent = `${bestTrade.coin} (+${money(bestTrade.pnl, 0)})`;
-  $("statLongShort").textContent = longPnl >= shortPnl ? `Longs (+${money(longPnl, 0)})` : `Shorts (+${money(shortPnl, 0)})`;
-  $("statSession").textContent = `${topSessionName} (${money(maxSessionVal, 0)})`;
-  $("statDuration").textContent = durationPnl.scalp >= durationPnl.intraday ? "Scalps" : "Intraday";
-  $("statRecovery").textContent = `${avgRecoveryDays} Days`;
-  $("statDays").textContent = dates.length.toLocaleString();
+  if ($("statPeak")) $("statPeak").textContent = money(peakPnl, 2);
+  if ($("statMaxDD")) $("statMaxDD").textContent = "−" + plainMoney(maxDrawdown, 2);
+  if ($("statWinLoss")) $("statWinLoss").textContent = `${winLossRatioStr} (${totalWins}W / ${totalLosses}L)`;
+  if ($("statProfitFactor")) $("statProfitFactor").textContent = profitFactorVal;
+  if ($("statAvgTrade")) $("statAvgTrade").textContent = money(avgTradeExpectancy, 2);
+  if ($("statStreak")) $("statStreak").textContent = `${maxWinStreak}W / ${maxLossStreak}L`;
+  if ($("statOutliers")) $("statOutliers").textContent = `${bestTrade.coin} (+${money(bestTrade.pnl, 0)})`;
+  if ($("statLongShort")) $("statLongShort").textContent = longPnl >= shortPnl ? `Longs (+${money(longPnl, 0)})` : `Shorts (+${money(shortPnl, 0)})`;
+  if ($("statSession")) $("statSession").textContent = `${topSessionName} (${money(maxSessionVal, 0)})`;
+  if ($("statDuration")) $("statDuration").textContent = durationPnl.scalp >= durationPnl.intraday ? "Scalps" : "Intraday";
+  if ($("statRecovery")) $("statRecovery").textContent = `${avgRecoveryDays} Days`;
+  if ($("statDays")) $("statDays").textContent = dates.length.toLocaleString();
 
   renderAssetTable(assetMap);
   renderAssetBarChart(assetMap);
@@ -614,6 +612,8 @@ function renderAssetBarChart(assetMap) {
 
 function renderAssetTable(assetMap) {
   const assetBody = $("assetTableBody");
+  if (!assetBody) return;
+
   const sortedCoins = Object.keys(assetMap).sort((a, b) => assetMap[b].netPnl - assetMap[a].netPnl);
 
   if (!sortedCoins.length) {
@@ -627,6 +627,8 @@ function renderAssetTable(assetMap) {
   let totalVolume = 0;
   let totalFills = 0;
 
+  const isMobile = window.innerWidth <= 768;
+
   const rowsHtml = sortedCoins.map(coin => {
     const row = assetMap[coin];
     totalClosedPnl += row.closedPnl;
@@ -635,7 +637,7 @@ function renderAssetTable(assetMap) {
     totalVolume += row.volume;
     totalFills += row.fills;
 
-    return `<tr class="clickable-asset-row" style="cursor: pointer;" data-coin="${esc(coin)}">
+    return `<tr class="${isMobile ? "" : "clickable-asset-row"}" style="${isMobile ? "" : "cursor: pointer;"}" data-coin="${esc(coin)}">
       <td style="text-align: left; font-weight: 800;" class="coin-name">${esc(coin)}</td>
       <td class="${row.closedPnl > 0 ? "text-positive" : row.closedPnl < 0 ? "text-negative" : ""}">${money(row.closedPnl, 2)}</td>
       <td>${plainMoney(row.fees, 2)}</td>
@@ -656,32 +658,34 @@ function renderAssetTable(assetMap) {
 
   assetBody.innerHTML = rowsHtml + totalRowHtml;
 
-  assetBody.querySelectorAll(".clickable-asset-row").forEach(tr => {
-    const triggerModal = (e) => {
-      e.preventDefault();
-      const coin = tr.getAttribute("data-coin");
-      const data = assetMap[coin];
-      if (!data) return;
+  // Strict check: Only attach row click popups if viewport width is greater than 768px (laptop/desktop view)
+  if (!isMobile) {
+    assetBody.querySelectorAll(".clickable-asset-row").forEach(tr => {
+      tr.addEventListener("click", (e) => {
+        e.preventDefault();
+        const coin = tr.getAttribute("data-coin");
+        const data = assetMap[coin];
+        if (!data) return;
 
-      $("modalAssetTitle").textContent = `${coin} — Performance Details`;
-      $("modalAssetClosedPnl").textContent = money(data.closedPnl, 2);
-      $("modalAssetClosedPnl").className = data.closedPnl >= 0 ? "text-positive" : "text-negative";
-      
-      $("modalAssetFees").textContent = plainMoney(data.fees, 2);
-      
-      $("modalAssetNetPnl").textContent = money(data.netPnl, 2);
-      $("modalAssetNetPnl").className = data.netPnl >= 0 ? "text-positive" : "text-negative";
+        $("modalAssetTitle").textContent = `${coin} — Performance Details`;
+        $("modalAssetClosedPnl").textContent = money(data.closedPnl, 2);
+        $("modalAssetClosedPnl").className = data.closedPnl >= 0 ? "text-positive" : "text-negative";
+        
+        $("modalAssetFees").textContent = plainMoney(data.fees, 2);
+        
+        $("modalAssetNetPnl").textContent = money(data.netPnl, 2);
+        $("modalAssetNetPnl").className = data.netPnl >= 0 ? "text-positive" : "text-negative";
 
-      $("modalAssetVolume").textContent = plainMoney(data.volume, 2);
-      $("modalAssetFills").textContent = data.fills.toLocaleString();
-      $("modalAssetWinLoss").textContent = `${data.wins}W / ${data.losses}L`;
+        $("modalAssetVolume").textContent = plainMoney(data.volume, 2);
+        $("modalAssetFills").textContent = data.fills.toLocaleString();
+        $("modalAssetWinLoss").textContent = `${data.wins}W / ${data.losses}L`;
 
-      assetModal.classList.remove("hidden");
-    };
+        assetModal.classList.remove("hidden");
+      });
+    });
+  }
 
-    tr.addEventListener("click", triggerModal);
-    tr.addEventListener("touchend", triggerModal);
-  });
-
-  $("tableMeta").textContent = `Displaying performance across ${sortedCoins.length} traded asset market(s). Tap any row for details.`;
+  if ($("tableMeta")) {
+    $("tableMeta").textContent = `Displaying performance across ${sortedCoins.length} traded asset market(s).`;
+  }
 }

@@ -58,23 +58,23 @@ const feeCard = $("feeCard"), feeModal = $("feeModal"), closeModalBtn = $("close
 const winRateCard = $("winRateCard"), winRateModal = $("winRateModal"), closeWinModal = $("closeWinModal");
 const holdingsCard = $("holdingsCard"), holdingsModal = $("holdingsModal"), closeHoldingsModal = $("closeHoldingsModal");
 
-fillsCard.addEventListener("click", () => fillsModal.classList.remove("hidden"));
-closeFillsModal.addEventListener("click", () => fillsModal.classList.add("hidden"));
+fillsCard?.addEventListener("click", () => fillsModal.classList.remove("hidden"));
+closeFillsModal?.addEventListener("click", () => fillsModal.classList.add("hidden"));
 
-netPnlCard.addEventListener("click", () => netPnlModal.classList.remove("hidden"));
-closeNetModal.addEventListener("click", () => netPnlModal.classList.add("hidden"));
+netPnlCard?.addEventListener("click", () => netPnlModal.classList.remove("hidden"));
+closeNetModal?.addEventListener("click", () => netPnlModal.classList.add("hidden"));
 
-closedPnlCard.addEventListener("click", () => closedPnlModal.classList.remove("hidden"));
-closeClosedModal.addEventListener("click", () => closedPnlModal.classList.add("hidden"));
+closedPnlCard?.addEventListener("click", () => closedPnlModal.classList.remove("hidden"));
+closeClosedModal?.addEventListener("click", () => closedPnlModal.classList.add("hidden"));
 
-feeCard.addEventListener("click", () => feeModal.classList.remove("hidden"));
-closeModalBtn.addEventListener("click", () => feeModal.classList.add("hidden"));
+feeCard?.addEventListener("click", () => feeModal.classList.remove("hidden"));
+closeModalBtn?.addEventListener("click", () => feeModal.classList.add("hidden"));
 
-winRateCard.addEventListener("click", () => winRateModal.classList.remove("hidden"));
-closeWinModal.addEventListener("click", () => winRateModal.classList.add("hidden"));
+winRateCard?.addEventListener("click", () => winRateModal.classList.remove("hidden"));
+closeWinModal?.addEventListener("click", () => winRateModal.classList.add("hidden"));
 
-holdingsCard.addEventListener("click", () => holdingsModal.classList.remove("hidden"));
-closeHoldingsModal.addEventListener("click", () => holdingsModal.classList.add("hidden"));
+holdingsCard?.addEventListener("click", () => holdingsModal.classList.remove("hidden"));
+closeHoldingsModal?.addEventListener("click", () => holdingsModal.classList.add("hidden"));
 
 window.addEventListener("click", e => { 
   if (e.target === feeModal) feeModal.classList.add("hidden");
@@ -142,16 +142,19 @@ function renderWatchlistUI() {
   if (!container) return;
 
   if (!watchlist.length) {
-    container.innerHTML = '<span style="color: var(--text-muted); font-size: 12px;">No saved watchlisted wallets yet.</span>';
+    container.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 20px;">No saved watchlisted wallets yet.</td></tr>';
     return;
   }
 
   container.innerHTML = watchlist.map((item, idx) => `
-    <div style="display: flex; align-items: center; gap: 6px; background: var(--btn-secondary-bg); border: 1px solid var(--btn-secondary-border); padding: 6px 10px; border-radius: 6px;">
-      <span style="font-weight: 700; color: var(--coinglass-green); cursor: pointer;" onclick="loadWatchlistedWallet('${item.address}')">${esc(item.label)}</span>
-      <span style="font-size: 10px; color: var(--text-muted); font-family: monospace;">(${item.address.slice(0, 6)}...${item.address.slice(-4)})</span>
-      <button onclick="removeWatchlistItem(${idx})" style="background: none; border: none; color: var(--coinglass-red); cursor: pointer; font-weight: bold; padding: 0 4px;">✕</button>
-    </div>
+    <tr>
+      <td style="font-weight: 700; color: var(--coinglass-green);">${esc(item.label)}</td>
+      <td style="font-family: monospace; color: var(--text-muted);">${esc(item.address)}</td>
+      <td style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
+        <button class="secondary" style="height: 30px; padding: 0 10px; font-size: 11px;" onclick="loadWatchlistedWallet('${item.address}')">Load</button>
+        <button class="btn-ghost" style="height: 30px; padding: 0 8px; color: var(--coinglass-red);" onclick="removeWatchlistItem(${idx})">✕</button>
+      </td>
+    </tr>
   `).join("");
 }
 
@@ -276,11 +279,15 @@ async function setInceptionPreset() {
 
   const today = new Date();
   endEl.value = formatDateInput(today);
+  const depEnd = $("depositEndDate");
+  if (depEnd) depEnd.value = formatDateInput(today);
 
   if (!isAddress(wallet)) {
     const defaultStart = new Date();
     defaultStart.setFullYear(defaultStart.getFullYear() - 1);
     startEl.value = formatDateInput(defaultStart);
+    const depStart = $("depositStartDate");
+    if (depStart) depStart.value = formatDateInput(defaultStart);
     return;
   }
 
@@ -294,25 +301,44 @@ async function setInceptionPreset() {
       aggregateByTime: false
     });
 
+    let minTime = Date.now();
     if (Array.isArray(res) && res.length > 0) {
-      let minTime = Date.now();
       res.forEach(f => {
         const t = Number(f.time);
         if (t > 0 && t < minTime) minTime = t;
       });
-      startEl.value = formatDateInput(new Date(minTime));
-      setStatus(`Detected wallet trading inception date: ${new Date(minTime).toLocaleDateString()}`, "success");
-    } else {
-      const defaultStart = new Date();
-      defaultStart.setMonth(defaultStart.getMonth() - 3);
-      startEl.value = formatDateInput(defaultStart);
-      clearStatus();
     }
+
+    try {
+      const ledgerRes = await postInfo({
+        type: "userNonFundingLedgerUpdates",
+        user: wallet.toLowerCase(),
+        startTime: 0,
+        endTime: Date.now()
+      });
+      if (Array.isArray(ledgerRes) && ledgerRes.length > 0) {
+        ledgerRes.forEach(item => {
+          const t = Number(item.time || item.delta?.time || 0);
+          if (t > 0 && t < minTime) minTime = t;
+        });
+      }
+    } catch (e) {
+      console.warn("Ledger inception check warning:", e);
+    }
+
+    const inceptionStr = formatDateInput(new Date(minTime === Date.now() ? Date.now() - 90*86400000 : minTime));
+    startEl.value = inceptionStr;
+    const depStart = $("depositStartDate");
+    if (depStart) depStart.value = inceptionStr;
+
+    setStatus(`Detected wallet initial transaction/inception date: ${new Date(minTime === Date.now() ? Date.now() - 90*86400000 : minTime).toLocaleDateString()}`, "success");
   } catch (e) {
     console.warn("Could not fetch inception date:", e);
     const defaultStart = new Date();
     defaultStart.setFullYear(defaultStart.getFullYear() - 1);
     startEl.value = formatDateInput(defaultStart);
+    const depStart = $("depositStartDate");
+    if (depStart) depStart.value = formatDateInput(defaultStart);
     clearStatus();
   }
 }
@@ -322,24 +348,34 @@ function setPreset(k) {
   const e = new Date(n);
   let s = new Date(n);
 
-  [allInceptionBtn, monthBtn, ytdBtn, todayBtn].forEach(b => b && b.classList.remove("active"));
+  [allInceptionBtn, monthBtn, ytdBtn, todayBtn, $("zoom7dBtn"), $("zoom30dBtn"), $("zoom90dBtn"), $("zoomYtdBtn"), $("zoomAllBtn")].forEach(b => b && b.classList.remove("active"));
 
   if (k === "today") {
     s = new Date(n.getFullYear(), n.getMonth(), n.getDate());
     if (todayBtn) todayBtn.classList.add("active");
-  } else if (k === "month") {
-    s = new Date(n.getFullYear(), n.getMonth(), 1);
+  } else if (k === "month" || k === "30d") {
+    s = new Date(n.getTime() - 30 * 86400000);
     if (monthBtn) monthBtn.classList.add("active");
+    if ($("zoom30dBtn")) $("zoom30dBtn").classList.add("active");
+  } else if (k === "7d") {
+    s = new Date(n.getTime() - 7 * 86400000);
+    if ($("zoom7dBtn")) $("zoom7dBtn").classList.add("active");
+  } else if (k === "90d") {
+    s = new Date(n.getTime() - 90 * 86400000);
+    if ($("zoom90dBtn")) $("zoom90dBtn").classList.add("active");
   } else if (k === "ytd") {
     s = new Date(n.getFullYear(), 0, 1);
     if (ytdBtn) ytdBtn.classList.add("active");
+    if ($("zoomYtdBtn")) $("zoomYtdBtn").classList.add("active");
   } else {
     setInceptionPreset();
+    if ($("zoomAllBtn")) $("zoomAllBtn").classList.add("active");
     return;
   }
 
   startEl.value = formatDateInput(s);
   endEl.value = formatDateInput(e);
+  renderTrades();
 }
 
 setInceptionPreset();
@@ -469,8 +505,8 @@ async function fetchAccountData(user, startMs, endMs) {
       const ledgerData = await postInfo({
         type: "userNonFundingLedgerUpdates",
         user: cleanUser,
-        startTime: startMs,
-        endTime: endMs
+        startTime: 0,
+        endTime: Date.now()
       });
       if (Array.isArray(ledgerData)) return ledgerData;
     } catch (e) {
@@ -798,7 +834,7 @@ function getFilteredFills() {
 
 function renderContracts() {
   if (!activePositions || activePositions.length === 0) {
-    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="8">No open perpetual positions currently active.</td></tr>';
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="10">No open perpetual positions currently active.</td></tr>';
     contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
@@ -807,7 +843,7 @@ function renderContracts() {
   let count = 0;
   let totalUnrealizedPnl = 0;
 
-  activePositions.forEach(item => {
+  activePositions.forEach((item, index) => {
     const pos = item.position || item;
     if (!pos) return;
 
@@ -817,9 +853,10 @@ function renderContracts() {
     count++;
     const coin = pos.coin || "PERP";
     const entryPx = num(pos.entryPx);
+    const positionValue = num(pos.positionValue) || Math.abs(sizeNum * entryPx);
+    const marginUsed = num(pos.marginUsed) || (positionValue / num(pos.leverage?.value || 1));
     
-    const currentMarkPx = num(livePrices[coin]) || (sizeNum !== 0 ? Math.abs(num(pos.positionValue) / sizeNum) : entryPx);
-    const liveNotional = Math.abs(sizeNum * currentMarkPx);
+    const currentMarkPx = num(livePrices[coin]) || (sizeNum !== 0 ? Math.abs(positionValue / sizeNum) : entryPx);
     const priceDiff = sizeNum > 0 ? (currentMarkPx - entryPx) : (entryPx - currentMarkPx);
     const liveUnPnl = priceDiff * Math.abs(sizeNum);
 
@@ -830,8 +867,15 @@ function renderContracts() {
     const leverageText = ` (${levValue}x)`;
     const dirLabel = sizeNum > 0 ? `LONG${leverageText}` : `SHORT${leverageText}`;
 
-    let estLiqPx = sizeNum > 0 ? entryPx * (1 - (1 / levValue) * 0.9) : entryPx * (1 + (1 / levValue) * 0.9);
-    estLiqPx = Math.max(0, estLiqPx);
+    let estLiqPx = num(pos.liquidationPx || pos.liqPx);
+    if (!estLiqPx || estLiqPx <= 0) {
+      if (sizeNum > 0) {
+        estLiqPx = entryPx - (marginUsed / Math.abs(sizeNum)) * 0.95;
+      } else {
+        estLiqPx = entryPx + (marginUsed / Math.abs(sizeNum)) * 0.95;
+      }
+      estLiqPx = Math.max(0, estLiqPx);
+    }
 
     const distancePercent = Math.abs((currentMarkPx - estLiqPx) / currentMarkPx) * 100;
     let riskColor = "text-positive";
@@ -844,7 +888,7 @@ function renderContracts() {
       riskLabel = "Moderate (<15%)";
     }
 
-    const unPnlId = `contract-unpnl-${coin}`;
+    const unPnlId = `contract-unpnl-${coin}-${index}`;
     const pnlClass = liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : "";
 
     rows.push(`
@@ -852,26 +896,29 @@ function renderContracts() {
         <td style="text-align: left; font-weight: 800;" class="coin-name">${esc(coin)}</td>
         <td class="${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</td>
         <td>${Math.abs(sizeNum).toLocaleString()}</td>
+        <td>${plainMoney(positionValue, 2)}</td>
+        <td>${plainMoney(marginUsed, 2)}</td>
         <td>${plainMoney(entryPx, 4)}</td>
         <td>${plainMoney(currentMarkPx, 4)}</td>
         <td>${plainMoney(estLiqPx, 4)}</td>
         <td class="${riskColor}" style="font-weight: 700;">${riskLabel}</td>
         <td class="${pnlClass}">
           <span id="${unPnlId}" class="contract-animated-pnl">${money(liveUnPnl, 2)}</span>
+          <button class="secondary" style="margin-left: 8px; height: 26px; padding: 0 6px; font-size: 10px;" onclick="openCloseSimulation('${esc(coin)}', ${sizeNum}, ${entryPx}, ${currentMarkPx})">Simulate Close</button>
         </td>
       </tr>
     `);
   });
 
   if (rows.length === 0) {
-    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="8">No open perpetual positions currently active.</td></tr>';
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="10">No open perpetual positions currently active.</td></tr>';
     contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
 
   contractsBodyEl.innerHTML = rows.join("");
 
-  activePositions.forEach(item => {
+  activePositions.forEach((item, index) => {
     const pos = item.position || item;
     if (!pos) return;
     const sizeNum = num(pos.szi);
@@ -882,13 +929,61 @@ function renderContracts() {
     const currentMarkPx = num(livePrices[coin]) || (sizeNum !== 0 ? Math.abs(num(pos.positionValue) / sizeNum) : entryPx);
     const liveUnPnl = (sizeNum > 0 ? (currentMarkPx - entryPx) : (entryPx - currentMarkPx)) * Math.abs(sizeNum);
 
-    animateNumber(`contract-unpnl-${coin}`, liveUnPnl, true, 2, true);
+    animateNumber(`contract-unpnl-${coin}-${index}`, liveUnPnl, true, 2, true);
   });
   
   const totalPnlClass = totalUnrealizedPnl > 0 ? "text-positive" : totalUnrealizedPnl < 0 ? "text-negative" : "";
   contractsMeta.innerHTML = `Displaying ${count} active contract(s) | Total Unrealized P&L: <strong id="totalUnrealizedMeta" class="${totalPnlClass}">${money(totalUnrealizedPnl, 2)}</strong>`;
   animateNumber("totalUnrealizedMeta", totalUnrealizedPnl, true, 2, true);
 }
+
+window.openCloseSimulation = function(coin, size, entryPx, markPx) {
+  let modal = $("simModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "simModal";
+    modal.className = "modal";
+    modal.innerHTML = `
+      <div class="modal-content" style="width: 400px;">
+        <div class="modal-header">
+          <h3 id="simModalTitle">Simulate Closing Contract</h3>
+          <button class="btn-ghost" onclick="$('simModal').classList.add('hidden')">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="fee-row"><span>Coin:</span> <strong id="simCoin">—</strong></div>
+          <div class="fee-row"><span>Position Size:</span> <strong id="simSize">—</strong></div>
+          <div class="fee-row"><span>Entry Price:</span> <strong id="simEntry">—</strong></div>
+          <div style="margin: 14px 0;">
+            <label style="font-size: 10px; font-weight: 800; color: var(--text-muted); display: block; margin-bottom: 6px;">CUSTOM CLOSING PRICE ($)</label>
+            <input id="simClosePriceInput" type="number" step="any" style="width: 100%;">
+          </div>
+          <hr class="modal-divider">
+          <div class="fee-row total"><span>Estimated P&L Result:</span> <strong id="simResultPnl">$0.00</strong></div>
+          <button class="btn-primary" style="width: 100%; margin-top: 16px;" onclick="calculateSimulatedPnl()">Calculate Real Value</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  $("simCoin").textContent = coin;
+  $("simSize").textContent = size;
+  $("simEntry").textContent = plainMoney(entryPx, 4);
+  $("simClosePriceInput").value = markPx;
+  $("simResultPnl").textContent = money((size > 0 ? (markPx - entryPx) : (entryPx - markPx)) * Math.abs(size), 2);
+  
+  window._simData = { size, entryPx };
+  modal.classList.remove("hidden");
+};
+
+window.calculateSimulatedPnl = function() {
+  const closePx = num($("simClosePriceInput").value);
+  const { size, entryPx } = window._simData;
+  const pnl = (size > 0 ? (closePx - entryPx) : (entryPx - closePx)) * Math.abs(size);
+  const resEl = $("simResultPnl");
+  resEl.textContent = money(pnl, 2);
+  resEl.className = pnl >= 0 ? "text-positive" : "text-negative";
+};
 
 function renderQuantMetrics() {
   const targetFills = getFilteredFills();
@@ -1179,12 +1274,26 @@ function renderDepositsWithdrawals() {
     return;
   }
 
-  depositsBodyEl.innerHTML = ledgerUpdates.map(item => {
+  const depStart = $("depositStartDate")?.value ? msStart($("depositStartDate").value) : 0;
+  const depEnd = $("depositEndDate")?.value ? msEnd($("depositEndDate").value) : Date.now();
+
+  const filteredLedger = ledgerUpdates.filter(item => {
+    const t = Number(item.time || item.delta?.time || 0);
+    return t >= depStart && t <= depEnd;
+  });
+
+  if (!filteredLedger.length) {
+    depositsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="5">No deposit or withdrawal records in selected date range.</td></tr>';
+    depositsMeta.textContent = "0 transfer records found in range.";
+    return;
+  }
+
+  depositsBodyEl.innerHTML = filteredLedger.map(item => {
     const t = item.time || item.delta?.time;
     const delta = item.delta || item;
     const type = delta.type || "Transfer";
-    const usdcVal = num(delta.usdcValue || delta.amount || 0);
-    const token = delta.token || "USDC";
+    const usdcVal = num(delta.usdc || delta.usdcValue || delta.amount || 0);
+    const token = delta.token || (type === "deposit" || type === "withdraw" ? "USDC" : "Asset");
     const hash = item.hash || "—";
     const hasHash = hash && hash !== "null" && hash !== "0x0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -1194,15 +1303,26 @@ function renderDepositsWithdrawals() {
 
     return `<tr>
       <td style="text-align: left;">${esc(formatDate(t))}</td>
-      <td style="font-weight: 700;">${esc(type)}</td>
+      <td style="font-weight: 700; text-transform: capitalize;">${esc(type)}</td>
       <td>${esc(token)}</td>
       <td class="${usdcVal > 0 ? "text-positive" : usdcVal < 0 ? "text-negative" : ""}">${money(usdcVal, 2)}</td>
       <td>${hashCell}</td>
     </tr>`;
   }).join("");
 
-  depositsMeta.textContent = `Displaying ${ledgerUpdates.length} deposit/withdrawal record(s).`;
+  depositsMeta.textContent = `Displaying ${filteredLedger.length} deposit/withdrawal record(s).`;
 }
+
+$("depositFetchBtn")?.addEventListener("click", () => {
+  const btn = $("depositFetchBtn");
+  btn.disabled = true;
+  btn.innerHTML = `<span style="display:inline-block; width:10px; height:10px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.8s linear infinite; margin-right:4px; vertical-align:middle;"></span> Filtering...`;
+  setTimeout(() => {
+    renderDepositsWithdrawals();
+    btn.disabled = false;
+    btn.innerHTML = "Filter Dates";
+  }, 300);
+});
 
 function renderOpenOrders() {
   if (!openOrdersList || !openOrdersList.length) {
@@ -1340,7 +1460,6 @@ function renderWalletDetails() {
   $("detSpotValue").textContent = plainMoney(spotVal, 2);
   $("detLeverage").textContent = totalLeverage.toFixed(2) + "x";
 
-  // --- Calculate Daily, Monthly, and Yearly Average Net P&L ---
   const dailyMap = {};
   const monthlyMap = {};
   const yearlyMap = {};
@@ -1397,7 +1516,6 @@ function renderWalletDetails() {
     detAvgYearlyEl.textContent = money(avgYearlyPnl, 2);
     detAvgYearlyEl.className = "value " + (avgYearlyPnl > 0 ? "text-positive" : avgYearlyPnl < 0 ? "text-negative" : "");
   }
-  // -------------------------------------------------------------
 
   renderWalletPieChart([
     Math.max(0, perpVal),
@@ -1549,6 +1667,8 @@ fetchBtn.addEventListener("click", async () => {
   }
 
   fetchBtn.disabled = true;
+  fetchBtn.innerHTML = `<span style="display:inline-block; width:12px; height:12px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.8s linear infinite; margin-right:6px; vertical-align:middle;"></span> Fetching...`;
+
   fills = [];
   fundingHistory = [];
   ledgerUpdates = [];
@@ -1603,6 +1723,7 @@ fetchBtn.addEventListener("click", async () => {
     setStatus("Error fetching data: " + (err?.message || "Check network connection or wallet address."), "error");
   } finally {
     fetchBtn.disabled = false;
+    fetchBtn.innerHTML = "Fetch Data";
   }
 });
 
@@ -1795,6 +1916,12 @@ monthBtn.addEventListener("click", () => setPreset("month"));
 ytdBtn.addEventListener("click", () => setPreset("ytd"));
 allInceptionBtn.addEventListener("click", () => setInceptionPreset());
 
+$("zoom7dBtn")?.addEventListener("click", () => setPreset("7d"));
+$("zoom30dBtn")?.addEventListener("click", () => setPreset("30d"));
+$("zoom90dBtn")?.addEventListener("click", () => setPreset("90d"));
+$("zoomYtdBtn")?.addEventListener("click", () => setPreset("ytd"));
+$("zoomAllBtn")?.addEventListener("click", () => setInceptionPreset());
+
 $("clearBtn").addEventListener("click", () => {
   walletEl.value = "";
   if (pollTimer) clearInterval(pollTimer);
@@ -1827,7 +1954,7 @@ $("clearBtn").addEventListener("click", () => {
   clearStatus();
   noticeEl.classList.add("hidden");
   bodyEl.innerHTML = '<tr class="empty-row"><td colspan="12">Enter a valid wallet address to display trade history.</td></tr>';
-  contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="8">Enter a valid wallet address to view active contracts.</td></tr>';
+  contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="10">Enter a valid wallet address to view active contracts.</td></tr>';
   dailyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">Enter a valid wallet address to view daily breakdown.</td></tr>';
   monthlyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">Enter a valid wallet address to view monthly breakdown.</td></tr>';
   depositsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="5">Enter a valid wallet address to view deposit & withdrawal history.</td></tr>';
