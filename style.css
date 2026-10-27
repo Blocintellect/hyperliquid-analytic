@@ -627,7 +627,8 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   #panelContracts .coinglass-table td:nth-child(7):before { content: "Mark Price"; font-weight: 800; color: var(--text-muted); }
   #panelContracts .coinglass-table td:nth-child(8):before { content: "Est. Liq. Price"; font-weight: 800; color: var(--text-muted); }
   #panelContracts .coinglass-table td:nth-child(9):before { content: "Risk Proximity"; font-weight: 800; color: var(--text-muted); }
-  #panelContracts .coinglass-table td:nth-child(10):before { content: "Unrealized P&L"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(10):before { content: "Funding"; font-weight: 800; color: var(--text-muted); }
+  #panelContracts .coinglass-table td:nth-child(11):before { content: "Unrealized P&L"; font-weight: 800; color: var(--text-muted); }
 
   #panelTrades .coinglass-table td:nth-child(1):before { content: "Date / Time"; font-weight: 800; color: var(--text-muted); }
   #panelTrades .coinglass-table td:nth-child(2):before { content: "Coin"; font-weight: 800; color: var(--text-muted); }

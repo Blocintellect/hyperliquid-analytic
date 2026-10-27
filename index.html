@@ -32,8 +32,11 @@
       </div>
     </header>
 
+    <!-- Unhide Controls Button (Hidden by default) -->
+    <button id="unhideBtn" class="secondary hidden" style="margin-bottom: 14px; width: 100%; font-size: 13px; font-weight: 700;">⚙️ Change Variables / Show Controls</button>
+
     <!-- Controls Panel -->
-    <section class="panel controls">
+    <section id="controlsPanel" class="panel controls">
       <div class="control-row">
         <div class="field wallet-field">
           <label for="wallet">HYPERLIQUID WALLET ADDRESS</label>
@@ -244,12 +247,13 @@
               <th>MARK PRICE</th>
               <th>EST. LIQ. PRICE</th>
               <th>RISK PROXIMITY</th>
+              <th>FUNDING</th>
               <th>UNREALIZED P&L</th>
             </tr>
           </thead>
           <tbody id="contractsBody">
             <tr class="empty-row">
-              <td colspan="10">Enter a valid wallet address to view active contracts.</td>
+              <td colspan="11">Enter a valid wallet address to view active contracts.</td>
             </tr>
           </tbody>
         </table>

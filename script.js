@@ -48,7 +48,9 @@ const walletEl = $("wallet"),
       prevPageBtn = $("prevPageBtn"),
       nextPageBtn = $("nextPageBtn"),
       pageIndicator = $("pageIndicator"),
-      paginationContainer = $("paginationContainer");
+      paginationContainer = $("paginationContainer"),
+      controlsPanel = $("controlsPanel"),
+      unhideBtn = $("unhideBtn");
 
 // Modal Elements
 const fillsCard = $("fillsCard"), fillsModal = $("fillsModal"), closeFillsModal = $("closeFillsModal");
@@ -83,6 +85,13 @@ window.addEventListener("click", e => {
   if (e.target === closedPnlModal) closedPnlModal.classList.add("hidden");
   if (e.target === winRateModal) winRateModal.classList.add("hidden");
   if (e.target === holdingsModal) holdingsModal.classList.add("hidden");
+});
+
+// Unhide controls button event listener with persistence
+unhideBtn?.addEventListener("click", () => {
+  controlsPanel.classList.remove("hidden");
+  unhideBtn.classList.add("hidden");
+  localStorage.setItem("hyperliquid_controls_hidden", "false");
 });
 
 let fills = [];
@@ -739,7 +748,7 @@ function resetMetrics() {
 
 function calculateTotalUnrealizedPnl() {
   if (!activePositions || activePositions.length === 0) return 0;
-  let totalUnPnl = 0;
+  let totalUnrealizedPnl = 0;
 
   activePositions.forEach(item => {
     const pos = item.position || item;
@@ -751,10 +760,10 @@ function calculateTotalUnrealizedPnl() {
     const entryPx = num(pos.entryPx);
     const currentMarkPx = num(livePrices[coin]) || (sizeNum !== 0 ? Math.abs(num(pos.positionValue) / sizeNum) : entryPx);
     const priceDiff = sizeNum > 0 ? (currentMarkPx - entryPx) : (entryPx - currentMarkPx);
-    totalUnPnl += priceDiff * Math.abs(sizeNum);
+    totalUnrealizedPnl += priceDiff * Math.abs(sizeNum);
   });
 
-  return totalUnPnl;
+  return totalUnrealizedPnl;
 }
 
 function updateMetrics() {
@@ -843,6 +852,11 @@ function updateMetrics() {
   setMetric("mNet", netPnl, netPnl, true, 2, true);
   setMetric("mWinRate", winRate, winRate > 50 ? 1 : winRate < 50 ? -1 : 0, false, 1, false);
   setMetric("mWalletHoldings", totalAccountVal, null, true, 2, false);
+
+  const holdingsValEl = $("mWalletHoldings");
+  if (holdingsValEl) {
+    holdingsValEl.style.color = "var(--coinglass-purple)";
+  }
 }
 
 function updateCoinFilterOptions() {
@@ -868,7 +882,7 @@ function getFilteredFills() {
 
 function renderContracts() {
   if (!activePositions || activePositions.length === 0) {
-    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="10">No open perpetual positions currently active.</td></tr>';
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="11">No open perpetual positions currently active.</td></tr>';
     contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
@@ -922,6 +936,11 @@ function renderContracts() {
       riskLabel = "Moderate (<15%)";
     }
 
+    const cumFundingObj = pos.cumFunding || {};
+    const rawCumFunding = num(cumFundingObj.sinceOpen !== undefined ? cumFundingObj.sinceOpen : (cumFundingObj.allTime || 0));
+    const positionFunding = -rawCumFunding; 
+    const fundingClass = positionFunding > 0 ? "text-positive" : positionFunding < 0 ? "text-negative" : "";
+
     const unPnlId = `contract-unpnl-${coin}-${index}`;
     const pnlClass = liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : "";
 
@@ -936,6 +955,7 @@ function renderContracts() {
         <td>${plainMoney(currentMarkPx, 4)}</td>
         <td>${plainMoney(estLiqPx, 4)}</td>
         <td class="${riskColor}" style="font-weight: 700;">${riskLabel}</td>
+        <td class="${fundingClass}">${money(positionFunding, 2)}</td>
         <td class="${pnlClass}">
           <span id="${unPnlId}" class="contract-animated-pnl">${money(liveUnPnl, 2)}</span>
           <button class="secondary" style="margin-left: 8px; height: 26px; padding: 0 6px; font-size: 10px;" onclick="openCloseSimulation('${esc(coin)}', ${sizeNum}, ${entryPx}, ${currentMarkPx})">Simulate Close</button>
@@ -945,7 +965,7 @@ function renderContracts() {
   });
 
   if (rows.length === 0) {
-    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="10">No open perpetual positions currently active.</td></tr>';
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="11">No open perpetual positions currently active.</td></tr>';
     contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
@@ -1617,7 +1637,13 @@ function renderTrades() {
   renderMonthlyPnl();
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
+  const savedControlsHidden = localStorage.getItem("hyperliquid_controls_hidden");
+  if (savedControlsHidden === "true") {
+    controlsPanel.classList.add("hidden");
+    unhideBtn.classList.remove("hidden");
+  }
+
   const cacheTime = Number(localStorage.getItem(CACHE_TIME_KEY) || 0);
   const isExpired = (Date.now() - cacheTime) > 7200000;
 
@@ -1630,7 +1656,6 @@ window.addEventListener("DOMContentLoaded", () => {
     localStorage.removeItem(CACHE_POSITIONS_KEY);
     localStorage.removeItem(CACHE_TIME_KEY);
     sessionStorage.clear();
-    return;
   }
 
   const savedFills = localStorage.getItem(CACHE_FILLS_KEY);
@@ -1668,6 +1693,52 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     } catch (e) {
       console.warn("Failed to load persisted storage data:", e);
+    }
+  }
+
+  // Automatically fetch ALL TIME data on load if a wallet address is saved
+  if (actualWalletValue && isAddress(actualWalletValue)) {
+    try {
+      await setInceptionPreset();
+      const cleanUser = actualWalletValue.toLowerCase();
+      const s = msStart(startEl.value), e = msEnd(endEl.value);
+
+      const accountData = await fetchAccountData(cleanUser, s, e);
+      fills = accountData.fills;
+      fundingHistory = accountData.funding;
+      ledgerUpdates = accountData.ledger;
+      openOrdersList = accountData.orders;
+      holdingsData = accountData.holdings;
+      activePositions = accountData.positions;
+
+      localStorage.setItem(CACHE_FILLS_KEY, JSON.stringify(fills));
+      localStorage.setItem(CACHE_FUNDING_KEY, JSON.stringify(fundingHistory));
+      localStorage.setItem(CACHE_LEDGER_KEY, JSON.stringify(ledgerUpdates));
+      localStorage.setItem(CACHE_ORDERS_KEY, JSON.stringify(openOrdersList));
+      localStorage.setItem(CACHE_HOLDINGS_KEY, JSON.stringify(holdingsData));
+      localStorage.setItem(CACHE_POSITIONS_KEY, JSON.stringify(activePositions));
+      localStorage.setItem(CACHE_TIME_KEY, Date.now());
+
+      updateCoinFilterOptions();
+      renderTrades();
+      renderContracts();
+      renderDepositsWithdrawals();
+      renderOpenOrders();
+      renderWalletDetails();
+      renderQuantMetrics();
+
+      if (activePositions.length > 0) {
+        const uniqueCoins = [...new Set(activePositions.map(p => (p.position || p).coin))];
+        initWebSocket(uniqueCoins);
+        startFiveSecondPoller(cleanUser);
+      }
+
+      // Auto-hide controls and save state on successful auto-load
+      controlsPanel.classList.add("hidden");
+      unhideBtn.classList.remove("hidden");
+      localStorage.setItem("hyperliquid_controls_hidden", "true");
+    } catch (e) {
+      console.warn("Auto-fetch all-time data on load error:", e);
     }
   }
 });
@@ -1753,6 +1824,11 @@ fetchBtn.addEventListener("click", async () => {
     }
 
     setStatus(`Successfully fetched data and ${activePositions.length} active perpetual contract(s).`, "success");
+
+    controlsPanel.classList.add("hidden");
+    unhideBtn.classList.remove("hidden");
+    localStorage.setItem("hyperliquid_controls_hidden", "true");
+
   } catch (err) {
     console.error(err);
     setStatus("Error fetching data: " + (err?.message || "Check network connection or wallet address."), "error");
@@ -1973,9 +2049,13 @@ $("clearBtn").addEventListener("click", () => {
   localStorage.removeItem(CACHE_HOLDINGS_KEY);
   localStorage.removeItem(CACHE_POSITIONS_KEY);
   localStorage.removeItem(CACHE_TIME_KEY);
+  localStorage.setItem("hyperliquid_controls_hidden", "false");
   sessionStorage.clear();
   setInceptionPreset();
   
+  controlsPanel.classList.remove("hidden");
+  unhideBtn.classList.add("hidden");
+
   viewSelect.value = "contracts";
   switchView("contracts");
 
@@ -1992,7 +2072,7 @@ $("clearBtn").addEventListener("click", () => {
   clearStatus();
   noticeEl.classList.add("hidden");
   bodyEl.innerHTML = '<tr class="empty-row"><td colspan="12">Enter a valid wallet address to display trade history.</td></tr>';
-  contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="10">Enter a valid wallet address to view active contracts.</td></tr>';
+  contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="11">Enter a valid wallet address to view active contracts.</td></tr>';
   dailyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">Enter a valid wallet address to view daily breakdown.</td></tr>';
   monthlyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">Enter a valid wallet address to view monthly breakdown.</td></tr>';
   depositsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="5">Enter a valid wallet address to view deposit & withdrawal history.</td></tr>';
