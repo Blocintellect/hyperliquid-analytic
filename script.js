@@ -880,6 +880,31 @@ function getFilteredFills() {
   });
 }
 
+function setupMobileCardRow(tr, headerContentHtml, summaryBadgeHtml) {
+  tr.classList.add("mobile-card-row");
+  
+  const headerDiv = document.createElement("div");
+  headerDiv.className = "mobile-card-header";
+  headerDiv.innerHTML = `
+    <div>${headerContentHtml}</div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <div class="mobile-preview-badge">${summaryBadgeHtml}</div>
+      <button type="button" class="mobile-card-toggle-btn" aria-label="Toggle Details">▼</button>
+    </div>
+  `;
+
+  tr.prepend(headerDiv);
+
+  const toggleBtn = headerDiv.querySelector(".mobile-card-toggle-btn");
+  headerDiv.addEventListener("click", (e) => {
+    e.stopPropagation();
+    tr.classList.toggle("expanded");
+  });
+
+  const cells = tr.querySelectorAll("td");
+  cells.forEach(td => td.classList.add("collapsible-detail"));
+}
+
 function renderContracts() {
   if (!activePositions || activePositions.length === 0) {
     contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="10">No open perpetual positions currently active.</td></tr>';
@@ -973,6 +998,24 @@ function renderContracts() {
   }
 
   contractsBodyEl.innerHTML = rows.join("");
+
+  // Post-process table rows to attach mobile collapsible card wrappers
+  const trs = contractsBodyEl.querySelectorAll("tr");
+  trs.forEach((tr, index) => {
+    const pos = activePositions[index]?.position || activePositions[index];
+    if (!pos) return;
+    const coin = pos.coin || "PERP";
+    const sizeNum = num(pos.szi);
+    const currentMarkPx = num(livePrices[coin]) || (sizeNum !== 0 ? Math.abs(num(pos.positionValue) / sizeNum) : num(pos.entryPx));
+    const priceDiff = sizeNum > 0 ? (currentMarkPx - num(pos.entryPx)) : (num(pos.entryPx) - currentMarkPx);
+    const liveUnPnl = priceDiff * Math.abs(sizeNum);
+    const pnlClass = liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : "";
+
+    const headerTitle = `<span style="font-weight: 800; color: var(--text-main);">${esc(coin)}</span> <span class="${sizeNum > 0 ? "text-positive" : "text-negative"}" style="font-size: 11px;">(${sizeNum > 0 ? "LONG" : "SHORT"})</span>`;
+    const summaryBadge = `<span>Mark: <strong>${plainMoney(currentMarkPx, 2)}</strong></span> <span class="${pnlClass}">uP&L: <strong>${money(liveUnPnl, 2)}</strong></span>`;
+
+    setupMobileCardRow(tr, headerTitle, summaryBadge);
+  });
 
   activePositions.forEach((item, index) => {
     const pos = item.position || item;
@@ -1253,6 +1296,20 @@ function renderDailyPnl() {
     </tr>`;
   }).join("");
 
+  // Attach mobile collapsible card styling for Daily P&L rows
+  const trs = dailyBodyEl.querySelectorAll("tr");
+  trs.forEach((tr, index) => {
+    const dayKey = sortedKeys[index];
+    const day = dailyMap[dayKey];
+    if (!day) return;
+    const pnlClass = day.netPnl > 0 ? "text-positive" : day.netPnl < 0 ? "text-negative" : "";
+
+    const headerTitle = `<span style="font-weight: 800; color: var(--text-main);">${esc(day.label)}</span>`;
+    const summaryBadge = `<span class="${pnlClass}">Net P&L: <strong>${money(day.netPnl, 2)}</strong></span>`;
+
+    setupMobileCardRow(tr, headerTitle, summaryBadge);
+  });
+
   dailyMeta.textContent = `Showing aggregated daily performance across ${sortedKeys.length} active day(s).`;
 }
 
@@ -1319,6 +1376,20 @@ function renderMonthlyPnl() {
       <td>${m.fillsCount.toLocaleString()}</td>
     </tr>`;
   }).join("");
+
+  // Attach mobile collapsible card styling for Monthly P&L rows
+  const trs = monthlyBodyEl.querySelectorAll("tr");
+  trs.forEach((tr, index) => {
+    const monthKey = sortedKeys[index];
+    const m = monthlyMap[monthKey];
+    if (!m) return;
+    const pnlClass = m.netPnl > 0 ? "text-positive" : m.netPnl < 0 ? "text-negative" : "";
+
+    const headerTitle = `<span style="font-weight: 800; color: var(--text-main);">${esc(m.label)}</span>`;
+    const summaryBadge = `<span class="${pnlClass}">Net P&L: <strong>${money(m.netPnl, 2)}</strong></span>`;
+
+    setupMobileCardRow(tr, headerTitle, summaryBadge);
+  });
 
   monthlyMeta.textContent = `Showing aggregated monthly performance across ${sortedKeys.length} month(s).`;
 }
@@ -1622,6 +1693,20 @@ function renderTrades() {
       <td>${hashCell}</td>
     </tr>`;
   }).join("");
+
+  // Attach mobile collapsible card styling for Trade Executions rows
+  const trs = bodyEl.querySelectorAll("tr");
+  trs.forEach((tr, index) => {
+    const f = paginatedFills[index];
+    if (!f) return;
+    const p = num(f.closedPnl);
+    const pnlClass = p > 0 ? "text-positive" : p < 0 ? "text-negative" : "";
+
+    const headerTitle = `<span style="font-weight: 800; color: var(--text-main);">${esc(f.coin)}</span> <span style="font-size: 11px; color: var(--text-muted);">${esc(mapSide(f.side))}</span>`;
+    const summaryBadge = `<span class="${pnlClass}">P&L: <strong>${money(p, 2)}</strong></span>`;
+
+    setupMobileCardRow(tr, headerTitle, summaryBadge);
+  });
 
   tableMeta.textContent = `${displayFills.length.toLocaleString()} fills matching filters (Showing ${startIdx + 1}–${Math.min(startIdx + rowsPerPage, displayFills.length)})`;
   
