@@ -882,7 +882,7 @@ function getFilteredFills() {
 
 function renderContracts() {
   if (!activePositions || activePositions.length === 0) {
-    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="11">No open perpetual positions currently active.</td></tr>';
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="10">No open perpetual positions currently active.</td></tr>';
     contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
@@ -927,14 +927,16 @@ function renderContracts() {
 
     const distancePercent = Math.abs((currentMarkPx - estLiqPx) / currentMarkPx) * 100;
     let riskColor = "text-positive";
-    let riskLabel = "Safe (>20%)";
+    let riskLabel = "Safe";
     if (distancePercent < 5) {
       riskColor = "text-negative";
-      riskLabel = "CRITICAL (<5%)";
+      riskLabel = "Critical";
     } else if (distancePercent < 15) {
       riskColor = "";
-      riskLabel = "Moderate (<15%)";
+      riskLabel = "Moderate";
     }
+
+    const proximityHtml = `<span class="${riskColor}" style="font-weight: 700;">${distancePercent.toFixed(1)}% (${riskLabel})</span>`;
 
     const cumFundingObj = pos.cumFunding || {};
     const rawCumFunding = num(cumFundingObj.sinceOpen !== undefined ? cumFundingObj.sinceOpen : (cumFundingObj.allTime || 0));
@@ -954,7 +956,7 @@ function renderContracts() {
         <td>${plainMoney(entryPx, 4)}</td>
         <td>${plainMoney(currentMarkPx, 4)}</td>
         <td>${plainMoney(estLiqPx, 4)}</td>
-        <td class="${riskColor}" style="font-weight: 700;">${riskLabel}</td>
+        <td>${proximityHtml}</td>
         <td class="${fundingClass}">${money(positionFunding, 2)}</td>
         <td class="${pnlClass}">
           <span id="${unPnlId}" class="contract-animated-pnl">${money(liveUnPnl, 2)}</span>
@@ -965,7 +967,7 @@ function renderContracts() {
   });
 
   if (rows.length === 0) {
-    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="11">No open perpetual positions currently active.</td></tr>';
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="10">No open perpetual positions currently active.</td></tr>';
     contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
@@ -2072,7 +2074,7 @@ $("clearBtn").addEventListener("click", () => {
   clearStatus();
   noticeEl.classList.add("hidden");
   bodyEl.innerHTML = '<tr class="empty-row"><td colspan="12">Enter a valid wallet address to display trade history.</td></tr>';
-  contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="11">Enter a valid wallet address to view active contracts.</td></tr>';
+  contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="10">Enter a valid wallet address to view active contracts.</td></tr>';
   dailyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">Enter a valid wallet address to view daily breakdown.</td></tr>';
   monthlyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">Enter a valid wallet address to view monthly breakdown.</td></tr>';
   depositsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="5">Enter a valid wallet address to view deposit & withdrawal history.</td></tr>';
