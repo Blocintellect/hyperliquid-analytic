@@ -99,6 +99,7 @@ let ledgerUpdates = [];
 let openOrdersList = [];
 let holdingsData = null;
 let xyzHoldingsData = null;
+let spotHoldingsData = null;
 let activePositions = [];
 let livePrices = {};
 let previousNumericValues = {}; 
@@ -118,6 +119,7 @@ const CACHE_FUNDING_KEY = "hyperliquid_persisted_funding";
 const CACHE_LEDGER_KEY = "hyperliquid_persisted_ledger";
 const CACHE_ORDERS_KEY = "hyperliquid_persisted_orders";
 const CACHE_HOLDINGS_KEY = "hyperliquid_persisted_holdings";
+const CACHE_SPOT_HOLDINGS_KEY = "hyperliquid_persisted_spot_holdings";
 const CACHE_POSITIONS_KEY = "hyperliquid_persisted_positions";
 const CACHE_TIME_KEY = "hyperliquid_cache_timestamp";
 
@@ -447,13 +449,15 @@ async function postInfo(body) {
 
 async function fetchActiveContractsOnly(cleanUser) {
   try {
-    const [defaultData, xyzData] = await Promise.all([
+    const [defaultData, xyzData, spotData] = await Promise.all([
       postInfo({ type: "clearinghouseState", user: cleanUser }).catch(() => null),
-      postInfo({ type: "clearinghouseState", user: cleanUser, dex: "xyz" }).catch(() => null)
+      postInfo({ type: "clearinghouseState", user: cleanUser, dex: "xyz" }).catch(() => null),
+      postInfo({ type: "spotClearinghouseState", user: cleanUser }).catch(() => null)
     ]);
     
     if (defaultData) holdingsData = defaultData;
     if (xyzData) xyzHoldingsData = xyzData;
+    if (spotData) spotHoldingsData = spotData;
 
     const rawAssetPositions = [
       ...(defaultData?.assetPositions || []),
@@ -570,11 +574,12 @@ async function fetchAccountData(user, startMs, endMs) {
 
   const holdingsPromise = (async () => {
     try {
-      const [defaultData, xyzData] = await Promise.all([
+      const [defaultData, xyzData, spotData] = await Promise.all([
         postInfo({ type: "clearinghouseState", user: cleanUser }),
-        postInfo({ type: "clearinghouseState", user: cleanUser, dex: "xyz" }).catch(() => null)
+        postInfo({ type: "clearinghouseState", user: cleanUser, dex: "xyz" }).catch(() => null),
+        postInfo({ type: "spotClearinghouseState", user: cleanUser }).catch(() => null)
       ]);
-      return { defaultData, xyzData };
+      return { defaultData, xyzData, spotData };
     } catch (e) {
       console.warn("Clearinghouse state fetch warning:", e);
       return null;
@@ -587,6 +592,7 @@ async function fetchAccountData(user, startMs, endMs) {
 
   holdingsData = holdingsRes?.defaultData || null;
   xyzHoldingsData = holdingsRes?.xyzData || null;
+  spotHoldingsData = holdingsRes?.spotData || null;
 
   const rawAssetPositions = [
     ...(holdingsRes?.defaultData?.assetPositions || []),
@@ -599,6 +605,7 @@ async function fetchAccountData(user, startMs, endMs) {
     ledger: ledgerRes,
     orders: ordersRes,
     holdings: holdingsRes?.defaultData || null,
+    spotHoldings: holdingsRes?.spotData || null,
     positions: rawAssetPositions.filter(item => num(item.position?.szi) !== 0),
     reachedGlobalLimit: fillsRes.reachedGlobalLimit
   };
@@ -785,26 +792,27 @@ function updateMetrics() {
   const winningTrades = tradesWithPnl.filter(f => num(f.closedPnl) > 0);
   const winRate = tradesWithPnl.length > 0 ? (winningTrades.length / tradesWithPnl.length) * 100 : 0;
 
-  let totalAccountVal = 0;
+  // STRICT API-BASED PERP EQUITY (RENAMED TO PERP HOLDINGS)
   let perpAccountVal = 0, withdrawableVal = 0, spotVal = 0;
 
   if (holdingsData) {
     const margin = holdingsData.marginSummary || {};
-    perpAccountVal = num(margin.accountValue);
+    perpAccountVal = num(margin.accountValue); 
     withdrawableVal = num(holdingsData.withdrawable);
-    totalAccountVal += Math.max(perpAccountVal, withdrawableVal);
-
-    if (Array.isArray(holdingsData.balances)) {
-      holdingsData.balances.forEach(b => {
-        spotVal += num(b.total) * (num(livePrices[b.coin]) || 1);
-      });
-      totalAccountVal += spotVal;
-    }
   }
 
   if (xyzHoldingsData) {
     const xyzMargin = xyzHoldingsData.marginSummary || {};
-    totalAccountVal += num(xyzMargin.accountValue);
+    perpAccountVal += num(xyzMargin.accountValue);
+  }
+
+  if (spotHoldingsData && Array.isArray(spotHoldingsData.balances)) {
+    spotHoldingsData.balances.forEach(b => {
+      const tokenSymbol = b.coin || b.token;
+      const totalAmount = num(b.total);
+      const tokenPrice = num(livePrices[tokenSymbol]) || num(livePrices[tokenSymbol + "-PERP"]) || (tokenSymbol === "USDC" ? 1 : 1);
+      spotVal += totalAmount * tokenPrice;
+    });
   }
 
   const totalVol = targetFills.reduce((s, f) => s + Math.abs(num(f.px) * num(f.sz)), 0);
@@ -841,14 +849,14 @@ function updateMetrics() {
   $("modalPerpValue").textContent = plainMoney(perpAccountVal, 2);
   $("modalWithdrawable").textContent = plainMoney(withdrawableVal, 2);
   $("modalSpotValue").textContent = plainMoney(spotVal, 2);
-  $("modalTotalHoldings").textContent = plainMoney(totalAccountVal, 2);
+  $("modalTotalHoldings").textContent = plainMoney(perpAccountVal + spotVal, 2);
 
   setMetric("mFills", targetFills.length, null, false, 0, false);
   setMetric("mPnl", closedPnl, closedPnl, true, 2, true);
   setMetric("mFees", totalFees, null, true, 2, false);
   setMetric("mNet", netPnl, netPnl, true, 2, true);
   setMetric("mWinRate", winRate, winRate > 50 ? 1 : winRate < 50 ? -1 : 0, false, 1, false);
-  setMetric("mWalletHoldings", totalAccountVal, null, true, 2, false);
+  setMetric("mWalletHoldings", perpAccountVal, null, true, 2, false);
 
   const holdingsValEl = $("mWalletHoldings");
   if (holdingsValEl) {
@@ -1486,7 +1494,7 @@ function renderWalletPieChart(dataValues) {
   walletPieChartInstance = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: ['Perp Margin Value', 'Withdrawable Balance', 'Spot Token Balances', 'Active Open Notional'],
+      labels: ['Perp Equity', 'Withdrawable Balance', 'Spot Token Holdings', 'Active Open Notional'],
       datasets: [{
         data: dataValues,
         backgroundColor: [
@@ -1539,19 +1547,22 @@ function renderWalletDetails() {
 
   if (holdingsData) {
     const margin = holdingsData.marginSummary || {};
-    perpVal = num(margin.accountValue);
+    perpVal = num(margin.accountValue); 
     withdrawable = num(holdingsData.withdrawable);
-
-    if (Array.isArray(holdingsData.balances)) {
-      holdingsData.balances.forEach(b => {
-        spotVal += num(b.total) * (num(livePrices[b.coin]) || 1);
-      });
-    }
   }
 
   if (xyzHoldingsData) {
     const xyzMargin = xyzHoldingsData.marginSummary || {};
     perpVal += num(xyzMargin.accountValue);
+  }
+
+  if (spotHoldingsData && Array.isArray(spotHoldingsData.balances)) {
+    spotHoldingsData.balances.forEach(b => {
+      const tokenSymbol = b.coin || b.token;
+      const totalAmount = num(b.total);
+      const tokenPrice = num(livePrices[tokenSymbol]) || num(livePrices[tokenSymbol + "-PERP"]) || (tokenSymbol === "USDC" ? 1 : 1);
+      spotVal += totalAmount * tokenPrice;
+    });
   }
 
   if (activePositions && activePositions.length > 0) {
@@ -1726,6 +1737,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     localStorage.removeItem(CACHE_LEDGER_KEY);
     localStorage.removeItem(CACHE_ORDERS_KEY);
     localStorage.removeItem(CACHE_HOLDINGS_KEY);
+    localStorage.removeItem(CACHE_SPOT_HOLDINGS_KEY);
     localStorage.removeItem(CACHE_POSITIONS_KEY);
     localStorage.removeItem(CACHE_TIME_KEY);
     sessionStorage.clear();
@@ -1736,6 +1748,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   const savedLedger = localStorage.getItem(CACHE_LEDGER_KEY);
   const savedOrders = localStorage.getItem(CACHE_ORDERS_KEY);
   const savedHoldings = localStorage.getItem(CACHE_HOLDINGS_KEY);
+  const savedSpotHoldings = localStorage.getItem(CACHE_SPOT_HOLDINGS_KEY);
   const savedPositions = localStorage.getItem(CACHE_POSITIONS_KEY);
 
   if (savedFills) {
@@ -1745,6 +1758,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       ledgerUpdates = savedLedger ? JSON.parse(savedLedger) : [];
       openOrdersList = savedOrders ? JSON.parse(savedOrders) : [];
       holdingsData = savedHoldings ? JSON.parse(savedHoldings) : null;
+      spotHoldingsData = savedSpotHoldings ? JSON.parse(savedSpotHoldings) : null;
       activePositions = savedPositions ? JSON.parse(savedPositions) : [];
       if (fills.length > 0 || activePositions.length > 0) {
         updateCoinFilterOptions();
@@ -1781,6 +1795,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       ledgerUpdates = accountData.ledger;
       openOrdersList = accountData.orders;
       holdingsData = accountData.holdings;
+      spotHoldingsData = accountData.spotHoldings;
       activePositions = accountData.positions;
 
       localStorage.setItem(CACHE_FILLS_KEY, JSON.stringify(fills));
@@ -1788,6 +1803,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       localStorage.setItem(CACHE_LEDGER_KEY, JSON.stringify(ledgerUpdates));
       localStorage.setItem(CACHE_ORDERS_KEY, JSON.stringify(openOrdersList));
       localStorage.setItem(CACHE_HOLDINGS_KEY, JSON.stringify(holdingsData));
+      localStorage.setItem(CACHE_SPOT_HOLDINGS_KEY, JSON.stringify(spotHoldingsData));
       localStorage.setItem(CACHE_POSITIONS_KEY, JSON.stringify(activePositions));
       localStorage.setItem(CACHE_TIME_KEY, Date.now());
 
@@ -1852,6 +1868,7 @@ fetchBtn.addEventListener("click", async () => {
   openOrdersList = [];
   holdingsData = null;
   xyzHoldingsData = null;
+  spotHoldingsData = null;
   activePositions = [];
   currentPage = 1;
   resetMetrics();
@@ -1865,6 +1882,7 @@ fetchBtn.addEventListener("click", async () => {
     ledgerUpdates = accountData.ledger;
     openOrdersList = accountData.orders;
     holdingsData = accountData.holdings;
+    spotHoldingsData = accountData.spotHoldings;
     activePositions = accountData.positions;
 
     localStorage.setItem(CACHE_FILLS_KEY, JSON.stringify(fills));
@@ -1872,6 +1890,7 @@ fetchBtn.addEventListener("click", async () => {
     localStorage.setItem(CACHE_LEDGER_KEY, JSON.stringify(ledgerUpdates));
     localStorage.setItem(CACHE_ORDERS_KEY, JSON.stringify(openOrdersList));
     localStorage.setItem(CACHE_HOLDINGS_KEY, JSON.stringify(holdingsData));
+    localStorage.setItem(CACHE_SPOT_HOLDINGS_KEY, JSON.stringify(spotHoldingsData));
     localStorage.setItem(CACHE_POSITIONS_KEY, JSON.stringify(activePositions));
     localStorage.setItem(CACHE_TIME_KEY, Date.now());
 
@@ -1958,7 +1977,7 @@ jsonBtn.addEventListener("click", () => {
   const currentWallet = actualWalletValue || walletEl.value.trim();
   if (targetFills.length) {
     const mappedFills = targetFills.map(f => ({ ...f, sideFormatted: mapSide(f.side) }));
-    downloadBlob(JSON.stringify({ fills: mappedFills, fundingHistory, ledgerUpdates, openOrders: openOrdersList, holdings: holdingsData, positions: activePositions }, null, 2), `hyperliquid-statement-${currentWallet.slice(0, 10)}.json`, "application/json");
+    downloadBlob(JSON.stringify({ fills: mappedFills, fundingHistory, ledgerUpdates, openOrders: openOrdersList, holdings: holdingsData, spotHoldings: spotHoldingsData, positions: activePositions }, null, 2), `hyperliquid-statement-${currentWallet.slice(0, 10)}.json`, "application/json");
   }
 });
 
@@ -2118,6 +2137,7 @@ $("clearBtn").addEventListener("click", () => {
   localStorage.removeItem(CACHE_LEDGER_KEY);
   localStorage.removeItem(CACHE_ORDERS_KEY);
   localStorage.removeItem(CACHE_HOLDINGS_KEY);
+  localStorage.removeItem(CACHE_SPOT_HOLDINGS_KEY);
   localStorage.removeItem(CACHE_POSITIONS_KEY);
   localStorage.removeItem(CACHE_TIME_KEY);
   localStorage.setItem("hyperliquid_controls_hidden", "false");
@@ -2136,6 +2156,7 @@ $("clearBtn").addEventListener("click", () => {
   openOrdersList = [];
   holdingsData = null;
   xyzHoldingsData = null;
+  spotHoldingsData = null;
   activePositions = [];
   previousNumericValues = {};
   pnlFilterSelect.value = "all";
