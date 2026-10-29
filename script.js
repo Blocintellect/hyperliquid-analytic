@@ -1015,30 +1015,47 @@ window.openCloseSimulation = function(coin, size, entryPx, markPx) {
           </div>
           <hr class="modal-divider">
           <div class="fee-row total"><span>Estimated P&L Result:</span> <strong id="simResultPnl">$0.00</strong></div>
-          <button class="btn-primary" style="width: 100%; margin-top: 16px;" onclick="calculateSimulatedPnl()">Calculate Real Value</button>
         </div>
       </div>
     `;
     document.body.appendChild(modal);
+
+    // Attach instant live calculation listener on input
+    const closePriceInput = $("simClosePriceInput");
+    if (closePriceInput) {
+      closePriceInput.addEventListener("input", () => {
+        const closePx = num(closePriceInput.value);
+        const { size, entryPx } = window._simData || {};
+        if (size === undefined || entryPx === undefined) return;
+        const pnl = (size > 0 ? (closePx - entryPx) : (entryPx - closePx)) * Math.abs(size);
+        const resEl = $("simResultPnl");
+        if (resEl) {
+          resEl.textContent = money(pnl, 2);
+          resEl.className = pnl >= 0 ? "text-positive" : "text-negative";
+        }
+      });
+    }
   }
 
   $("simCoin").textContent = coin;
   $("simSize").textContent = size;
   $("simEntry").textContent = plainMoney(entryPx, 4);
-  $("simClosePriceInput").value = markPx;
-  $("simResultPnl").textContent = money((size > 0 ? (markPx - entryPx) : (entryPx - markPx)) * Math.abs(size), 2);
+  
+  const closePriceInput = $("simClosePriceInput");
+  if (closePriceInput) {
+    closePriceInput.value = markPx;
+  }
   
   window._simData = { size, entryPx };
-  modal.classList.remove("hidden");
-};
 
-window.calculateSimulatedPnl = function() {
-  const closePx = num($("simClosePriceInput").value);
-  const { size, entryPx } = window._simData;
-  const pnl = (size > 0 ? (closePx - entryPx) : (entryPx - closePx)) * Math.abs(size);
+  const initialPnl = (size > 0 ? (markPx - entryPx) : (entryPx - markPx)) * Math.abs(size);
   const resEl = $("simResultPnl");
-  resEl.textContent = money(pnl, 2);
-  resEl.className = pnl >= 0 ? "text-positive" : "text-negative";
+  if (resEl) {
+    resEl.textContent = money(initialPnl, 2);
+    resEl.className = initialPnl >= 0 ? "text-positive" : "text-negative";
+  }
+
+  modal.classList.remove("hidden");
 };
 
 function renderQuantMetrics() {
