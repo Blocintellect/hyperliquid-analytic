@@ -1,0 +1,42 @@
+/* ================================================================= */
+/* LIVE PRICES & WATCHLIST MODULE CSS                                */
+/* ================================================================= */
+
+#pricesModal .modal-content {
+  width: 820px;
+  max-width: 95vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#pricesModal .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  flex: 1;
+}
+
+#pricesModal .table-wrap {
+  overflow-y: auto;
+  max-height: 52vh;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+}
+
+#livePricesModalBtn {
+  background: var(--btn-secondary-bg);
+  border: 1px solid var(--btn-secondary-border);
+  color: var(--text-main);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  text-decoration: none;
+  height: 40px;
+}

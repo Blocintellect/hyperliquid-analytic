@@ -1,0 +1,12 @@
+/* ================================================================= */
+/* PERFORMANCE GROWTH ANALYTICS CHARTS CSS                           */
+/* ================================================================= */
+
+/* Charts specific spacing & grid overrides */
+.metrics-grid {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+}
+
+.table-panel {
+  padding: 20px;
+}

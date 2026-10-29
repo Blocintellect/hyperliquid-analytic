@@ -1,3 +1,7 @@
+/* ================================================================= */
+/* MAIN STATEMENT & CORE LAYOUT CSS                                  */
+/* ================================================================= */
+
 * { box-sizing: border-box; }
 
 body.dark-theme {
@@ -539,7 +543,7 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 }
 .page-indicator { font-size: 11px; font-weight: 600; color: var(--text-muted); }
 
-/* Responsive Breakpoints */
+/* Responsive Breakpoints & Mobile Accordions */
 @media (max-width: 1024px) {
   .metrics-grid { grid-template-columns: repeat(3, 1fr); }
   .control-row { grid-template-columns: 1fr; }
@@ -547,9 +551,6 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   .wallet-layout-grid { grid-template-columns: 1fr !important; }
 }
 
-/* ================================================================= */
-/* STRICT MOBILE ONLY VIEW (max-width: 768px)                         */
-/* ================================================================= */
 @media (max-width: 768px) {
   body { padding: 8px 4px; }
   
@@ -558,13 +559,8 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     gap: 8px;
   }
   
-  .metric-card {
-    padding: 10px 8px;
-  }
-
-  .metric-card .value {
-    font-size: 13px;
-  }
+  .metric-card { padding: 10px 8px; }
+  .metric-card .value { font-size: 13px; }
 
   .topbar { flex-direction: column; align-items: stretch; }
   .header-right { width: 100%; justify-content: space-between; }
@@ -588,17 +584,8 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     text-align: center !important;
   }
 
-  /* Table to Card Accordion Layout for Mobile */
-  .coinglass-table thead {
-    display: none !important;
-  }
-
-  .coinglass-table, 
-  .coinglass-table tbody, 
-  .coinglass-table tr {
-    display: block !important;
-    width: 100% !important;
-  }
+  .coinglass-table thead { display: none !important; }
+  .coinglass-table, .coinglass-table tbody, .coinglass-table tr { display: block !important; width: 100% !important; }
 
   .coinglass-table tbody tr {
     background: var(--input-bg) !important;
@@ -609,7 +596,6 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     position: relative;
   }
 
-  /* Header row on mobile card */
   .coinglass-table tbody tr .mobile-card-header {
     display: flex !important;
     justify-content: space-between !important;
@@ -639,12 +625,8 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     transform: rotate(180deg);
   }
 
-  /* Hide regular cells on collapsed mobile view */
-  .coinglass-table td.collapsible-detail {
-    display: none !important;
-  }
+  .coinglass-table td.collapsible-detail { display: none !important; }
 
-  /* Show regular cells when expanded */
   .coinglass-table tbody tr.expanded td.collapsible-detail {
     display: flex !important;
     justify-content: space-between !important;
@@ -666,23 +648,9 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     border-bottom: none !important;
   }
 
-  .mobile-label-text {
-    display: inline-block !important;
-    font-weight: 800;
-    color: var(--text-muted);
-  }
-
-  .mobile-preview-badge {
-    display: flex !important;
-    gap: 8px;
-    font-size: 11px;
-    color: var(--text-muted);
-    align-items: center;
-  }
-
-  .coinglass-table tbody tr.expanded .mobile-preview-badge {
-    display: none !important;
-  }
+  .mobile-label-text { display: inline-block !important; font-weight: 800; color: var(--text-muted); }
+  .mobile-preview-badge { display: flex !important; gap: 8px; font-size: 11px; color: var(--text-muted); align-items: center; }
+  .coinglass-table tbody tr.expanded .mobile-preview-badge { display: none !important; }
 }
 
 @media (max-width: 600px) {
