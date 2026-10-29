@@ -87,7 +87,6 @@ window.addEventListener("click", e => {
   if (e.target === holdingsModal) holdingsModal.classList.add("hidden");
 });
 
-// Unhide controls button event listener with persistence
 unhideBtn?.addEventListener("click", () => {
   controlsPanel.classList.remove("hidden");
   unhideBtn.classList.add("hidden");
@@ -122,7 +121,6 @@ const CACHE_HOLDINGS_KEY = "hyperliquid_persisted_holdings";
 const CACHE_POSITIONS_KEY = "hyperliquid_persisted_positions";
 const CACHE_TIME_KEY = "hyperliquid_cache_timestamp";
 
-// Helper for masking addresses securely
 function maskAddress(addr) {
   const clean = String(addr || "").trim();
   if (!clean || clean.length < 10) return clean;
@@ -149,7 +147,6 @@ walletEl.addEventListener("input", () => {
   localStorage.setItem(SAVED_WALLET_KEY, actualWalletValue);
 });
 
-// Copy wallet address button handler
 const copyWalletBtn = $("copyWalletBtn");
 if (copyWalletBtn) {
   copyWalletBtn.addEventListener("click", () => {
@@ -880,9 +877,18 @@ function getFilteredFills() {
   });
 }
 
+window.toggleMobileCard = function(btnElement) {
+  if (window.innerWidth <= 768) {
+    const tr = btnElement.closest("tr");
+    if (tr) {
+      tr.classList.toggle("expanded");
+    }
+  }
+};
+
 function renderContracts() {
   if (!activePositions || activePositions.length === 0) {
-    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="10">No open perpetual positions currently active.</td></tr>';
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="11">No open perpetual positions currently active.</td></tr>';
     contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
@@ -947,27 +953,39 @@ function renderContracts() {
     const pnlClass = liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : "";
 
     rows.push(`
-      <tr>
-        <td style="text-align: left; font-weight: 800;" class="coin-name">${esc(coin)}</td>
-        <td class="${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</td>
-        <td>${Math.abs(sizeNum).toLocaleString()}</td>
-        <td>${plainMoney(positionValue, 2)}</td>
-        <td>${plainMoney(marginUsed, 2)}</td>
-        <td>${plainMoney(entryPx, 4)}</td>
-        <td>${plainMoney(currentMarkPx, 4)}</td>
-        <td>${plainMoney(estLiqPx, 4)}</td>
-        <td>${proximityHtml}</td>
-        <td class="${fundingClass}">${money(positionFunding, 2)}</td>
-        <td class="${pnlClass}">
-          <span id="${unPnlId}" class="contract-animated-pnl">${money(liveUnPnl, 2)}</span>
-          <button class="secondary" style="margin-left: 8px; height: 26px; padding: 0 6px; font-size: 10px;" onclick="openCloseSimulation('${esc(coin)}', ${sizeNum}, ${entryPx}, ${currentMarkPx})">Simulate Close</button>
+      <tr onclick="toggleMobileCard(this)">
+        <td style="text-align: left; font-weight: 800;" class="coin-name mobile-card-header">
+          <span>${esc(coin)} <span class="${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</span></span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="mobile-preview-badge">
+              <span>Mark: ${plainMoney(currentMarkPx, 2)}</span>
+              <span class="${pnlClass}">P&L: ${money(liveUnPnl, 2)}</span>
+            </div>
+            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this)">▼</button>
+          </div>
+        </td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Position / Lev</span><span class="${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Size</span><span>${Math.abs(sizeNum).toLocaleString()}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Position Value</span><span>${plainMoney(positionValue, 2)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Margin Used</span><span>${plainMoney(marginUsed, 2)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Entry Price</span><span>${plainMoney(entryPx, 4)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Mark Price</span><span>${plainMoney(currentMarkPx, 4)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Est. Liq. Price</span><span>${plainMoney(estLiqPx, 4)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Risk Proximity</span><span>${proximityHtml}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Funding</span><span class="${fundingClass}">${money(positionFunding, 2)}</span></td>
+        <td class="collapsible-detail">
+          <span class="mobile-label-text">Unrealized P&L</span>
+          <div style="display: inline-flex; align-items: center;">
+            <span id="${unPnlId}" class="${pnlClass}">${money(liveUnPnl, 2)}</span>
+            <button class="secondary" style="margin-left: 8px; height: 26px; padding: 0 6px; font-size: 10px;" onclick="event.stopPropagation(); openCloseSimulation('${esc(coin)}', ${sizeNum}, ${entryPx}, ${currentMarkPx})">Simulate</button>
+          </div>
         </td>
       </tr>
     `);
   });
 
   if (rows.length === 0) {
-    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="10">No open perpetual positions currently active.</td></tr>';
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="11">No open perpetual positions currently active.</td></tr>';
     contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
@@ -1020,7 +1038,6 @@ window.openCloseSimulation = function(coin, size, entryPx, markPx) {
     `;
     document.body.appendChild(modal);
 
-    // Attach instant live calculation listener on input
     const closePriceInput = $("simClosePriceInput");
     if (closePriceInput) {
       closePriceInput.addEventListener("input", () => {
@@ -1260,14 +1277,27 @@ function renderDailyPnl() {
 
   dailyBodyEl.innerHTML = sortedKeys.map(k => {
     const day = dailyMap[k];
-    return `<tr>
-      <td style="text-align: left; font-weight: 800;">${esc(day.label)}</td>
-      <td class="${day.closedPnl > 0 ? "text-positive" : day.closedPnl < 0 ? "text-negative" : ""}">${money(day.closedPnl, 2)}</td>
-      <td>${plainMoney(day.fees, 2)}</td>
-      <td class="${day.netPnl > 0 ? "text-positive" : day.netPnl < 0 ? "text-negative" : ""}">${money(day.netPnl, 2)}</td>
-      <td>${plainMoney(day.volume, 2)}</td>
-      <td>${day.fillsCount.toLocaleString()}</td>
-    </tr>`;
+    const pnlClass = day.netPnl > 0 ? "text-positive" : day.netPnl < 0 ? "text-negative" : "";
+    const closedClass = day.closedPnl > 0 ? "text-positive" : day.closedPnl < 0 ? "text-negative" : "";
+
+    return `
+      <tr onclick="toggleMobileCard(this)">
+        <td style="text-align: left; font-weight: 800;" class="mobile-card-header">
+          <span>${esc(day.label)}</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="mobile-preview-badge">
+              <span class="${pnlClass}">Net P&L: ${money(day.netPnl, 2)}</span>
+            </div>
+            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this)">▼</button>
+          </div>
+        </td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Closed P&L</span><span class="${closedClass}">${money(day.closedPnl, 2)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Net Fees & Funding</span><span>${plainMoney(day.fees, 2)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Net P&L</span><span class="${pnlClass}">${money(day.netPnl, 2)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Total Volume</span><span>${plainMoney(day.volume, 2)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Total Fills</span><span>${day.fillsCount.toLocaleString()}</span></td>
+      </tr>
+    `;
   }).join("");
 
   dailyMeta.textContent = `Showing aggregated daily performance across ${sortedKeys.length} active day(s).`;
@@ -1327,14 +1357,27 @@ function renderMonthlyPnl() {
 
   monthlyBodyEl.innerHTML = sortedKeys.map(k => {
     const m = monthlyMap[k];
-    return `<tr>
-      <td style="text-align: left; font-weight: 800;">${esc(m.label)}</td>
-      <td class="${m.closedPnl > 0 ? "text-positive" : m.closedPnl < 0 ? "text-negative" : ""}">${money(m.closedPnl, 2)}</td>
-      <td>${plainMoney(m.fees, 2)}</td>
-      <td class="${m.netPnl > 0 ? "text-positive" : m.netPnl < 0 ? "text-negative" : ""}">${money(m.netPnl, 2)}</td>
-      <td>${plainMoney(m.volume, 2)}</td>
-      <td>${m.fillsCount.toLocaleString()}</td>
-    </tr>`;
+    const pnlClass = m.netPnl > 0 ? "text-positive" : m.netPnl < 0 ? "text-negative" : "";
+    const closedClass = m.closedPnl > 0 ? "text-positive" : m.closedPnl < 0 ? "text-negative" : "";
+
+    return `
+      <tr onclick="toggleMobileCard(this)">
+        <td style="text-align: left; font-weight: 800;" class="mobile-card-header">
+          <span>${esc(m.label)}</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="mobile-preview-badge">
+              <span class="${pnlClass}">Net P&L: ${money(m.netPnl, 2)}</span>
+            </div>
+            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this)">▼</button>
+          </div>
+        </td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Closed P&L</span><span class="${closedClass}">${money(m.closedPnl, 2)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Net Fees & Funding</span><span>${plainMoney(m.fees, 2)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Net P&L</span><span class="${pnlClass}">${money(m.netPnl, 2)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Total Volume</span><span>${plainMoney(m.volume, 2)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Total Fills</span><span>${m.fillsCount.toLocaleString()}</span></td>
+      </tr>
+    `;
   }).join("");
 
   monthlyMeta.textContent = `Showing aggregated monthly performance across ${sortedKeys.length} month(s).`;
@@ -1619,25 +1662,36 @@ function renderTrades() {
     const dc = d.toLowerCase().includes("close") ? "dir-close" : "dir-open";
     const rawHash = String(f.hash ?? "");
     const hasHash = rawHash && rawHash !== "null" && rawHash !== "undefined";
+    const pnlClass = p > 0 ? "text-positive" : p < 0 ? "text-negative" : "";
 
     const hashCell = hasHash 
       ? `<a href="${EXPLORER_URL}${esc(rawHash)}" target="_blank" rel="noopener noreferrer" class="hash" title="View Explorer">${esc(rawHash)}</a>`
       : '—';
 
-    return `<tr>
-      <td>${esc(formatDate(f.time))}</td>
-      <td class="coin-name">${esc(f.coin)}</td>
-      <td class="${dc}">${esc(d)}</td>
-      <td>${esc(mapSide(f.side))}</td>
-      <td>${esc(f.px)}</td>
-      <td>${esc(f.sz)}</td>
-      <td>${plainMoney(Math.abs(num(f.px) * num(f.sz)), 2)}</td>
-      <td class="${p > 0 ? "text-positive" : p < 0 ? "text-negative" : ""}">${money(p, 4)}</td>
-      <td>${plainMoney(f.fee, 4)}</td>
-      <td>${esc(f.feeToken)}</td>
-      <td>${esc(f.oid)}</td>
-      <td>${hashCell}</td>
-    </tr>`;
+    return `
+      <tr onclick="toggleMobileCard(this)">
+        <td style="text-align: left;" class="mobile-card-header">
+          <span>${esc(formatDate(f.time))}</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="mobile-preview-badge">
+              <span class="${pnlClass}">P&L: ${money(p, 2)}</span>
+            </div>
+            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this)">▼</button>
+          </div>
+        </td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Coin</span><span class="coin-name">${esc(f.coin)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Dir</span><span class="${dc}">${esc(d)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Side</span><span>${esc(mapSide(f.side))}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Price</span><span>${esc(f.px)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Size</span><span>${esc(f.sz)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Notional</span><span>${plainMoney(Math.abs(num(f.px) * num(f.sz)), 2)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Closed P&L</span><span class="${pnlClass}">${money(p, 4)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Fee</span><span>${plainMoney(f.fee, 4)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Fee Token</span><span>${esc(f.feeToken)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Order ID</span><span>${esc(f.oid)}</span></td>
+        <td class="collapsible-detail"><span class="mobile-label-text">Hash</span><span>${hashCell}</span></td>
+      </tr>
+    `;
   }).join("");
 
   tableMeta.textContent = `${displayFills.length.toLocaleString()} fills matching filters (Showing ${startIdx + 1}–${Math.min(startIdx + rowsPerPage, displayFills.length)})`;
@@ -1715,7 +1769,6 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // Automatically fetch ALL TIME data on load if a wallet address is saved
   if (actualWalletValue && isAddress(actualWalletValue)) {
     try {
       await setInceptionPreset();
@@ -1752,7 +1805,6 @@ window.addEventListener("DOMContentLoaded", async () => {
         startFiveSecondPoller(cleanUser);
       }
 
-      // Auto-hide controls and save state on successful auto-load
       controlsPanel.classList.add("hidden");
       unhideBtn.classList.remove("hidden");
       localStorage.setItem("hyperliquid_controls_hidden", "true");
