@@ -77,7 +77,7 @@ body { padding: 16px 10px; }
   flex-wrap: wrap;
 }
 
-.theme-toggle-btn, .secondary[href*="charts.html"] {
+.theme-toggle-btn, .secondary[href*="charts.html"], #livePricesModalBtn {
   background: var(--btn-secondary-bg);
   border: 1px solid var(--btn-secondary-border);
   color: var(--text-main);
