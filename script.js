@@ -901,6 +901,13 @@ function renderContracts() {
     return;
   }
 
+  // 1. SAVE WHICH COINS ARE CURRENTLY EXPANDED ON MOBILE
+  const expandedCoins = new Set();
+  contractsBodyEl.querySelectorAll("tr.expanded").forEach(tr => {
+    const coinSpan = tr.querySelector(".coin-name span");
+    if (coinSpan) expandedCoins.add(coinSpan.textContent.trim().split(" ")[0]);
+  });
+
   const rows = [];
   let count = 0;
   let totalUnrealizedPnl = 0;
@@ -960,8 +967,11 @@ function renderContracts() {
     const unPnlId = `contract-unpnl-${coin}-${index}`;
     const pnlClass = liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : "";
 
+    // 2. PRESERVE EXPANDED STATE
+    const isExpanded = expandedCoins.has(coin);
+
     rows.push(`
-      <tr onclick="toggleMobileCard(this)">
+      <tr class="${isExpanded ? "expanded" : ""}" onclick="toggleMobileCard(this)">
         <td style="text-align: left; font-weight: 800;" class="coin-name mobile-card-header">
           <span>${esc(coin)} <span class="${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</span></span>
           <div style="display: flex; align-items: center; gap: 8px;">
