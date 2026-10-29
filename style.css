@@ -693,3 +693,91 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   }
 }
 
+/* ================================================================= */
+/* MOBILE COLLAPSIBLE CARDS & ACCORDION STYLES                       */
+/* ================================================================= */
+
+/* Hide mobile accordion toggles on desktop view */
+.mobile-card-toggle-btn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* Style individual table rows as independent collapsible cards */
+  .coinglass-table tbody tr {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    background: var(--input-bg) !important;
+    border: 1px solid var(--panel-border) !important;
+    border-radius: 8px !important;
+    margin-bottom: 10px !important;
+    padding: 12px !important;
+    position: relative;
+    cursor: default !important;
+  }
+
+  /* Header summary row always visible when collapsed */
+  .coinglass-table tbody tr .mobile-card-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+    font-weight: 700;
+  }
+
+  /* Show toggle arrow button on mobile */
+  .mobile-card-toggle-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    background: var(--btn-secondary-bg);
+    border: 1px solid var(--btn-secondary-border);
+    color: var(--text-main);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 12px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  /* Rotate arrow when expanded */
+  .coinglass-table tbody tr.expanded .mobile-card-toggle-btn {
+    transform: rotate(180deg);
+  }
+
+  /* Hide regular table cells by default (collapsed state) */
+  .coinglass-table td.collapsible-detail {
+    display: none !important;
+  }
+
+  /* Show regular table cells when row has .expanded class */
+  .coinglass-table tbody tr.expanded td.collapsible-detail {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 6px 0 !important;
+    border-bottom: 1px dashed var(--panel-border) !important;
+    font-size: 12px !important;
+    width: 100% !important;
+  }
+
+  .coinglass-table tbody tr.expanded td.collapsible-detail:last-child {
+    border-bottom: none !important;
+  }
+
+  /* Compact summary preview badge shown when collapsed */
+  .mobile-preview-badge {
+    display: flex;
+    gap: 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+    align-items: center;
+  }
+
+  .coinglass-table tbody tr.expanded .mobile-preview-badge {
+    display: none !important;
+  }
+}
