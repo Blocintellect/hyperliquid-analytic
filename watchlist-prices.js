@@ -13,7 +13,6 @@
   let currentSearchQuery = "";
   let activeTab = "all";
   
-  // Track expanded rows in memory so re-renders don't collapse them
   const expandedPricesCoins = new Set();
 
   const ASSET_NAME_MAP = {
@@ -142,10 +141,13 @@
       priceWatchlist.push(coin);
     }
     savePriceWatchlist();
+    
+    // Instantly update the button style without full re-render if present
     const btn = document.getElementById(`watchlist-btn-${coin}`);
+    const isStarred = priceWatchlist.includes(coin);
     if (btn) {
-      btn.textContent = priceWatchlist.includes(coin) ? "★" : "☆";
-      btn.style.color = priceWatchlist.includes(coin) ? "var(--coinglass-green)" : "var(--text-muted)";
+      btn.textContent = isStarred ? "★" : "☆";
+      btn.style.color = isStarred ? "#f59e0b" : "var(--text-muted)";
     }
     document.getElementById("tabWatchlistCoins").textContent = `⭐ Watchlist (${priceWatchlist.length})`;
     if (activeTab === "watchlist") renderPricesTable();
@@ -310,7 +312,8 @@
     tbody.innerHTML = filtered.map(item => {
       const isStarred = priceWatchlist.includes(item.coin);
       const starIcon = isStarred ? "★" : "☆";
-      const starColor = isStarred ? "var(--coinglass-green)" : "var(--text-muted)";
+      // Explicit vibrant yellow/gold color for favorited stars
+      const starColor = isStarred ? "#f59e0b" : "var(--text-muted)";
       const changeClass = item.change24h > 0 ? "text-positive" : item.change24h < 0 ? "text-negative" : "";
       const changeStr = (item.change24h > 0 ? "+" : "") + item.change24h.toFixed(2) + "%";
       const fundingPct = (item.funding * 100).toFixed(4) + "%";
@@ -330,7 +333,7 @@
       return `
         <tr class="${isExpanded ? "expanded" : ""}" onclick="togglePricesMobileCard(this, '${item.coin}')" style="cursor: pointer;">
           <td style="text-align: left; width: 40px;" onclick="event.stopPropagation()">
-            <button id="watchlist-btn-${item.coin}" class="btn-ghost" style="padding: 0 4px; font-size: 14px; color: ${starColor};" onclick="togglePriceWatchlist('${item.coin}')" title="Toggle Watchlist">${starIcon}</button>
+            <button id="watchlist-btn-${item.coin}" class="btn-ghost" style="padding: 0 4px; font-size: 16px; color: ${starColor};" onclick="togglePriceWatchlist('${item.coin}')" title="Toggle Watchlist">${starIcon}</button>
           </td>
           <td style="text-align: left; font-weight: 800; color: var(--text-main);" class="prices-coin-name mobile-card-header">
             <span>${item.pair}</span>
