@@ -659,7 +659,7 @@ function initWebSocket(coins) {
       if (msg.channel === "allMids" && msg.data?.mids) {
         livePrices = msg.data.mids;
         if (!panelContracts.classList.contains("hidden")) {
-          renderContracts();
+          updateActiveContractsLiveValues();
         }
         updateMetrics();
         renderWalletDetails();
@@ -674,6 +674,75 @@ function initWebSocket(coins) {
       if (coins.length > 0) initWebSocket(coins);
     }, 5000);
   };
+}
+
+window.showRiskInfo = function(coin, currentPx, liqPx, distance) {
+  alert(`Liquidation Risk for ${coin}:\n\n• Current Price: $${Number(currentPx).toLocaleString()}\n• Est. Liquidation Price: $${Number(liqPx).toLocaleString()}\n• Distance to Liquidation: ${distance.toFixed(1)}%\n\nIf the asset moves this percentage against your position, you will reach liquidation.`);
+};
+
+// Live update function for active contracts without collapsing accordion rows
+function updateActiveContractsLiveValues() {
+  if (!activePositions || activePositions.length === 0) return;
+  let totalUnrealizedPnl = 0;
+
+  activePositions.forEach((item, index) => {
+    const pos = item.position || item;
+    if (!pos) return;
+    const sizeNum = num(pos.szi);
+    if (sizeNum === 0) return;
+
+    const coin = pos.coin || "PERP";
+    const entryPx = num(pos.entryPx);
+    const positionValue = num(pos.positionValue) || Math.abs(sizeNum * entryPx);
+    const marginUsed = num(pos.marginUsed) || (positionValue / num(pos.leverage?.value || 1));
+    
+    const currentMarkPx = num(livePrices[coin]) || (sizeNum !== 0 ? Math.abs(positionValue / sizeNum) : entryPx);
+    const priceDiff = sizeNum > 0 ? (currentMarkPx - entryPx) : (entryPx - currentMarkPx);
+    const liveUnPnl = priceDiff * Math.abs(sizeNum);
+    totalUnrealizedPnl += liveUnPnl;
+
+    let estLiqPx = num(pos.liquidationPx || pos.liqPx);
+    if (!estLiqPx || estLiqPx <= 0) {
+      if (sizeNum > 0) {
+        estLiqPx = entryPx - (marginUsed / Math.abs(sizeNum)) * 0.95;
+      } else {
+        estLiqPx = entryPx + (marginUsed / Math.abs(sizeNum)) * 0.95;
+      }
+      estLiqPx = Math.max(0, estLiqPx);
+    }
+
+    const distancePercent = Math.abs((currentMarkPx - estLiqPx) / currentMarkPx) * 100;
+    let riskColor = "text-positive";
+    let riskLabel = "Safe";
+    if (distancePercent < 5) {
+      riskColor = "text-negative";
+      riskLabel = "Critical";
+    } else if (distancePercent < 15) {
+      riskColor = "";
+      riskLabel = "Moderate";
+    }
+
+    const riskEl = $(`contract-risk-${coin}-${index}`);
+    if (riskEl) {
+      riskEl.className = riskColor;
+      riskEl.style.fontWeight = "700";
+      riskEl.style.cursor = "pointer";
+      riskEl.onclick = () => window.showRiskInfo(coin, currentMarkPx, estLiqPx, distancePercent);
+      riskEl.textContent = `${distancePercent.toFixed(1)}% (${riskLabel} !)`;
+    }
+
+    const unPnlEl = $(`contract-unpnl-${coin}-${index}`);
+    if (unPnlEl) {
+      unPnlEl.className = liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : "";
+      unPnlEl.textContent = money(liveUnPnl, 2);
+    }
+  });
+
+  const totalUnrealizedMeta = $("totalUnrealizedMeta");
+  if (totalUnrealizedMeta) {
+    totalUnrealizedMeta.className = totalUnrealizedPnl > 0 ? "text-positive" : totalUnrealizedPnl < 0 ? "text-negative" : "";
+    totalUnrealizedMeta.textContent = money(totalUnrealizedPnl, 2);
+  }
 }
 
 function animateNumber(elementId, targetVal, isCurrency = true, decimals = 2, isSigned = false) {
@@ -888,7 +957,6 @@ function getFilteredFills() {
   });
 }
 
-// Track expanded rows in memory so live price updates don't close them
 const expandedContractsCoins = new Set();
 const expandedTradesIds = new Set();
 const expandedDailyKeys = new Set();
@@ -899,7 +967,6 @@ window.toggleMobileCard = function(btnElement, identifier = "") {
     const tr = btnElement.closest("tr");
     if (tr) {
       const isAlreadyExpanded = tr.classList.contains("expanded");
-      // Clear out other expansions and toggle
       document.querySelectorAll("#contractsBody tr.expanded, #tradeBody tr.expanded, #dailyBody tr.expanded, #monthlyBody tr.expanded").forEach(row => {
         row.classList.remove("expanded");
       });
@@ -978,7 +1045,8 @@ function renderContracts() {
       riskLabel = "Moderate";
     }
 
-    const proximityHtml = `<span class="${riskColor}" style="font-weight: 700;">${distancePercent.toFixed(1)}% (${riskLabel})</span>`;
+    const riskId = `contract-risk-${coin}-${index}`;
+    const proximityHtml = `<span id="${riskId}" class="${riskColor}" style="font-weight: 700; cursor: pointer;" onclick="window.showRiskInfo('${esc(coin)}', ${currentMarkPx}, ${estLiqPx}, ${distancePercent})">${distancePercent.toFixed(1)}% (${riskLabel} !)</span>`;
 
     const rawCumFunding = num((pos.cumFunding || {}).sinceOpen ?? (pos.cumFunding || {}).allTime ?? 0);
     const positionFunding = -rawCumFunding; 
@@ -1028,20 +1096,6 @@ function renderContracts() {
   }
 
   contractsBodyEl.innerHTML = rows.join("");
-
-  activePositions.forEach((item, index) => {
-    const pos = item.position || item;
-    if (!pos) return;
-    const sizeNum = num(pos.szi);
-    if (sizeNum === 0) return;
-
-    const coin = pos.coin || "PERP";
-    const entryPx = num(pos.entryPx);
-    const currentMarkPx = num(livePrices[coin]) || (sizeNum !== 0 ? Math.abs(num(pos.positionValue) / sizeNum) : entryPx);
-    const liveUnPnl = (sizeNum > 0 ? (currentMarkPx - entryPx) : (entryPx - currentMarkPx)) * Math.abs(sizeNum);
-
-    animateNumber(`contract-unpnl-${coin}-${index}`, liveUnPnl, true, 2, true);
-  });
   
   const totalPnlClass = totalUnrealizedPnl > 0 ? "text-positive" : totalUnrealizedPnl < 0 ? "text-negative" : "";
   contractsMeta.innerHTML = `Displaying ${count} active contract(s) | Total Unrealized P&L: <strong id="totalUnrealizedMeta" class="${totalPnlClass}">${money(totalUnrealizedPnl, 2)}</strong>`;
