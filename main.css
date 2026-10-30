@@ -543,7 +543,34 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 }
 .page-indicator { font-size: 11px; font-weight: 600; color: var(--text-muted); }
 
-/* Responsive Breakpoints & Mobile Accordions */
+/* ================================================================= */
+/* LIVE PRICES & WATCHLIST MODULE                                    */
+/* ================================================================= */
+
+.prices-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+
+.prices-table th,
+.prices-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prices-table th:nth-child(1), .prices-table td:nth-child(1) { width: 45px; }
+.prices-table th:nth-child(2), .prices-table td:nth-child(2) { width: 190px; text-align: left; }
+.prices-table th:nth-child(3), .prices-table td:nth-child(3) { width: 110px; }
+.prices-table th:nth-child(4), .prices-table td:nth-child(4) { width: 100px; }
+.prices-table th:nth-child(5), .prices-table td:nth-child(5) { width: 110px; }
+.prices-table th:nth-child(6), .prices-table td:nth-child(6) { width: 120px; }
+.prices-table th:nth-child(7), .prices-table td:nth-child(7) { width: 100px; text-align: right; }
+
+.prices-mobile-price-preview {
+  display: none !important;
+}
+
 @media (max-width: 1024px) {
   .metrics-grid { grid-template-columns: repeat(3, 1fr); }
   .control-row { grid-template-columns: 1fr; }
@@ -584,6 +611,11 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     text-align: center !important;
   }
 
+  .table-wrap {
+    overflow-x: hidden !important;
+    width: 100% !important;
+  }
+
   .coinglass-table thead { display: none !important; }
   .coinglass-table, .coinglass-table tbody, .coinglass-table tr { display: block !important; width: 100% !important; }
 
@@ -594,6 +626,7 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     margin-bottom: 10px !important;
     padding: 10px 12px !important;
     position: relative;
+    width: 100% !important;
   }
 
   .coinglass-table tbody tr .mobile-card-header {
@@ -617,7 +650,7 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     border-radius: 50%;
     font-size: 10px;
     cursor: pointer;
-    transition: transform 0.2s ease;
+    transition: transform 0.25s ease;
     flex-shrink: 0;
   }
 
@@ -625,9 +658,49 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     transform: rotate(180deg);
   }
 
-  .coinglass-table td.collapsible-detail { display: none !important; }
+  .prices-table tbody tr {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
 
-  .coinglass-table tbody tr.expanded td.collapsible-detail {
+  .prices-table tbody tr td:first-child {
+    display: inline-flex !important;
+    align-items: center !important;
+    width: 40px !important;
+    padding: 0 !important;
+    border-bottom: none !important;
+    flex-shrink: 0;
+  }
+
+  .prices-table tbody tr td.prices-coin-name {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: calc(100% - 40px) !important;
+    padding: 0 !important;
+    border-bottom: none !important;
+  }
+
+  .prices-mobile-price-preview {
+    display: inline-block !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: var(--text-main) !important;
+  }
+
+  .prices-table tbody tr.expanded .prices-mobile-price-preview {
+    display: none !important;
+  }
+
+  .coinglass-table td.collapsible-detail,
+  .prices-table td.prices-collapsible-detail { 
+    display: none !important;
+  }
+
+  .coinglass-table tbody tr.expanded td.collapsible-detail,
+  .prices-table tbody tr.expanded td.prices-collapsible-detail {
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
@@ -638,13 +711,15 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     text-align: right !important;
   }
 
-  .coinglass-table tbody tr.expanded td.collapsible-detail:first-child {
+  .coinglass-table tbody tr.expanded td.collapsible-detail:first-child,
+  .prices-table tbody tr.expanded td.prices-collapsible-detail:first-child {
     margin-top: 8px;
     border-top: 1px solid var(--panel-border);
     padding-top: 8px !important;
   }
 
-  .coinglass-table tbody tr.expanded td.collapsible-detail:last-child {
+  .coinglass-table tbody tr.expanded td.collapsible-detail:last-child,
+  .prices-table tbody tr.expanded td.prices-collapsible-detail:last-child {
     border-bottom: none !important;
   }
 

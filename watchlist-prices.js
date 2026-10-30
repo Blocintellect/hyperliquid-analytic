@@ -1,8 +1,5 @@
 /**
  * Hyperliquid Pro - Watchlist & Live Prices Module
- * Fetches all perpetual asset pairs (USDC margined) including crypto, commodities, 
- * and indices, with real-time WebSocket mid prices, keyword matching (WTI, Oil, Gold), 
- * custom watchlists, and dynamic Filter/Unfilter toggle actions.
  */
 
 (function () {
@@ -14,9 +11,11 @@
   let priceWatchlist = [];
   let pricesWs = null;
   let currentSearchQuery = "";
-  let activeTab = "all"; // 'all' or 'watchlist'
+  let activeTab = "all";
+  
+  // Track expanded rows in memory so re-renders don't collapse them
+  const expandedPricesCoins = new Set();
 
-  // Friendly name map for commodities, equities, and indices
   const ASSET_NAME_MAP = {
     "CL": "WTI Crude Oil Futures",
     "BRENTOIL": "Brent Crude Oil",
@@ -70,8 +69,8 @@
               <input id="pricesSearchInput" type="text" placeholder="Search asset (e.g. BTC, WTI, OIL, GOLD)..." style="max-width: 260px; height: 34px; font-size: 11px;" oninput="filterPricesSearch(this.value)">
             </div>
 
-            <div class="table-wrap" style="overflow-y: auto; max-height: 52vh; border: 1px solid var(--panel-border); border-radius: 6px;">
-              <table class="coinglass-table" style="font-size: 11.5px;">
+            <div class="table-wrap" style="overflow-y: auto; overflow-x: hidden; max-height: 52vh; border: 1px solid var(--panel-border); border-radius: 6px; width: 100%;">
+              <table class="coinglass-table prices-table" style="font-size: 11.5px; width: 100%; table-layout: fixed;">
                 <thead>
                   <tr>
                     <th style="text-align: left; width: 40px;">⭐</th>
@@ -152,6 +151,23 @@
     if (activeTab === "watchlist") renderPricesTable();
   };
 
+  window.togglePricesMobileCard = function(btnElement, coin) {
+    if (window.innerWidth <= 768) {
+      const tr = btnElement.closest("tr");
+      if (tr) {
+        const isAlreadyExpanded = tr.classList.contains("expanded");
+        expandedPricesCoins.clear();
+        document.querySelectorAll("#pricesTableBody tr.expanded").forEach(row => {
+          row.classList.remove("expanded");
+        });
+        if (!isAlreadyExpanded) {
+          tr.classList.add("expanded");
+          expandedPricesCoins.add(coin);
+        }
+      }
+    }
+  };
+
   async function fetchAssetPricesData() {
     try {
       const [nativeRes, xyzRes] = await Promise.all([
@@ -224,7 +240,6 @@
 
   function startPricesWebSocket() {
     if (pricesWs) pricesWs.close();
-
     pricesWs = new WebSocket(PRICES_WS_URL);
 
     pricesWs.onopen = () => {
@@ -301,7 +316,7 @@
       const fundingPct = (item.funding * 100).toFixed(4) + "%";
       const fundingClass = item.funding > 0 ? "text-positive" : item.funding < 0 ? "text-negative" : "";
 
-      const subtitle = item.fullName !== item.coin ? ` <span style="font-size: 10px; color: var(--text-muted);">(${item.fullName})</span>` : "";
+      const formattedPrice = item.markPx >= 1 ? item.markPx.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : item.markPx.toFixed(6);
 
       const isCurrentlyFiltered = activeFilteredCoin === item.coin;
       const actionLabel = isCurrentlyFiltered ? "Unfilter" : "Filter Fills";
@@ -310,19 +325,25 @@
         ? "height: 26px; padding: 0 8px; font-size: 10px; color: var(--coinglass-red); border-color: var(--coinglass-red);" 
         : "height: 26px; padding: 0 8px; font-size: 10px;";
 
+      const isExpanded = expandedPricesCoins.has(item.coin);
+
       return `
-        <tr>
-          <td style="text-align: left;">
+        <tr class="${isExpanded ? "expanded" : ""}" onclick="togglePricesMobileCard(this, '${item.coin}')" style="cursor: pointer;">
+          <td style="text-align: left; width: 40px;" onclick="event.stopPropagation()">
             <button id="watchlist-btn-${item.coin}" class="btn-ghost" style="padding: 0 4px; font-size: 14px; color: ${starColor};" onclick="togglePriceWatchlist('${item.coin}')" title="Toggle Watchlist">${starIcon}</button>
           </td>
-          <td style="text-align: left; font-weight: 800; color: var(--text-main);">
-            ${item.pair}${subtitle}
+          <td style="text-align: left; font-weight: 800; color: var(--text-main);" class="prices-coin-name mobile-card-header">
+            <span>${item.pair}</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="prices-mobile-price-preview">$${formattedPrice}</span>
+              <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); togglePricesMobileCard(this, '${item.coin}')">▼</button>
+            </div>
           </td>
-          <td>$${item.markPx >= 1 ? item.markPx.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : item.markPx.toFixed(6)}</td>
-          <td class="${changeClass}">${changeStr}</td>
-          <td class="${fundingClass}">${fundingPct}</td>
-          <td>${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</td>
-          <td style="text-align: right;">
+          <td class="prices-collapsible-detail"><span class="mobile-label-text">Mark Price</span><span>$${formattedPrice}</span></td>
+          <td class="prices-collapsible-detail ${changeClass}"><span class="mobile-label-text">24h Change</span><span>${changeStr}</span></td>
+          <td class="prices-collapsible-detail ${fundingClass}"><span class="mobile-label-text">Funding Rate</span><span>${fundingPct}</span></td>
+          <td class="prices-collapsible-detail"><span class="mobile-label-text">Open Interest</span><span>${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</span></td>
+          <td style="text-align: right;" class="prices-collapsible-detail" onclick="event.stopPropagation()">
             <button class="${actionClass}" style="${actionStyle}" onclick="toggleCoinFilter('${item.coin}')">${actionLabel}</button>
           </td>
         </tr>

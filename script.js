@@ -1,3 +1,7 @@
+/**
+ * Hyperliquid Pro - Main Statement & Core Logic Module
+ */
+
 const API = "https://api.hyperliquid.xyz/info";
 const WS_URL = "wss://api.hyperliquid.xyz/ws";
 const EXPLORER_URL = "https://app.hyperliquid.xyz/explorer/tx/";
@@ -792,7 +796,6 @@ function updateMetrics() {
   const winningTrades = tradesWithPnl.filter(f => num(f.closedPnl) > 0);
   const winRate = tradesWithPnl.length > 0 ? (winningTrades.length / tradesWithPnl.length) * 100 : 0;
 
-  // STRICT API-BASED PERP EQUITY (RENAMED TO PERP HOLDINGS)
   let perpAccountVal = 0, withdrawableVal = 0, spotVal = 0;
 
   if (holdingsData) {
@@ -885,11 +888,35 @@ function getFilteredFills() {
   });
 }
 
-window.toggleMobileCard = function(btnElement) {
+// Track expanded rows in memory so live price updates don't close them
+const expandedContractsCoins = new Set();
+const expandedTradesIds = new Set();
+const expandedDailyKeys = new Set();
+const expandedMonthlyKeys = new Set();
+
+window.toggleMobileCard = function(btnElement, identifier = "") {
   if (window.innerWidth <= 768) {
     const tr = btnElement.closest("tr");
     if (tr) {
-      tr.classList.toggle("expanded");
+      const isAlreadyExpanded = tr.classList.contains("expanded");
+      // Clear out other expansions and toggle
+      document.querySelectorAll("#contractsBody tr.expanded, #tradeBody tr.expanded, #dailyBody tr.expanded, #monthlyBody tr.expanded").forEach(row => {
+        row.classList.remove("expanded");
+      });
+      expandedContractsCoins.clear();
+      expandedTradesIds.clear();
+      expandedDailyKeys.clear();
+      expandedMonthlyKeys.clear();
+
+      if (!isAlreadyExpanded) {
+        tr.classList.add("expanded");
+        if (identifier) {
+          if (tr.closest("#contractsBody")) expandedContractsCoins.add(identifier);
+          if (tr.closest("#tradeBody")) expandedTradesIds.add(identifier);
+          if (tr.closest("#dailyBody")) expandedDailyKeys.add(identifier);
+          if (tr.closest("#monthlyBody")) expandedMonthlyKeys.add(identifier);
+        }
+      }
     }
   }
 };
@@ -900,13 +927,6 @@ function renderContracts() {
     contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
-
-  // 1. SAVE WHICH COINS ARE CURRENTLY EXPANDED ON MOBILE
-  const expandedCoins = new Set();
-  contractsBodyEl.querySelectorAll("tr.expanded").forEach(tr => {
-    const coinSpan = tr.querySelector(".coin-name span");
-    if (coinSpan) expandedCoins.add(coinSpan.textContent.trim().split(" ")[0]);
-  });
 
   const rows = [];
   let count = 0;
@@ -931,10 +951,11 @@ function renderContracts() {
 
     totalUnrealizedPnl += liveUnPnl;
 
-    const levObj = pos.leverage;
-    const levValue = levObj && levObj.value ? levObj.value : 1;
-    const leverageText = ` (${levValue}x)`;
-    const dirLabel = sizeNum > 0 ? `LONG${leverageText}` : `SHORT${leverageText}`;
+    const currentPosValue = Math.abs(sizeNum * currentMarkPx);
+    const realLeverage = marginUsed > 0 ? (currentPosValue / marginUsed) : num(pos.leverage?.value || 1);
+    const leverageText = ` (${realLeverage.toFixed(1)}x)`;
+    const rawDir = sizeNum > 0 ? "LONG" : "SHORT";
+    const dirLabel = `${rawDir}${leverageText}`;
 
     let estLiqPx = num(pos.liquidationPx || pos.liqPx);
     if (!estLiqPx || estLiqPx <= 0) {
@@ -959,27 +980,25 @@ function renderContracts() {
 
     const proximityHtml = `<span class="${riskColor}" style="font-weight: 700;">${distancePercent.toFixed(1)}% (${riskLabel})</span>`;
 
-    const cumFundingObj = pos.cumFunding || {};
-    const rawCumFunding = num(cumFundingObj.sinceOpen !== undefined ? cumFundingObj.sinceOpen : (cumFundingObj.allTime || 0));
+    const rawCumFunding = num((pos.cumFunding || {}).sinceOpen ?? (pos.cumFunding || {}).allTime ?? 0);
     const positionFunding = -rawCumFunding; 
     const fundingClass = positionFunding > 0 ? "text-positive" : positionFunding < 0 ? "text-negative" : "";
 
     const unPnlId = `contract-unpnl-${coin}-${index}`;
     const pnlClass = liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : "";
 
-    // 2. PRESERVE EXPANDED STATE
-    const isExpanded = expandedCoins.has(coin);
+    const isExpanded = expandedContractsCoins.has(coin);
 
     rows.push(`
-      <tr class="${isExpanded ? "expanded" : ""}" onclick="toggleMobileCard(this)">
+      <tr class="${isExpanded ? "expanded" : ""}" onclick="toggleMobileCard(this, '${coin}')">
         <td style="text-align: left; font-weight: 800;" class="coin-name mobile-card-header">
-          <span>${esc(coin)} <span class="${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</span></span>
+          <span>${esc(coin)}</span>
           <div style="display: flex; align-items: center; gap: 8px;">
             <div class="mobile-preview-badge">
               <span>Mark: ${plainMoney(currentMarkPx, 2)}</span>
               <span class="${pnlClass}">P&L: ${money(liveUnPnl, 2)}</span>
             </div>
-            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this)">▼</button>
+            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this, '${coin}')">▼</button>
           </div>
         </td>
         <td class="collapsible-detail"><span class="mobile-label-text">Position / Lev</span><span class="${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</span></td>
@@ -1297,16 +1316,17 @@ function renderDailyPnl() {
     const day = dailyMap[k];
     const pnlClass = day.netPnl > 0 ? "text-positive" : day.netPnl < 0 ? "text-negative" : "";
     const closedClass = day.closedPnl > 0 ? "text-positive" : day.closedPnl < 0 ? "text-negative" : "";
+    const isExpanded = expandedDailyKeys.has(day.label);
 
     return `
-      <tr onclick="toggleMobileCard(this)">
+      <tr class="${isExpanded ? "expanded" : ""}" onclick="toggleMobileCard(this, '${day.label}')">
         <td style="text-align: left; font-weight: 800;" class="mobile-card-header">
           <span>${esc(day.label)}</span>
           <div style="display: flex; align-items: center; gap: 8px;">
             <div class="mobile-preview-badge">
               <span class="${pnlClass}">Net P&L: ${money(day.netPnl, 2)}</span>
             </div>
-            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this)">▼</button>
+            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this, '${day.label}')">▼</button>
           </div>
         </td>
         <td class="collapsible-detail"><span class="mobile-label-text">Closed P&L</span><span class="${closedClass}">${money(day.closedPnl, 2)}</span></td>
@@ -1377,16 +1397,17 @@ function renderMonthlyPnl() {
     const m = monthlyMap[k];
     const pnlClass = m.netPnl > 0 ? "text-positive" : m.netPnl < 0 ? "text-negative" : "";
     const closedClass = m.closedPnl > 0 ? "text-positive" : m.closedPnl < 0 ? "text-negative" : "";
+    const isExpanded = expandedMonthlyKeys.has(m.label);
 
     return `
-      <tr onclick="toggleMobileCard(this)">
+      <tr class="${isExpanded ? "expanded" : ""}" onclick="toggleMobileCard(this, '${m.label}')">
         <td style="text-align: left; font-weight: 800;" class="mobile-card-header">
           <span>${esc(m.label)}</span>
           <div style="display: flex; align-items: center; gap: 8px;">
             <div class="mobile-preview-badge">
               <span class="${pnlClass}">Net P&L: ${money(m.netPnl, 2)}</span>
             </div>
-            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this)">▼</button>
+            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this, '${m.label}')">▼</button>
           </div>
         </td>
         <td class="collapsible-detail"><span class="mobile-label-text">Closed P&L</span><span class="${closedClass}">${money(m.closedPnl, 2)}</span></td>
@@ -1684,20 +1705,22 @@ function renderTrades() {
     const rawHash = String(f.hash ?? "");
     const hasHash = rawHash && rawHash !== "null" && rawHash !== "undefined";
     const pnlClass = p > 0 ? "text-positive" : p < 0 ? "text-negative" : "";
+    const fillId = f.tid || f.oid || f.time;
+    const isExpanded = expandedTradesIds.has(fillId);
 
     const hashCell = hasHash 
       ? `<a href="${EXPLORER_URL}${esc(rawHash)}" target="_blank" rel="noopener noreferrer" class="hash" title="View Explorer">${esc(rawHash)}</a>`
       : '—';
 
     return `
-      <tr onclick="toggleMobileCard(this)">
+      <tr class="${isExpanded ? "expanded" : ""}" onclick="toggleMobileCard(this, '${fillId}')">
         <td style="text-align: left;" class="mobile-card-header">
           <span>${esc(formatDate(f.time))}</span>
           <div style="display: flex; align-items: center; gap: 8px;">
             <div class="mobile-preview-badge">
               <span class="${pnlClass}">P&L: ${money(p, 2)}</span>
             </div>
-            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this)">▼</button>
+            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this, '${fillId}')">▼</button>
           </div>
         </td>
         <td class="collapsible-detail"><span class="mobile-label-text">Coin</span><span class="coin-name">${esc(f.coin)}</span></td>

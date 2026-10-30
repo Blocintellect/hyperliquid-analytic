@@ -20,9 +20,11 @@
 
 #pricesModal .table-wrap {
   overflow-y: auto;
+  overflow-x: hidden;
   max-height: 52vh;
   border: 1px solid var(--panel-border);
   border-radius: 6px;
+  width: 100%;
 }
 
 #livePricesModalBtn {
