@@ -726,11 +726,40 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   .mobile-label-text { display: inline-block !important; font-weight: 800; color: var(--text-muted); }
   .mobile-preview-badge { display: flex !important; gap: 8px; font-size: 11px; color: var(--text-muted); align-items: center; }
   .coinglass-table tbody tr.expanded .mobile-preview-badge { display: none !important; }
+
+  /* Make Deposit & Withdrawal Ledger table rows display 2 in a row as cards on mobile */
+  #panelDepositsWithdrawals .coinglass-table tbody {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  #panelDepositsWithdrawals .coinglass-table tbody tr {
+    margin-bottom: 0 !important;
+    height: 100%;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
 }
 
 @media (max-width: 600px) {
   .actions-row { flex-direction: column; align-items: stretch; }
   .main-btns { display: grid; grid-template-columns: 2fr 1fr; }
+}
+
+@media (max-width: 480px) {
+  .fee-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  .fee-cards-grid .metric-card {
+    padding: 10px !important;
+  }
+  .fee-cards-grid .metric-card .value {
+    font-size: 14px !important;
+  }
 }
 
 .flash-green { color: var(--coinglass-green) !important; transition: color 0.3s ease; }
