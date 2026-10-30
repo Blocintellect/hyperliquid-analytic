@@ -627,8 +627,6 @@ function renderAssetTable(assetMap) {
   let totalVolume = 0;
   let totalFills = 0;
 
-  const isMobile = window.innerWidth <= 768;
-
   const rowsHtml = sortedCoins.map(coin => {
     const row = assetMap[coin];
     totalClosedPnl += row.closedPnl;
@@ -637,53 +635,119 @@ function renderAssetTable(assetMap) {
     totalVolume += row.volume;
     totalFills += row.fills;
 
-    return `<tr class="${isMobile ? "" : "clickable-asset-row"}" style="${isMobile ? "" : "cursor: pointer;"}" data-coin="${esc(coin)}">
-      <td style="text-align: left; font-weight: 800;" class="coin-name">${esc(coin)}</td>
-      <td class="${row.closedPnl > 0 ? "text-positive" : row.closedPnl < 0 ? "text-negative" : ""}">${money(row.closedPnl, 2)}</td>
-      <td>${plainMoney(row.fees, 2)}</td>
-      <td class="${row.netPnl > 0 ? "text-positive" : row.netPnl < 0 ? "text-negative" : ""}">${money(row.netPnl, 2)}</td>
-      <td>${plainMoney(row.volume, 2)}</td>
-      <td>${row.fills.toLocaleString()}</td>
+    return `
+    <tr class="asset-card-row" data-coin="${esc(coin)}">
+      <td class="coin-name-cell" style="padding: 0;">
+        <div class="mobile-card-header">
+          <span class="coin-name">${esc(coin)}</span>
+          <div class="mobile-header-right">
+            <span class="${row.netPnl >= 0 ? "text-positive" : "text-negative"}">${money(row.netPnl, 2)}</span>
+            <button class="mobile-card-toggle-btn" aria-label="Toggle details">▼</button>
+          </div>
+        </div>
+        <div class="asset-detail-wrapper">
+          <div class="asset-detail-inner">
+            <div class="collapsible-detail-row">
+              <span class="mobile-label-text">CLOSED P&L</span>
+              <span class="${row.closedPnl >= 0 ? "text-positive" : "text-negative"}">${money(row.closedPnl, 2)}</span>
+            </div>
+            <div class="collapsible-detail-row">
+              <span class="mobile-label-text">TOTAL FEES</span>
+              <span>${plainMoney(row.fees, 2)}</span>
+            </div>
+            <div class="collapsible-detail-row">
+              <span class="mobile-label-text">NET P&L</span>
+              <span class="${row.netPnl >= 0 ? "text-positive" : "text-negative"}">${money(row.netPnl, 2)}</span>
+            </div>
+            <div class="collapsible-detail-row">
+              <span class="mobile-label-text">TOTAL VOLUME</span>
+              <span>${plainMoney(row.volume, 2)}</span>
+            </div>
+            <div class="collapsible-detail-row" style="border-bottom: none;">
+              <span class="mobile-label-text">FILLS COUNT</span>
+              <span>${row.fills.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+      </td>
+      <td style="display:none;"></td><td style="display:none;"></td><td style="display:none;"></td><td style="display:none;"></td><td style="display:none;"></td>
     </tr>`;
   }).join("");
 
-  const totalRowHtml = `<tr style="border-top: 2px solid var(--panel-border); font-weight: bold; background: rgba(255,255,255,0.02);">
-    <td style="text-align: left; font-weight: 900;">TOTAL / SUMMARY</td>
-    <td class="${totalClosedPnl > 0 ? "text-positive" : totalClosedPnl < 0 ? "text-negative" : ""}">${money(totalClosedPnl, 2)}</td>
-    <td>${plainMoney(totalFees, 2)}</td>
-    <td class="${totalNetPnl > 0 ? "text-positive" : totalNetPnl < 0 ? "text-negative" : ""}">${money(totalNetPnl, 2)}</td>
-    <td>${plainMoney(totalVolume, 2)}</td>
-    <td>${totalFills.toLocaleString()}</td>
+  const totalRowHtml = `
+  <tr class="asset-total-row">
+    <td class="coin-name-cell" style="padding: 0;">
+      <div class="mobile-card-header">
+        <span class="coin-name">TOTAL / SUMMARY</span>
+        <div class="mobile-header-right">
+          <span class="${totalNetPnl >= 0 ? "text-positive" : "text-negative"}">${money(totalNetPnl, 2)}</span>
+          <button class="mobile-card-toggle-btn" aria-label="Toggle details">▼</button>
+        </div>
+      </div>
+      <div class="asset-detail-wrapper">
+        <div class="asset-detail-inner">
+          <div class="collapsible-detail-row">
+            <span class="mobile-label-text">CLOSED P&L</span>
+            <span class="${totalClosedPnl >= 0 ? "text-positive" : "text-negative"}">${money(totalClosedPnl, 2)}</span>
+          </div>
+          <div class="collapsible-detail-row">
+            <span class="mobile-label-text">TOTAL FEES</span>
+            <span>${plainMoney(totalFees, 2)}</span>
+          </div>
+          <div class="collapsible-detail-row">
+            <span class="mobile-label-text">NET P&L</span>
+            <span class="${totalNetPnl >= 0 ? "text-positive" : "text-negative"}">${money(totalNetPnl, 2)}</span>
+          </div>
+          <div class="collapsible-detail-row">
+            <span class="mobile-label-text">TOTAL VOLUME</span>
+            <span>${plainMoney(totalVolume, 2)}</span>
+          </div>
+          <div class="collapsible-detail-row" style="border-bottom: none;">
+            <span class="mobile-label-text">FILLS COUNT</span>
+            <span>${totalFills.toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+    </td>
+    <td style="display:none;"></td><td style="display:none;"></td><td style="display:none;"></td><td style="display:none;"></td><td style="display:none;"></td>
   </tr>`;
 
   assetBody.innerHTML = rowsHtml + totalRowHtml;
 
-  // Strict check: Only attach row click popups if viewport width is greater than 768px (laptop/desktop view)
-  if (!isMobile) {
-    assetBody.querySelectorAll(".clickable-asset-row").forEach(tr => {
-      tr.addEventListener("click", (e) => {
+  assetBody.querySelectorAll(".asset-card-row, .asset-total-row").forEach(tr => {
+    tr.addEventListener("click", (e) => {
+      const isMobile = window.innerWidth <= 768;
+      
+      if (isMobile) {
+        const wasExpanded = tr.classList.contains("expanded");
+        assetBody.querySelectorAll(".asset-card-row, .asset-total-row").forEach(row => {
+          row.classList.remove("expanded");
+        });
+        
+        if (!wasExpanded) {
+          tr.classList.add("expanded");
+        }
+      } else {
         e.preventDefault();
         const coin = tr.getAttribute("data-coin");
+        if (!coin) return;
         const data = assetMap[coin];
         if (!data) return;
 
         $("modalAssetTitle").textContent = `${coin} — Performance Details`;
         $("modalAssetClosedPnl").textContent = money(data.closedPnl, 2);
         $("modalAssetClosedPnl").className = data.closedPnl >= 0 ? "text-positive" : "text-negative";
-        
         $("modalAssetFees").textContent = plainMoney(data.fees, 2);
-        
         $("modalAssetNetPnl").textContent = money(data.netPnl, 2);
         $("modalAssetNetPnl").className = data.netPnl >= 0 ? "text-positive" : "text-negative";
-
         $("modalAssetVolume").textContent = plainMoney(data.volume, 2);
         $("modalAssetFills").textContent = data.fills.toLocaleString();
         $("modalAssetWinLoss").textContent = `${data.wins}W / ${data.losses}L`;
 
         assetModal.classList.remove("hidden");
-      });
+      }
     });
-  }
+  });
 
   if ($("tableMeta")) {
     $("tableMeta").textContent = `Displaying performance across ${sortedCoins.length} traded asset market(s).`;
