@@ -114,11 +114,11 @@ let watchlist = [];
 let currentPage = 1;
 const rowsPerPage = 50;
 
-// Track expanded state across re-renders
 let expandedContractKey = null;
 let expandedTradeId = null;
 let expandedDailyKey = null;
 let expandedMonthlyKey = null;
+let expandedDepositHash = null;
 
 const SAVED_WALLET_KEY = "hyperliquid_saved_wallet";
 const SAVED_THEME_KEY = "hyperliquid_theme";
@@ -939,6 +939,9 @@ function updateMetrics() {
   if (holdingsValEl) {
     holdingsValEl.style.color = "var(--coinglass-purple)";
   }
+
+  // Update Share Card preview automatically
+  renderShareCardPreview();
 }
 
 function updateCoinFilterOptions() {
@@ -1296,16 +1299,43 @@ function renderFeeCalculator() {
 function renderShareCardPreview() {
   const targetFills = getFilteredFills();
   const closedPnl = targetFills.reduce((s, f) => s + num(f.closedPnl), 0);
-  const winningTrades = targetFills.filter(f => num(f.closedPnl) > 0);
-  const winRate = targetFills.length > 0 ? (winningTrades.length / targetFills.length) * 100 : 0;
+  const tradingFees = targetFills.reduce((s, f) => s + num(f.fee), 0);
+  const builderFees = targetFills.reduce((s, f) => s + num(f.builderFee), 0);
+  
+  let netFundingUsd = 0;
+  fundingHistory.forEach(item => {
+    netFundingUsd += num(item.delta?.usdc);
+  });
+  const currentUnrealizedPnl = calculateTotalUnrealizedPnl();
+  const netPnl = closedPnl - tradingFees - builderFees + netFundingUsd + currentUnrealizedPnl;
+
   const totalVol = targetFills.reduce((s, f) => s + Math.abs(num(f.px) * num(f.sz)), 0);
   const wallet = actualWalletValue || walletEl.value.trim() || "0x0000...0000";
 
+  let perpAccountVal = 0, spotVal = 0;
+  if (holdingsData) {
+    const margin = holdingsData.marginSummary || {};
+    perpAccountVal = num(margin.accountValue);
+  }
+  if (xyzHoldingsData) {
+    const xyzMargin = xyzHoldingsData.marginSummary || {};
+    perpAccountVal += num(xyzMargin.accountValue);
+  }
+  if (spotHoldingsData && Array.isArray(spotHoldingsData.balances)) {
+    spotHoldingsData.balances.forEach(b => {
+      const tokenSymbol = b.coin || b.token;
+      const totalAmount = num(b.total);
+      const tokenPrice = num(livePrices[tokenSymbol]) || num(livePrices[tokenSymbol + "-PERP"]) || 1;
+      spotVal += totalAmount * tokenPrice;
+    });
+  }
+  const totalHoldings = perpAccountVal + spotVal;
+
   $("shareCardWallet").textContent = maskAddress(wallet);
-  $("shareCardPnl").textContent = money(closedPnl, 2);
-  $("shareCardPnl").className = closedPnl >= 0 ? "text-positive" : "text-negative";
+  $("shareCardPnl").textContent = money(netPnl, 2);
+  $("shareCardPnl").className = netPnl >= 0 ? "text-positive" : "text-negative";
+  $("shareCardHoldings").textContent = plainMoney(totalHoldings, 2);
   $("shareCardFills").textContent = targetFills.length.toLocaleString();
-  $("shareCardWinRate").textContent = winRate.toFixed(1) + "%";
   $("shareCardVol").textContent = plainMoney(totalVol, 2);
 }
 
@@ -1324,9 +1354,33 @@ $("downloadShareCardBtn")?.addEventListener("click", () => {
 
   const targetFills = getFilteredFills();
   const closedPnl = targetFills.reduce((s, f) => s + num(f.closedPnl), 0);
-  const winningTrades = targetFills.filter(f => num(f.closedPnl) > 0);
-  const winRate = targetFills.length > 0 ? (winningTrades.length / targetFills.length) * 100 : 0;
+  const tradingFees = targetFills.reduce((s, f) => s + num(f.fee), 0);
+  const builderFees = targetFills.reduce((s, f) => s + num(f.builderFee), 0);
+  
+  let netFundingUsd = 0;
+  fundingHistory.forEach(item => { netFundingUsd += num(item.delta?.usdc); });
+  const currentUnrealizedPnl = calculateTotalUnrealizedPnl();
+  const netPnl = closedPnl - tradingFees - builderFees + netFundingUsd + currentUnrealizedPnl;
   const totalVol = targetFills.reduce((s, f) => s + Math.abs(num(f.px) * num(f.sz)), 0);
+
+  let perpAccountVal = 0, spotVal = 0;
+  if (holdingsData) {
+    const margin = holdingsData.marginSummary || {};
+    perpAccountVal = num(margin.accountValue);
+  }
+  if (xyzHoldingsData) {
+    const xyzMargin = xyzHoldingsData.marginSummary || {};
+    perpAccountVal += num(xyzMargin.accountValue);
+  }
+  if (spotHoldingsData && Array.isArray(spotHoldingsData.balances)) {
+    spotHoldingsData.balances.forEach(b => {
+      const tokenSymbol = b.coin || b.token;
+      const totalAmount = num(b.total);
+      const tokenPrice = num(livePrices[tokenSymbol]) || num(livePrices[tokenSymbol + "-PERP"]) || 1;
+      spotVal += totalAmount * tokenPrice;
+    });
+  }
+  const totalHoldings = perpAccountVal + spotVal;
 
   ctx.fillStyle = "#8492a6";
   ctx.font = "16px monospace";
@@ -1334,11 +1388,11 @@ $("downloadShareCardBtn")?.addEventListener("click", () => {
 
   ctx.fillStyle = "#f0f4f8";
   ctx.font = "18px sans-serif";
-  ctx.fillText("NET REALIZED P&L", 80, 220);
+  ctx.fillText("NET P&L", 80, 220);
 
-  ctx.fillStyle = closedPnl >= 0 ? "#00b87c" : "#f6465d";
+  ctx.fillStyle = netPnl >= 0 ? "#00b87c" : "#f6465d";
   ctx.font = "bold 64px sans-serif";
-  ctx.fillText(money(closedPnl, 2), 80, 300);
+  ctx.fillText(money(netPnl, 2), 80, 300);
 
   ctx.fillStyle = "#121721";
   ctx.fillRect(80, 380, 1040, 140);
@@ -1347,15 +1401,15 @@ $("downloadShareCardBtn")?.addEventListener("click", () => {
 
   ctx.fillStyle = "#8492a6";
   ctx.font = "16px sans-serif";
-  ctx.fillText("TOTAL FILLS", 140, 435);
-  ctx.fillText("WIN RATE", 520, 435);
-  ctx.fillText("TOTAL VOLUME", 840, 435);
+  ctx.fillText("WALLET HOLDINGS", 120, 435);
+  ctx.fillText("TOTAL FILLS", 480, 435);
+  ctx.fillText("TOTAL VOLUME", 820, 435);
 
   ctx.fillStyle = "#f0f4f8";
   ctx.font = "bold 24px sans-serif";
-  ctx.fillText(targetFills.length.toLocaleString(), 140, 475);
-  ctx.fillText(winRate.toFixed(1) + "%", 520, 475);
-  ctx.fillText(plainMoney(totalVol, 2), 840, 475);
+  ctx.fillText(plainMoney(totalHoldings, 2), 120, 475);
+  ctx.fillText(targetFills.length.toLocaleString(), 480, 475);
+  ctx.fillText(plainMoney(totalVol, 2), 820, 475);
 
   const link = document.createElement("a");
   link.download = "hyperliquid-pnl-card.png";
@@ -1600,7 +1654,7 @@ function renderDepositsWithdrawals() {
     return;
   }
 
-  depositsBodyEl.innerHTML = filteredLedger.map(item => {
+  depositsBodyEl.innerHTML = filteredLedger.map((item, idx) => {
     const t = item.time || item.delta?.time;
     const delta = item.delta || item;
     const type = delta.type || "Transfer";
@@ -1608,22 +1662,84 @@ function renderDepositsWithdrawals() {
     const token = delta.token || (type === "deposit" || type === "withdraw" ? "USDC" : "Asset");
     const hash = item.hash || "—";
     const hasHash = hash && hash !== "null" && hash !== "0x0000000000000000000000000000000000000000000000000000000000000000";
+    const rowId = hash !== "—" ? hash : `deposit-${idx}`;
+    const isThisExpanded = (expandedDepositHash === rowId) ? "expanded" : "";
 
     const hashCell = hasHash 
       ? `<a href="${EXPLORER_URL}${esc(hash)}" target="_blank" rel="noopener noreferrer" class="hash">${esc(hash)}</a>` 
       : '—';
 
-    return `<tr>
-      <td style="text-align: left;">${esc(formatDate(t))}</td>
-      <td style="font-weight: 700; text-transform: capitalize;">${esc(type)}</td>
-      <td>${esc(token)}</td>
-      <td class="${usdcVal > 0 ? "text-positive" : usdcVal < 0 ? "text-negative" : ""}">${money(usdcVal, 2)}</td>
-      <td>${hashCell}</td>
-    </tr>`;
+    return `
+      <tr class="asset-card-row ${isThisExpanded}" onclick="toggleDepositCard(this, '${rowId}')">
+        <!-- PC Columns -->
+        <td class="pc-col pc-col-left" style="text-align: left;">${esc(formatDate(t))}</td>
+        <td class="pc-col pc-col-right" style="font-weight: 700; text-transform: capitalize; text-align: left;">${esc(type)}</td>
+        <td class="pc-col pc-col-right" style="text-align: right;">${esc(token)}</td>
+        <td class="pc-col pc-col-right ${usdcVal > 0 ? "text-positive" : usdcVal < 0 ? "text-negative" : ""}" style="text-align: right;">${money(usdcVal, 2)}</td>
+        <td class="pc-col pc-col-right" style="text-align: right;">${hashCell}</td>
+
+        <!-- Mobile Card Wrapper Cell -->
+        <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
+          <div class="mobile-card-header">
+            <span class="coin-name" style="text-transform: capitalize;">${esc(type)} (${esc(token)})</span>
+            <div class="mobile-header-right">
+              <span class="${usdcVal > 0 ? "text-positive" : usdcVal < 0 ? "text-negative" : ""}" style="font-weight:700;">${money(usdcVal, 2)}</span>
+              <button class="mobile-card-toggle-btn" type="button" aria-label="Toggle details">▼</button>
+            </div>
+          </div>
+          <div class="asset-detail-wrapper">
+            <div class="asset-detail-inner">
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">DATE / TIME</span>
+                <span>${esc(formatDate(t))}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">TYPE</span>
+                <span style="text-transform: capitalize; font-weight: 700;">${esc(type)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">TOKEN</span>
+                <span>${esc(token)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">AMOUNT</span>
+                <span class="${usdcVal > 0 ? "text-positive" : usdcVal < 0 ? "text-negative" : ""}">${money(usdcVal, 2)}</span>
+              </div>
+              <div class="collapsible-detail-row" style="border-bottom: none;">
+                <span class="mobile-label-text">TX HASH</span>
+                <span>${hashCell}</span>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    `;
   }).join("");
 
   depositsMeta.textContent = `Displaying ${filteredLedger.length} deposit/withdrawal record(s).`;
 }
+
+window.toggleDepositCard = function(target, rowId) {
+  if (window.innerWidth <= 768) {
+    const tr = target.closest("tr");
+    if (tr) {
+      const wasExpanded = tr.classList.contains("expanded");
+      const tbody = tr.closest("tbody");
+      if (tbody) {
+        tbody.querySelectorAll("tr.expanded").forEach(row => {
+          row.classList.remove("expanded");
+        });
+      }
+
+      expandedDepositHash = null;
+
+      if (!wasExpanded) {
+        tr.classList.add("expanded");
+        expandedDepositHash = rowId;
+      }
+    }
+  }
+};
 
 $("depositFetchBtn")?.addEventListener("click", () => {
   const btn = $("depositFetchBtn");

@@ -562,7 +562,7 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 }
 
 /* ================================================================= */
-/* MOBILE CARD ACCORDION OVERRIDES FOR CORE TABLES                   */
+/* MOBILE CARD ACCORDION & FULL-ROW MOBILE CARD STYLING              */
 /* ================================================================= */
 
 @media (max-width: 1024px) {
@@ -735,20 +735,29 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     letter-spacing: 0.5px;
   }
 
-  /* Make Deposit & Withdrawal Ledger table rows display 2 in a row as cards on mobile */
+  /* Force Full-Row Cards on Mobile for VIP Fee Calculator & Deposit/Withdrawal Ledgers */
+  .fee-cards-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
   #panelDepositsWithdrawals .coinglass-table tbody {
-    display: grid !important;
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 8px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
     width: 100% !important;
   }
 
   #panelDepositsWithdrawals .coinglass-table tbody tr {
     margin-bottom: 0 !important;
-    height: 100%;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: space-between !important;
+    display: block !important;
+    width: 100% !important;
+    background: var(--panel-bg, #121721) !important;
+    border: 1px solid var(--panel-border, #1e2638) !important;
+    border-radius: 8px !important;
+    padding: 12px !important;
+    box-sizing: border-box !important;
+    cursor: pointer;
   }
 }
 
@@ -765,14 +774,14 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 
 @media (max-width: 480px) {
   .fee-cards-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: 1fr !important;
     gap: 8px !important;
   }
   .fee-cards-grid .metric-card {
-    padding: 10px !important;
+    padding: 12px !important;
   }
   .fee-cards-grid .metric-card .value {
-    font-size: 14px !important;
+    font-size: 16px !important;
   }
 }
 
