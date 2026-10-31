@@ -637,7 +637,16 @@ function renderAssetTable(assetMap) {
 
     return `
     <tr class="asset-card-row" data-coin="${esc(coin)}">
-      <td class="coin-name-cell" style="padding: 0;">
+      <!-- PC Columns -->
+      <td class="pc-col pc-col-left coin-name">${esc(coin)}</td>
+      <td class="pc-col pc-col-right ${row.closedPnl >= 0 ? "text-positive" : "text-negative"}">${money(row.closedPnl, 2)}</td>
+      <td class="pc-col pc-col-right">${plainMoney(row.fees, 2)}</td>
+      <td class="pc-col pc-col-right ${row.netPnl >= 0 ? "text-positive" : "text-negative"}">${money(row.netPnl, 2)}</td>
+      <td class="pc-col pc-col-right">${plainMoney(row.volume, 2)}</td>
+      <td class="pc-col pc-col-right">${row.fills.toLocaleString()}</td>
+
+      <!-- Mobile Card Fallback Wrapper -->
+      <td class="mobile-card-wrapper-cell" style="display:none; padding:0;">
         <div class="mobile-card-header">
           <span class="coin-name">${esc(coin)}</span>
           <div class="mobile-header-right">
@@ -670,13 +679,21 @@ function renderAssetTable(assetMap) {
           </div>
         </div>
       </td>
-      <td style="display:none;"></td><td style="display:none;"></td><td style="display:none;"></td><td style="display:none;"></td><td style="display:none;"></td>
     </tr>`;
   }).join("");
 
   const totalRowHtml = `
   <tr class="asset-total-row">
-    <td class="coin-name-cell" style="padding: 0;">
+    <!-- PC Columns -->
+    <td class="pc-col pc-col-left coin-name">TOTAL / SUMMARY</td>
+    <td class="pc-col pc-col-right ${totalClosedPnl >= 0 ? "text-positive" : "text-negative"}">${money(totalClosedPnl, 2)}</td>
+    <td class="pc-col pc-col-right">${plainMoney(totalFees, 2)}</td>
+    <td class="pc-col pc-col-right ${totalNetPnl >= 0 ? "text-positive" : "text-negative"}">${money(totalNetPnl, 2)}</td>
+    <td class="pc-col pc-col-right">${plainMoney(totalVolume, 2)}</td>
+    <td class="pc-col pc-col-right">${totalFills.toLocaleString()}</td>
+
+    <!-- Mobile Card Fallback Wrapper -->
+    <td class="mobile-card-wrapper-cell" style="display:none; padding:0;">
       <div class="mobile-card-header">
         <span class="coin-name">TOTAL / SUMMARY</span>
         <div class="mobile-header-right">
@@ -709,7 +726,6 @@ function renderAssetTable(assetMap) {
         </div>
       </div>
     </td>
-    <td style="display:none;"></td><td style="display:none;"></td><td style="display:none;"></td><td style="display:none;"></td><td style="display:none;"></td>
   </tr>`;
 
   assetBody.innerHTML = rowsHtml + totalRowHtml;

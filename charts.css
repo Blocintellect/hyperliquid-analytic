@@ -134,6 +134,73 @@
 }
 
 /* ================================================================= */
+/* DESKTOP (PC) OVERRIDES FOR ASSET PERFORMANCE BREAKDOWN TABLE      */
+/* ================================================================= */
+
+@media (min-width: 769px) {
+  .coinglass-table {
+    display: table !important;
+    width: 100% !important;
+  }
+
+  .coinglass-table thead {
+    display: table-header-group !important;
+  }
+
+  .coinglass-table tbody {
+    display: table-row-group !important;
+  }
+
+  .coinglass-table tr.asset-card-row,
+  .coinglass-table tr.asset-total-row {
+    display: table-row !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+
+  .coinglass-table tr.asset-card-row:hover {
+    background-color: var(--hover-bg, rgba(255, 255, 255, 0.03)) !important;
+  }
+
+  .coinglass-table tr.asset-total-row {
+    background-color: var(--input-bg, #090c12) !important;
+    font-weight: 700;
+  }
+
+  .coinglass-table tr.asset-total-row td {
+    border-top: 2px solid var(--coinglass-blue, #2962ff) !important;
+    border-bottom: 2px solid var(--coinglass-blue, #2962ff) !important;
+    color: var(--text-main, #f0f4f8);
+  }
+
+  .coinglass-table td.pc-col {
+    display: table-cell !important;
+    padding: 12px 14px !important;
+    border-bottom: 1px solid var(--panel-border, #1e2638) !important;
+    font-size: 12.5px !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .coinglass-table td.pc-col-left {
+    text-align: left !important;
+  }
+
+  .coinglass-table td.pc-col-right {
+    text-align: right !important;
+  }
+
+  /* Hide mobile card wrappers on PC */
+  .mobile-card-header,
+  .asset-detail-wrapper,
+  .mobile-card-wrapper-cell {
+    display: none !important;
+  }
+}
+
+/* ================================================================= */
 /* MOBILE CARD LAYOUT OVERRIDES FOR ASSET PERFORMANCE BREAKDOWN      */
 /* ================================================================= */
 
@@ -175,6 +242,17 @@
   .asset-total-row {
     border-color: var(--coinglass-blue, #2962ff) !important;
     background: var(--input-bg, #090c12) !important;
+  }
+
+  /* Hide PC columns on mobile */
+  .coinglass-table td.pc-col {
+    display: none !important;
+  }
+
+  /* Show mobile card wrapper cell on mobile */
+  .coinglass-table td.mobile-card-wrapper-cell {
+    display: block !important;
+    width: 100% !important;
   }
 
   .mobile-card-header {
