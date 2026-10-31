@@ -42,3 +42,146 @@
   text-decoration: none;
   height: 40px;
 }
+
+/* ================================================================= */
+/* MOBILE CARD ACCORDION OVERRIDES FOR PRICES MODAL                  */
+/* ================================================================= */
+
+@media (max-width: 768px) {
+  .prices-table thead {
+    display: none !important;
+  }
+
+  .prices-table, 
+  .prices-table tbody, 
+  .prices-table tr {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .prices-table .asset-card-row {
+    background: var(--panel-bg, #121721) !important;
+    border: 1px solid var(--panel-border, #1e2638) !important;
+    border-radius: 8px !important;
+    padding: 10px 12px !important;
+    box-sizing: border-box !important;
+    margin-bottom: 8px !important;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .prices-table .asset-card-row td {
+    display: block !important;
+    width: 100% !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  /* Position the star button nicely at top-left */
+  .prices-table .asset-card-row td:first-child {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: auto !important;
+    z-index: 2;
+  }
+
+  .prices-table .asset-card-row td:nth-child(2) {
+    padding-left: 32px !important; /* space for star */
+  }
+
+  /* Hide PC columns on mobile */
+  .prices-table td.pc-col {
+    display: none !important;
+  }
+
+  .prices-table .mobile-card-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+  }
+
+  .prices-table .mobile-header-right {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    font-size: 13px !important;
+    margin-left: auto;
+  }
+
+  .prices-table .mobile-card-toggle-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    background: var(--btn-secondary-bg, #171f2d);
+    border: 1px solid var(--btn-secondary-border, #233047);
+    color: var(--text-main, #f0f4f8);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    font-size: 9px;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease, color 0.2s ease;
+  }
+
+  .prices-table .asset-card-row.expanded .mobile-card-toggle-btn {
+    transform: rotate(180deg);
+    border-color: var(--coinglass-blue, #2962ff);
+    color: var(--coinglass-blue, #2962ff);
+  }
+
+  /* Smooth Grid Transition Animation */
+  .prices-table .asset-detail-wrapper {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+  }
+
+  .prices-table .asset-card-row.expanded .asset-detail-wrapper {
+    grid-template-rows: 1fr;
+  }
+
+  .prices-table .asset-detail-inner {
+    min-height: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease, padding 0.3s ease;
+    opacity: 0;
+    transform: translateY(-6px);
+    padding: 0;
+  }
+
+  .prices-table .asset-card-row.expanded .asset-detail-inner {
+    opacity: 1;
+    transform: translateY(0);
+    padding-top: 10px;
+  }
+
+  .prices-table .collapsible-detail-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 8px 0 !important;
+    border-bottom: 1px dashed var(--panel-border, #1e2638) !important;
+    font-size: 12px !important;
+    width: 100% !important;
+  }
+
+  .prices-table .collapsible-detail-row:first-of-type {
+    border-top: 1px solid var(--panel-border, #1e2638);
+    padding-top: 10px !important;
+  }
+
+  .prices-table .mobile-label-text {
+    display: inline-block !important;
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--text-muted, #8492a6);
+    letter-spacing: 0.5px;
+  }
+}
+
+@media (min-width: 769px) {
+  .prices-table .asset-detail-wrapper {
+    display: none !important;
+  }
+}

@@ -13,7 +13,8 @@
   let currentSearchQuery = "";
   let activeTab = "all";
   
-  const expandedPricesCoins = new Set();
+  // Track the currently expanded mobile coin across re-renders
+  let expandedMobileCoin = null;
 
   const ASSET_NAME_MAP = {
     "CL": "WTI Crude Oil Futures",
@@ -74,11 +75,11 @@
                   <tr>
                     <th style="text-align: left; width: 40px;">⭐</th>
                     <th style="text-align: left;">PERP PAIR / ASSET</th>
-                    <th>MARK PRICE</th>
-                    <th>24H CHANGE</th>
-                    <th>FUNDING RATE</th>
-                    <th>OPEN INTEREST</th>
-                    <th style="text-align: right;">ACTION</th>
+                    <th class="pc-col pc-col-right">MARK PRICE</th>
+                    <th class="pc-col pc-col-right">24H CHANGE</th>
+                    <th class="pc-col pc-col-right">FUNDING RATE</th>
+                    <th class="pc-col pc-col-right">OPEN INTEREST</th>
+                    <th class="pc-col pc-col-right" style="text-align: right;">ACTION</th>
                   </tr>
                 </thead>
                 <tbody id="pricesTableBody">
@@ -142,7 +143,6 @@
     }
     savePriceWatchlist();
     
-    // Instantly update the button style without full re-render if present
     const btn = document.getElementById(`watchlist-btn-${coin}`);
     const isStarred = priceWatchlist.includes(coin);
     if (btn) {
@@ -153,18 +153,19 @@
     if (activeTab === "watchlist") renderPricesTable();
   };
 
-  window.togglePricesMobileCard = function(btnElement, coin) {
+  window.togglePricesMobileCard = function(target, coin) {
     if (window.innerWidth <= 768) {
-      const tr = btnElement.closest("tr");
+      const tr = target.closest("tr");
       if (tr) {
-        const isAlreadyExpanded = tr.classList.contains("expanded");
-        expandedPricesCoins.clear();
+        const wasExpanded = tr.classList.contains("expanded");
         document.querySelectorAll("#pricesTableBody tr.expanded").forEach(row => {
           row.classList.remove("expanded");
         });
-        if (!isAlreadyExpanded) {
+        if (!wasExpanded) {
           tr.classList.add("expanded");
-          expandedPricesCoins.add(coin);
+          expandedMobileCoin = coin;
+        } else {
+          expandedMobileCoin = null;
         }
       }
     }
@@ -312,7 +313,6 @@
     tbody.innerHTML = filtered.map(item => {
       const isStarred = priceWatchlist.includes(item.coin);
       const starIcon = isStarred ? "★" : "☆";
-      // Explicit vibrant yellow/gold color for favorited stars
       const starColor = isStarred ? "#f59e0b" : "var(--text-muted)";
       const changeClass = item.change24h > 0 ? "text-positive" : item.change24h < 0 ? "text-negative" : "";
       const changeStr = (item.change24h > 0 ? "+" : "") + item.change24h.toFixed(2) + "%";
@@ -328,25 +328,52 @@
         ? "height: 26px; padding: 0 8px; font-size: 10px; color: var(--coinglass-red); border-color: var(--coinglass-red);" 
         : "height: 26px; padding: 0 8px; font-size: 10px;";
 
-      const isExpanded = expandedPricesCoins.has(item.coin);
+      const isThisExpanded = (expandedMobileCoin === item.coin) ? "expanded" : "";
 
       return `
-        <tr class="${isExpanded ? "expanded" : ""}" onclick="togglePricesMobileCard(this, '${item.coin}')" style="cursor: pointer;">
+        <tr class="asset-card-row ${isThisExpanded}" onclick="togglePricesMobileCard(this, '${item.coin}')" style="cursor: pointer;">
           <td style="text-align: left; width: 40px;" onclick="event.stopPropagation()">
             <button id="watchlist-btn-${item.coin}" class="btn-ghost" style="padding: 0 4px; font-size: 16px; color: ${starColor};" onclick="togglePriceWatchlist('${item.coin}')" title="Toggle Watchlist">${starIcon}</button>
           </td>
-          <td style="text-align: left; font-weight: 800; color: var(--text-main);" class="prices-coin-name mobile-card-header">
-            <span>${item.pair}</span>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="prices-mobile-price-preview">$${formattedPrice}</span>
-              <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); togglePricesMobileCard(this, '${item.coin}')">▼</button>
+          <td style="text-align: left; font-weight: 800; color: var(--text-main);" class="coin-name-cell">
+            <div class="mobile-card-header">
+              <span class="coin-name">${item.coin}</span>
+              <div class="mobile-header-right">
+                <span class="prices-mobile-price-preview" style="font-weight:700;">$${formattedPrice}</span>
+                <button class="mobile-card-toggle-btn" type="button" aria-label="Toggle details">▼</button>
+              </div>
+            </div>
+            <div class="asset-detail-wrapper">
+              <div class="asset-detail-inner">
+                <div class="collapsible-detail-row">
+                  <span class="mobile-label-text">MARK PRICE</span>
+                  <span>$${formattedPrice}</span>
+                </div>
+                <div class="collapsible-detail-row">
+                  <span class="mobile-label-text">24H CHANGE</span>
+                  <span class="${changeClass}">${changeStr}</span>
+                </div>
+                <div class="collapsible-detail-row">
+                  <span class="mobile-label-text">FUNDING RATE</span>
+                  <span class="${fundingClass}">${fundingPct}</span>
+                </div>
+                <div class="collapsible-detail-row">
+                  <span class="mobile-label-text">OPEN INTEREST</span>
+                  <span>${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</span>
+                </div>
+                <div class="collapsible-detail-row" style="border-bottom: none; justify-content: flex-end; padding-top: 8px;" onclick="event.stopPropagation()">
+                  <button class="${actionClass}" style="${actionStyle}" onclick="toggleCoinFilter('${item.coin}')">${actionLabel}</button>
+                </div>
+              </div>
             </div>
           </td>
-          <td class="prices-collapsible-detail"><span class="mobile-label-text">Mark Price</span><span>$${formattedPrice}</span></td>
-          <td class="prices-collapsible-detail ${changeClass}"><span class="mobile-label-text">24h Change</span><span>${changeStr}</span></td>
-          <td class="prices-collapsible-detail ${fundingClass}"><span class="mobile-label-text">Funding Rate</span><span>${fundingPct}</span></td>
-          <td class="prices-collapsible-detail"><span class="mobile-label-text">Open Interest</span><span>${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</span></td>
-          <td style="text-align: right;" class="prices-collapsible-detail" onclick="event.stopPropagation()">
+          
+          <!-- PC Columns -->
+          <td class="pc-col pc-col-right">$${formattedPrice}</td>
+          <td class="pc-col pc-col-right ${changeClass}">${changeStr}</td>
+          <td class="pc-col pc-col-right ${fundingClass}">${fundingPct}</td>
+          <td class="pc-col pc-col-right">${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</td>
+          <td class="pc-col pc-col-right" style="text-align: right;" onclick="event.stopPropagation()">
             <button class="${actionClass}" style="${actionStyle}" onclick="toggleCoinFilter('${item.coin}')">${actionLabel}</button>
           </td>
         </tr>
