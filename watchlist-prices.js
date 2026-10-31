@@ -530,7 +530,7 @@
                cleanOpt.includes(cleanTarget) || 
                cleanTarget.includes(cleanOpt) ||
                (cleanTarget === "SILVER" && cleanOpt.includes("SILVER")) ||
-               (cleanTarget === "SP500" && (cleanOpt.includes("SP500" ) || cleanOpt.includes("SPX")));
+               (cleanTarget === "SP500" && (cleanOpt.includes("SP500") || cleanOpt.includes("SPX")));
       });
 
       if (matchedOpt) {
@@ -540,9 +540,9 @@
       const currentVal = coinSelect.value.toUpperCase();
       const cleanCurrent = currentVal.replace("XYZ:", "").replace("-PERP", "").trim();
 
-      if (currentVal === "ALL") {
-        coinSelect.value = targetOptionValue;
-      } else if (cleanCurrent === cleanTarget || cleanCurrent.includes(cleanTarget) || cleanTarget.includes(cleanTarget)) {
+      // If the user clicks "Unfilter" on the currently selected asset, reset to "all".
+      // Otherwise, instantly switch the filter to the new target asset.
+      if (cleanCurrent === cleanTarget || cleanCurrent.includes(cleanTarget) || cleanTarget.includes(cleanCurrent)) {
         coinSelect.value = "all";
       } else {
         coinSelect.value = targetOptionValue;
