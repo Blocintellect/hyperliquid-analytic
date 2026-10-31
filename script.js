@@ -1323,14 +1323,27 @@ function renderShareCardPreview() {
   const builderFees = targetFills.reduce((s, f) => s + num(f.builderFee), 0);
   
   let netFundingUsd = 0;
+  let totalFundingPaid = 0;
   fundingHistory.forEach(item => {
-    netFundingUsd += num(item.delta?.usdc);
+    const usdPayment = num(item.delta?.usdc);
+    netFundingUsd += usdPayment;
+    if (usdPayment < 0) totalFundingPaid += Math.abs(usdPayment);
   });
   const currentUnrealizedPnl = calculateTotalUnrealizedPnl();
   const netPnl = closedPnl - tradingFees - builderFees + netFundingUsd + currentUnrealizedPnl;
+  const totalFees = tradingFees + totalFundingPaid + builderFees;
 
   const totalVol = targetFills.reduce((s, f) => s + Math.abs(num(f.px) * num(f.sz)), 0);
   const wallet = actualWalletValue || walletEl.value.trim() || "0x0000...0000";
+
+  const startDateStr = startEl.value || "Inception";
+  const endDateStr = endEl.value || "Present";
+  const datesEl = $("shareCardDates");
+  if (datesEl) datesEl.textContent = `${startDateStr} to ${endDateStr}`;
+
+  const tradesWithPnl = targetFills.filter(f => num(f.closedPnl) !== 0);
+  const winningTrades = tradesWithPnl.filter(f => num(f.closedPnl) > 0);
+  const winRate = tradesWithPnl.length > 0 ? (winningTrades.length / tradesWithPnl.length) * 100 : 0;
 
   let perpAccountVal = 0, spotVal = 0;
   if (holdingsData) {
@@ -1355,8 +1368,10 @@ function renderShareCardPreview() {
   $("shareCardPnl").textContent = money(netPnl, 2);
   $("shareCardPnl").className = netPnl >= 0 ? "text-positive" : "text-negative";
   $("shareCardHoldings").textContent = plainMoney(totalHoldings, 2);
+  $("shareCardWinRate").textContent = winRate.toFixed(1) + "%";
   $("shareCardFills").textContent = targetFills.length.toLocaleString();
   $("shareCardVol").textContent = plainMoney(totalVol, 2);
+  $("shareCardFees").textContent = plainMoney(totalFees, 2);
 }
 
 $("downloadShareCardBtn")?.addEventListener("click", () => {
@@ -1370,7 +1385,7 @@ $("downloadShareCardBtn")?.addEventListener("click", () => {
 
   ctx.fillStyle = "#00b87c";
   ctx.font = "bold 24px sans-serif";
-  ctx.fillText("HYPERLIQUID PRO STATEMENT", 80, 100);
+  ctx.fillText("HYPERLIQUID PRO STATEMENT", 80, 85);
 
   const targetFills = getFilteredFills();
   const closedPnl = targetFills.reduce((s, f) => s + num(f.closedPnl), 0);
@@ -1378,10 +1393,20 @@ $("downloadShareCardBtn")?.addEventListener("click", () => {
   const builderFees = targetFills.reduce((s, f) => s + num(f.builderFee), 0);
   
   let netFundingUsd = 0;
-  fundingHistory.forEach(item => { netFundingUsd += num(item.delta?.usdc); });
+  let totalFundingPaid = 0;
+  fundingHistory.forEach(item => {
+    const usdPayment = num(item.delta?.usdc);
+    netFundingUsd += usdPayment;
+    if (usdPayment < 0) totalFundingPaid += Math.abs(usdPayment);
+  });
   const currentUnrealizedPnl = calculateTotalUnrealizedPnl();
   const netPnl = closedPnl - tradingFees - builderFees + netFundingUsd + currentUnrealizedPnl;
+  const totalFees = tradingFees + totalFundingPaid + builderFees;
   const totalVol = targetFills.reduce((s, f) => s + Math.abs(num(f.px) * num(f.sz)), 0);
+
+  const tradesWithPnl = targetFills.filter(f => num(f.closedPnl) !== 0);
+  const winningTrades = tradesWithPnl.filter(f => num(f.closedPnl) > 0);
+  const winRate = tradesWithPnl.length > 0 ? (winningTrades.length / tradesWithPnl.length) * 100 : 0;
 
   let perpAccountVal = 0, spotVal = 0;
   if (holdingsData) {
@@ -1402,34 +1427,50 @@ $("downloadShareCardBtn")?.addEventListener("click", () => {
   }
   const totalHoldings = perpAccountVal + spotVal;
 
+  const wallet = actualWalletValue || walletEl.value.trim() || "0x0000...0000";
+  const startDateStr = startEl.value || "Inception";
+  const endDateStr = endEl.value || "Present";
+
   ctx.fillStyle = "#8492a6";
-  ctx.font = "16px monospace";
-  ctx.fillText("WALLET: " + maskAddress(actualWalletValue || walletEl.value.trim()), 80, 140);
+  ctx.font = "14px monospace";
+  ctx.fillText("WALLET: " + maskAddress(wallet), 80, 115);
+  ctx.fillText(`PERIOD: ${startDateStr} to ${endDateStr}`, 80, 138);
 
   ctx.fillStyle = "#f0f4f8";
-  ctx.font = "18px sans-serif";
-  ctx.fillText("NET P&L", 80, 220);
+  ctx.font = "16px sans-serif";
+  ctx.fillText("NET REALIZED PERFORMANCE", 80, 195);
 
   ctx.fillStyle = netPnl >= 0 ? "#00b87c" : "#f6465d";
-  ctx.font = "bold 64px sans-serif";
-  ctx.fillText(money(netPnl, 2), 80, 300);
+  ctx.font = "bold 56px sans-serif";
+  ctx.fillText(money(netPnl, 2), 80, 260);
 
+  // Bottom info cards box
   ctx.fillStyle = "#121721";
-  ctx.fillRect(80, 380, 1040, 140);
+  ctx.fillRect(80, 320, 1040, 220);
   ctx.strokeStyle = "#1e2638";
-  ctx.strokeRect(80, 380, 1040, 140);
+  ctx.strokeRect(80, 320, 1040, 220);
 
   ctx.fillStyle = "#8492a6";
-  ctx.font = "16px sans-serif";
-  ctx.fillText("WALLET HOLDINGS", 120, 435);
-  ctx.fillText("TOTAL FILLS", 480, 435);
-  ctx.fillText("TOTAL VOLUME", 820, 435);
+  ctx.font = "14px sans-serif";
+  ctx.fillText("WALLET HOLDINGS", 120, 370);
+  ctx.fillText("WIN RATE", 460, 370);
+  ctx.fillText("TOTAL FILLS", 800, 370);
 
   ctx.fillStyle = "#f0f4f8";
-  ctx.font = "bold 24px sans-serif";
-  ctx.fillText(plainMoney(totalHoldings, 2), 120, 475);
-  ctx.fillText(targetFills.length.toLocaleString(), 480, 475);
-  ctx.fillText(plainMoney(totalVol, 2), 820, 475);
+  ctx.font = "bold 22px sans-serif";
+  ctx.fillText(plainMoney(totalHoldings, 2), 120, 405);
+  ctx.fillText(winRate.toFixed(1) + "%", 460, 405);
+  ctx.fillText(targetFills.length.toLocaleString(), 800, 405);
+
+  ctx.fillStyle = "#8492a6";
+  ctx.font = "14px sans-serif";
+  ctx.fillText("TOTAL VOLUME", 120, 470);
+  ctx.fillText("TOTAL FEES & FUNDING", 460, 470);
+
+  ctx.fillStyle = "#f0f4f8";
+  ctx.font = "bold 22px sans-serif";
+  ctx.fillText(plainMoney(totalVol, 2), 120, 505);
+  ctx.fillText(plainMoney(totalFees, 2), 460, 505);
 
   const link = document.createElement("a");
   link.download = "hyperliquid-pnl-card.png";
