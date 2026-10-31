@@ -441,16 +441,16 @@
 
       let actionLabel = "Filter Fills";
       let actionClass = "secondary";
-      let actionStyle = "height: 24px; padding: 0 6px; font-size: 9.5px; white-space: nowrap;";
+      let actionStyle = "height: 26px; padding: 0 8px; font-size: 10px; white-space: nowrap;";
 
       if (isCurrentlyFiltered) {
         actionLabel = "Unfilter";
         actionClass = "btn-ghost";
-        actionStyle = "height: 24px; padding: 0 6px; font-size: 9.5px; color: var(--coinglass-red); border-color: var(--coinglass-red); white-space: nowrap;";
+        actionStyle = "height: 26px; padding: 0 8px; font-size: 10px; color: var(--coinglass-red); border-color: var(--coinglass-red); white-space: nowrap;";
       } else if (!hasFills) {
         actionLabel = "No Fills";
         actionClass = "secondary";
-        actionStyle = "height: 24px; padding: 0 6px; font-size: 9.5px; opacity: 0.4; cursor: not-allowed; background: transparent; border-color: var(--panel-border); color: var(--text-muted); white-space: nowrap;";
+        actionStyle = "height: 26px; padding: 0 8px; font-size: 10px; opacity: 0.4; cursor: not-allowed; background: transparent; border-color: var(--panel-border); color: var(--text-muted); white-space: nowrap;";
       }
 
       const clickHandler = hasFills || isCurrentlyFiltered ? `toggleCoinFilter('${item.coin}')` : `alert('This asset (${item.coin}) does not have any trade fills recorded in your statement.')`;
@@ -458,12 +458,29 @@
       const isThisExpanded = (expandedMobileCoin === item.coin) ? "expanded" : "";
 
       return `
-        <tr class="asset-card-row ${isThisExpanded}" onclick="togglePricesMobileCard(this, '${item.coin}')" style="cursor: pointer;">
-          <td style="text-align: left; width: 35px; padding-left: 6px;" onclick="event.stopPropagation()">
+        <tr class="asset-card-row ${isThisExpanded}" onclick="togglePricesMobileCard(this, '${item.coin}')">
+          <!-- PC Columns -->
+          <td class="pc-col" style="text-align: left; width: 35px; padding-left: 8px;" onclick="event.stopPropagation()">
             <button id="watchlist-btn-${item.coin}" class="btn-ghost" style="padding: 0 4px; font-size: 15px; color: ${starColor};" onclick="togglePriceWatchlist('${item.coin}')" title="Toggle Watchlist">${starIcon}</button>
           </td>
-          <td style="text-align: left; font-weight: 800; color: var(--text-main);" class="coin-name-cell">
-            <div class="mobile-card-header">
+          <td class="pc-col" style="text-align: left;">
+            <div style="font-weight: 800; color: var(--text-main);">${item.coin}</div>
+            <div style="font-size: 9.5px; font-weight: normal; color: var(--text-muted);">${item.fullName}</div>
+          </td>
+          <td class="pc-col" style="text-align: right; font-weight: 700;">$${formattedPrice}</td>
+          <td class="pc-col" style="text-align: right;" class="${changeClass}">${changeStr}</td>
+          <td class="pc-col" style="text-align: right;" class="${fundingClass}">${fundingPct}</td>
+          <td class="pc-col" style="text-align: right;">${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</td>
+          <td class="pc-col" style="text-align: right; padding-right: 12px;" onclick="event.stopPropagation()">
+            <button class="${actionClass}" style="${actionStyle}" onclick="${clickHandler}">${actionLabel}</button>
+          </td>
+
+          <!-- Mobile Card Wrapper Cell (Original Mobile Layout) -->
+          <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
+            <div style="position: absolute; top: 8px; left: 8px; z-index: 2;" onclick="event.stopPropagation()">
+              <button class="btn-ghost" style="padding: 0 4px; font-size: 15px; color: ${starColor};" onclick="togglePriceWatchlist('${item.coin}')">${starIcon}</button>
+            </div>
+            <div class="mobile-card-header" style="padding-left: 28px;">
               <div style="display: flex; flex-direction: column;">
                 <span class="coin-name" style="font-size: 13px;">${item.coin}</span>
                 <span style="font-size: 10px; font-weight: normal; color: var(--text-muted);">${item.fullName}</span>
@@ -493,19 +510,6 @@
               </div>
             </div>
           </td>
-          
-          <!-- PC Columns with explicit widths and compact alignment -->
-          <td class="pc-col pc-col-right" style="text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-            <div style="font-weight: 800; color: var(--text-main);">${item.coin}</div>
-            <div style="font-size: 9.5px; font-weight: normal; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis;">${item.fullName}</div>
-          </td>
-          <td class="pc-col pc-col-right">$${formattedPrice}</td>
-          <td class="pc-col pc-col-right ${changeClass}">${changeStr}</td>
-          <td class="pc-col pc-col-right ${fundingClass}">${fundingPct}</td>
-          <td class="pc-col pc-col-right">${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</td>
-          <td class="pc-col pc-col-right" style="text-align: right; padding-right: 8px;" onclick="event.stopPropagation()">
-            <button class="${actionClass}" style="${actionStyle}" onclick="${clickHandler}">${actionLabel}</button>
-          </td>
         </tr>
       `;
     }).join("");
@@ -526,7 +530,7 @@
                cleanOpt.includes(cleanTarget) || 
                cleanTarget.includes(cleanOpt) ||
                (cleanTarget === "SILVER" && cleanOpt.includes("SILVER")) ||
-               (cleanTarget === "SP500" && (cleanOpt.includes("SP500") || cleanOpt.includes("SPX")));
+               (cleanTarget === "SP500" && (cleanOpt.includes("SP500" ) || cleanOpt.includes("SPX")));
       });
 
       if (matchedOpt) {
@@ -538,7 +542,7 @@
 
       if (currentVal === "ALL") {
         coinSelect.value = targetOptionValue;
-      } else if (cleanCurrent === cleanTarget || cleanCurrent.includes(cleanTarget) || cleanTarget.includes(cleanCurrent)) {
+      } else if (cleanCurrent === cleanTarget || cleanCurrent.includes(cleanTarget) || cleanTarget.includes(cleanTarget)) {
         coinSelect.value = "all";
       } else {
         coinSelect.value = targetOptionValue;

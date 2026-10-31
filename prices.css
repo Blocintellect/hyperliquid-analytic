@@ -8,6 +8,8 @@
   max-height: 85vh;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 #pricesModal .modal-body {
@@ -16,15 +18,19 @@
   gap: 12px;
   overflow: hidden;
   flex: 1;
+  box-sizing: border-box;
+  min-height: 0;
 }
 
 #pricesModal .table-wrap {
   overflow-y: auto;
   overflow-x: hidden;
+  flex: 1;
   max-height: 52vh;
   border: 1px solid var(--panel-border);
   border-radius: 6px;
   width: 100%;
+  box-sizing: border-box;
 }
 
 #livePricesModalBtn {
@@ -41,6 +47,63 @@
   white-space: nowrap;
   text-decoration: none;
   height: 40px;
+}
+
+/* ================================================================= */
+/* PC VIEW OVERRIDES (min-width: 769px)                              */
+/* ================================================================= */
+
+@media (min-width: 769px) {
+  #pricesModal .prices-table {
+    table-layout: fixed !important;
+    width: 100% !important;
+    border-collapse: collapse;
+  }
+
+  #pricesModal .prices-table th,
+  #pricesModal .prices-table td.pc-col {
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Explicit Fixed Column Widths locked to fit within 860px modal width */
+  #pricesModal .prices-table th:nth-child(1), 
+  #pricesModal .prices-table td.pc-col:nth-child(1) { width: 6% !important; text-align: left; padding-left: 8px; }
+
+  #pricesModal .prices-table th:nth-child(2), 
+  #pricesModal .prices-table td.pc-col:nth-child(2) { width: 28% !important; text-align: left; }
+
+  #pricesModal .prices-table th:nth-child(3), 
+  #pricesModal .prices-table td.pc-col:nth-child(3) { width: 15% !important; text-align: right; }
+
+  #pricesModal .prices-table th:nth-child(4), 
+  #pricesModal .prices-table td.pc-col:nth-child(4) { width: 12% !important; text-align: right; }
+
+  #pricesModal .prices-table th:nth-child(5), 
+  #pricesModal .prices-table td.pc-col:nth-child(5) { width: 12% !important; text-align: right; }
+
+  #pricesModal .prices-table th:nth-child(6), 
+  #pricesModal .prices-table td.pc-col:nth-child(6) { width: 12% !important; text-align: right; }
+
+  #pricesModal .prices-table th:nth-child(7), 
+  #pricesModal .prices-table td.pc-col:nth-child(7) { width: 15% !important; text-align: right; padding-right: 12px; }
+
+  /* Keep Action buttons fully visible and contained within the final cell */
+  #pricesModal .prices-table td.pc-col button {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+  }
+
+  #pricesModal .prices-table .mobile-card-wrapper-cell {
+    display: none !important;
+  }
 }
 
 /* ================================================================= */
@@ -135,27 +198,15 @@
     position: relative;
   }
 
-  .prices-table .asset-card-row td {
+  .prices-table .asset-card-row td.pc-col {
+    display: none !important;
+  }
+
+  .prices-table .asset-card-row td.mobile-card-wrapper-cell {
     display: block !important;
     width: 100% !important;
     padding: 0 !important;
     border: none !important;
-  }
-
-  .prices-table .asset-card-row td:first-child {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    width: auto !important;
-    z-index: 2;
-  }
-
-  .prices-table .asset-card-row td:nth-child(2) {
-    padding-left: 32px !important;
-  }
-
-  .prices-table td.pc-col {
-    display: none !important;
   }
 
   .prices-table .mobile-card-header {
@@ -243,17 +294,5 @@
     font-weight: 800;
     color: var(--text-muted, #8492a6);
     letter-spacing: 0.5px;
-  }
-}
-
-@media (min-width: 769px) {
-  .prices-table .asset-detail-wrapper {
-    display: none !important;
-  }
-  .prices-table .prices-mobile-price-preview {
-    display: none !important;
-  }
-  .prices-table .mobile-card-toggle-btn {
-    display: none !important;
   }
 }
