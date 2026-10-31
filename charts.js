@@ -73,6 +73,39 @@ $("themeToggleBtn")?.addEventListener("click", () => {
 
 initTheme();
 
+// Listen for clear triggers from the main statement page
+window.addEventListener("storage", (e) => {
+  if (e.key === "hyperliquid_force_clear" || !localStorage.getItem(CACHE_FILLS_KEY)) {
+    rawGlobalFills = [];
+    rawGlobalFunding = [];
+    
+    analyticsCache = {
+      peakPnl: 0, maxDrawdown: 0, totalWins: 0, totalLosses: 0,
+      grossProfit: 0, grossLoss: 0, winLossRatioStr: "0.00",
+      profitFactorVal: "0.00", avgTradeExpectancy: 0, maxWinStreak: 0,
+      maxLossStreak: 0, bestTrade: { coin: "—", pnl: 0 },
+      worstTrade: { coin: "—", pnl: 0 }, longPnl: 0, longWinRate: 0,
+      shortPnl: 0, shortWinRate: 0, sessionPnl: { asian: 0, london: 0, ny: 0 },
+      durationPnl: { scalp: 0, intraday: 0, swing: 0 }, avgRecoveryDays: 0, daysCount: 0
+    };
+
+    if (pnlChartInstance) { pnlChartInstance.destroy(); pnlChartInstance = null; }
+    if (feeChartInstance) { feeChartInstance.destroy(); feeChartInstance = null; }
+    if (assetBarInstance) { assetBarInstance.destroy(); assetBarInstance = null; }
+
+    const assetBody = $("assetTableBody");
+    if (assetBody) {
+      assetBody.innerHTML = '<tr class="empty-row"><td colspan="6">No statement data found. Please fetch data on the main statement page first.</td></tr>';
+    }
+    
+    if ($("tableMeta")) {
+      $("tableMeta").textContent = "No data loaded.";
+    }
+
+    setStatus("Statement data has been cleared. Please fetch fresh data on the main statement page.", "error");
+  }
+});
+
 const peakCard = $("peakCard"), peakModal = $("peakModal"), closePeakModal = $("closePeakModal");
 const ddCard = $("ddCard"), ddModal = $("ddModal"), closeDdModal = $("closeDdModal");
 const winLossCard = $("winLossCard"), winLossModal = $("winLossModal"), closeWinLossModal = $("closeWinLossModal");
@@ -386,7 +419,6 @@ function processAndRenderAnalytics(fills, funding) {
   });
 
   // Include funding payments accurately into asset net P&L and overall fee/funding drag
-  let totalFundingDrag = 0;
   funding.forEach(item => {
     const timeVal = item.time || item.delta?.time;
     if (!timeVal) return;
@@ -400,13 +432,6 @@ function processAndRenderAnalytics(fills, funding) {
     }
 
     dailyMap[dateKey].netPnl += usdPayment;
-
-    // Funding negative values are payments (fees paid), positive are receipts
-    if (usdPayment < 0) {
-      totalFundingDrag += Math.abs(usdPayment);
-    } else {
-      totalFundingDrag -= usdPayment;
-    }
 
     const targetCoin = (coin && assetMap[coin]) ? coin : Object.keys(assetMap)[0];
     if (targetCoin && assetMap[targetCoin]) {
@@ -643,7 +668,6 @@ function renderAssetTable(assetMap) {
 
   const rowsHtml = sortedCoins.map(coin => {
     const row = assetMap[coin];
-    // Combined fee + funding impact for this asset row
     const assetTotalDrag = row.fees + row.funding;
     
     totalClosedPnl += row.closedPnl;

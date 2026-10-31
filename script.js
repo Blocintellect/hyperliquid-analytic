@@ -188,25 +188,101 @@ function loadWatchlist() {
   renderWatchlistUI();
 }
 
+let pendingWalletDeletions = new Map(); // address -> { item, timeoutId, intervalId, originalIndex }
+
+window.removeWalletWithUndo = function(address) {
+  const cleanAddr = address.toLowerCase();
+  
+  // If this wallet was already pending deletion, clear its old timer first
+  if (pendingWalletDeletions.has(cleanAddr)) {
+    const existing = pendingWalletDeletions.get(cleanAddr);
+    clearTimeout(existing.timeoutId);
+    clearInterval(existing.intervalId);
+    pendingWalletDeletions.delete(cleanAddr);
+  }
+
+  const itemIndex = watchlist.findIndex(w => w.address.toLowerCase() === cleanAddr);
+  if (itemIndex === -1) return;
+
+  const watchItem = watchlist[itemIndex];
+
+  // Temporarily remove from active array
+  watchlist.splice(itemIndex, 1);
+  renderWatchlistUI();
+
+  let secondsLeft = 5;
+
+  const intervalId = setInterval(() => {
+    secondsLeft--;
+    const countdownSpan = document.getElementById(`wallet-undo-countdown-${cleanAddr}`);
+    if (countdownSpan) {
+      countdownSpan.textContent = secondsLeft;
+    }
+  }, 1000);
+
+  const timeoutId = setTimeout(() => {
+    clearInterval(intervalId);
+    pendingWalletDeletions.delete(cleanAddr);
+    
+    // Permanently commit changes to localStorage after 5 seconds
+    localStorage.setItem(SAVED_WATCHLIST_KEY, JSON.stringify(watchlist));
+    renderWatchlistUI();
+  }, 5000);
+
+  pendingWalletDeletions.set(cleanAddr, { watchItem, timeoutId, intervalId, originalIndex: itemIndex });
+  renderWatchlistUI(); // Re-render to show all active undo banners
+};
+
+window.undoWalletRemoval = function(address) {
+  const cleanAddr = address.toLowerCase();
+  const pending = pendingWalletDeletions.get(cleanAddr);
+  if (!pending) return;
+
+  clearTimeout(pending.timeoutId);
+  clearInterval(pending.intervalId);
+  pendingWalletDeletions.delete(cleanAddr);
+
+  // Restore wallet back to its original position safely
+  watchlist.splice(pending.originalIndex, 0, pending.watchItem);
+  renderWatchlistUI();
+};
+
 function renderWatchlistUI() {
   const container = $("watchlistContainer");
   if (!container) return;
 
-  if (!watchlist.length) {
+  if (!watchlist.length && pendingWalletDeletions.size === 0) {
     container.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 20px;">No saved watchlisted wallets yet.</td></tr>';
     return;
   }
 
-  container.innerHTML = watchlist.map((item, idx) => `
+  // Generate undo banners for ALL items currently pending deletion
+  let undoBannersHTML = "";
+  pendingWalletDeletions.forEach((pending, cleanAddr) => {
+    undoBannersHTML += `
+      <tr id="undo-row-${cleanAddr}">
+        <td colspan="3" style="padding: 8px 12px; background: rgba(246, 70, 93, 0.08); border: 1px solid rgba(246, 70, 93, 0.25);">
+          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: var(--text-main);">
+            <span>Wallet <strong>${esc(pending.watchItem.label)}</strong> removed. Undoing available in <span id="wallet-undo-countdown-${cleanAddr}">5</span>s...</span>
+            <button class="secondary" style="height: 26px; padding: 0 12px; font-size: 10.5px; background: var(--coinglass-red); color: #fff; border: none; font-weight: 700; cursor: pointer;" onclick="undoWalletRemoval('${pending.watchItem.address}')">Undo</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  let htmlRows = watchlist.map((item) => `
     <tr>
       <td style="font-weight: 700; color: var(--coinglass-green);">${esc(item.label)}</td>
       <td style="font-family: monospace; color: var(--text-muted);">${esc(maskAddress(item.address))}</td>
       <td style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
         <button class="secondary" style="height: 30px; padding: 0 10px; font-size: 11px;" onclick="loadWatchlistedWallet('${item.address}')">Load</button>
-        <button class="btn-ghost" style="height: 30px; padding: 0 8px; color: var(--coinglass-red);" onclick="removeWatchlistItem(${idx})">✕</button>
+        <button class="btn-ghost" style="height: 30px; padding: 0 8px; color: var(--coinglass-red);" onclick="removeWalletWithUndo('${item.address}')">✕</button>
       </td>
     </tr>
   `).join("");
+
+  container.innerHTML = undoBannersHTML + htmlRows;
 }
 
 window.loadWatchlistedWallet = function(addr) {
@@ -214,12 +290,6 @@ window.loadWatchlistedWallet = function(addr) {
   walletEl.value = maskAddress(addr);
   localStorage.setItem(SAVED_WALLET_KEY, addr);
   fetchBtn.click();
-};
-
-window.removeWatchlistItem = function(idx) {
-  watchlist.splice(idx, 1);
-  localStorage.setItem(SAVED_WATCHLIST_KEY, JSON.stringify(watchlist));
-  renderWatchlistUI();
 };
 
 $("saveWalletBtn")?.addEventListener("click", () => {
@@ -2566,6 +2636,7 @@ $("clearBtn").addEventListener("click", () => {
   walletEl.value = "";
   if (pollTimer) clearInterval(pollTimer);
   if (wsConnection) wsConnection.close();
+  // Clear all storage
   localStorage.removeItem(SAVED_WALLET_KEY);
   localStorage.removeItem(SAVED_VIEW_KEY);
   localStorage.removeItem(CACHE_FILLS_KEY);
@@ -2578,6 +2649,7 @@ $("clearBtn").addEventListener("click", () => {
   localStorage.removeItem(CACHE_TIME_KEY);
   localStorage.setItem("hyperliquid_controls_hidden", "false");
   sessionStorage.clear();
+  localStorage.setItem("hyperliquid_force_clear", Date.now().toString());
   setInceptionPreset();
   
   controlsPanel.classList.remove("hidden");
