@@ -940,7 +940,6 @@ function updateMetrics() {
     holdingsValEl.style.color = "var(--coinglass-purple)";
   }
 
-  // Update Share Card preview automatically
   renderShareCardPreview();
 }
 
@@ -1657,13 +1656,32 @@ function renderDepositsWithdrawals() {
   depositsBodyEl.innerHTML = filteredLedger.map((item, idx) => {
     const t = item.time || item.delta?.time;
     const delta = item.delta || item;
-    const type = delta.type || "Transfer";
+    
+    const rawType = String(delta.type || "").toLowerCase();
     const usdcVal = num(delta.usdc || delta.usdcValue || delta.amount || 0);
-    const token = delta.token || (type === "deposit" || type === "withdraw" ? "USDC" : "Asset");
+
+    let displayType = "Deposit";
+    let isDeposit = true;
+
+    if (rawType.includes("withdraw") || rawType.includes("withdrawal") || rawType.includes("burn")) {
+      displayType = "Withdraw";
+      isDeposit = false;
+    } else if (rawType.includes("send") || rawType.includes("deposit") || rawType.includes("transfer")) {
+      displayType = "Deposit";
+      isDeposit = true;
+    } else {
+      isDeposit = usdcVal >= 0;
+      displayType = isDeposit ? "Deposit" : "Withdraw";
+    }
+
+    const token = delta.token || "USDC";
     const hash = item.hash || "—";
     const hasHash = hash && hash !== "null" && hash !== "0x0000000000000000000000000000000000000000000000000000000000000000";
     const rowId = hash !== "—" ? hash : `deposit-${idx}`;
     const isThisExpanded = (expandedDepositHash === rowId) ? "expanded" : "";
+
+    const amountClass = isDeposit ? "text-positive" : "text-negative";
+    const formattedAmount = isDeposit ? Math.abs(usdcVal) : -Math.abs(usdcVal);
 
     const hashCell = hasHash 
       ? `<a href="${EXPLORER_URL}${esc(hash)}" target="_blank" rel="noopener noreferrer" class="hash">${esc(hash)}</a>` 
@@ -1673,17 +1691,17 @@ function renderDepositsWithdrawals() {
       <tr class="asset-card-row ${isThisExpanded}" onclick="toggleDepositCard(this, '${rowId}')">
         <!-- PC Columns -->
         <td class="pc-col pc-col-left" style="text-align: left;">${esc(formatDate(t))}</td>
-        <td class="pc-col pc-col-right" style="font-weight: 700; text-transform: capitalize; text-align: left;">${esc(type)}</td>
+        <td class="pc-col pc-col-right" style="font-weight: 700; text-transform: capitalize; text-align: left;">${esc(displayType)}</td>
         <td class="pc-col pc-col-right" style="text-align: right;">${esc(token)}</td>
-        <td class="pc-col pc-col-right ${usdcVal > 0 ? "text-positive" : usdcVal < 0 ? "text-negative" : ""}" style="text-align: right;">${money(usdcVal, 2)}</td>
+        <td class="pc-col pc-col-right ${amountClass}" style="text-align: right;">${money(formattedAmount, 2)}</td>
         <td class="pc-col pc-col-right" style="text-align: right;">${hashCell}</td>
 
         <!-- Mobile Card Wrapper Cell -->
         <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
           <div class="mobile-card-header">
-            <span class="coin-name" style="text-transform: capitalize;">${esc(type)} (${esc(token)})</span>
+            <span class="coin-name" style="text-transform: capitalize;">${esc(displayType)} (${esc(token)})</span>
             <div class="mobile-header-right">
-              <span class="${usdcVal > 0 ? "text-positive" : usdcVal < 0 ? "text-negative" : ""}" style="font-weight:700;">${money(usdcVal, 2)}</span>
+              <span class="${amountClass}" style="font-weight:700;">${money(formattedAmount, 2)}</span>
               <button class="mobile-card-toggle-btn" type="button" aria-label="Toggle details">▼</button>
             </div>
           </div>
@@ -1695,7 +1713,7 @@ function renderDepositsWithdrawals() {
               </div>
               <div class="collapsible-detail-row">
                 <span class="mobile-label-text">TYPE</span>
-                <span style="text-transform: capitalize; font-weight: 700;">${esc(type)}</span>
+                <span style="text-transform: capitalize; font-weight: 700;">${esc(displayType)}</span>
               </div>
               <div class="collapsible-detail-row">
                 <span class="mobile-label-text">TOKEN</span>
@@ -1703,7 +1721,7 @@ function renderDepositsWithdrawals() {
               </div>
               <div class="collapsible-detail-row">
                 <span class="mobile-label-text">AMOUNT</span>
-                <span class="${usdcVal > 0 ? "text-positive" : usdcVal < 0 ? "text-negative" : ""}">${money(usdcVal, 2)}</span>
+                <span class="${amountClass}">${money(formattedAmount, 2)}</span>
               </div>
               <div class="collapsible-detail-row" style="border-bottom: none;">
                 <span class="mobile-label-text">TX HASH</span>
