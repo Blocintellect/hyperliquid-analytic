@@ -110,6 +110,10 @@
     margin-left: auto;
   }
 
+  .prices-table .prices-mobile-price-preview {
+    display: inline-block !important;
+  }
+
   .prices-table .mobile-card-toggle-btn {
     display: inline-flex !important;
     align-items: center;
@@ -182,6 +186,13 @@
 
 @media (min-width: 769px) {
   .prices-table .asset-detail-wrapper {
+    display: none !important;
+  }
+  .prices-table .prices-mobile-price-preview {
+    display: none !important;
+  }
+  /* Hide the mobile card toggle arrow on PC view */
+  .prices-table .mobile-card-toggle-btn {
     display: none !important;
   }
 }

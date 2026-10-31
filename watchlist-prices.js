@@ -55,7 +55,7 @@
       <div id="pricesModal" class="modal hidden">
         <div class="modal-content" style="width: 820px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column;">
           <div class="modal-header">
-            <h3>Hyperliquid USDC Perpetual Markets & Watchlist</h3>
+            <h3>Markets & Watchlist</h3>
             <button id="closePricesModal" class="btn-ghost">✕</button>
           </div>
           <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px; overflow: hidden; flex: 1;">
@@ -66,7 +66,10 @@
                 <button id="tabWatchlistCoins" class="secondary" style="height: 32px; padding: 0 12px; font-size: 11px;" onclick="switchPricesTab('watchlist')">⭐ Watchlist (${priceWatchlist.length})</button>
                 <button id="clearWatchlistBtn" class="btn-ghost" style="height: 32px; padding: 0 8px; font-size: 10px; color: var(--coinglass-red);" onclick="clearAllWatchlist()" title="Clear Watchlist">Clear All</button>
               </div>
-              <input id="pricesSearchInput" type="text" placeholder="Search asset (e.g. BTC, WTI, OIL, GOLD)..." style="max-width: 260px; height: 34px; font-size: 11px;" oninput="filterPricesSearch(this.value)">
+              <div style="position: relative; display: flex; align-items: center; max-width: 260px; width: 100%;">
+                <input id="pricesSearchInput" type="text" placeholder="Search asset (e.g. BTC, WTI, OIL, GOLD)..." style="width: 100%; height: 34px; font-size: 11px; padding-right: 28px;" oninput="handlePricesSearchInput(this.value)">
+                <button id="clearSearchBtn" class="btn-ghost hidden" style="position: absolute; right: 4px; height: 26px; width: 26px; padding: 0; font-size: 12px; color: var(--text-muted); display: flex; align-items: center; justify-content: center;" onclick="clearPricesSearch()" title="Clear search">✕</button>
+              </div>
             </div>
 
             <div class="table-wrap" style="overflow-y: auto; overflow-x: hidden; max-height: 52vh; border: 1px solid var(--panel-border); border-radius: 6px; width: 100%;">
@@ -122,9 +125,25 @@
     renderPricesTable();
   };
 
-  window.filterPricesSearch = function(query) {
+  window.handlePricesSearchInput = function(query) {
     currentSearchQuery = query.toLowerCase().trim();
+    const clearBtn = document.getElementById("clearSearchBtn");
+    if (clearBtn) {
+      if (query.length > 0) {
+        clearBtn.classList.remove("hidden");
+      } else {
+        clearBtn.classList.add("hidden");
+      }
+    }
     renderPricesTable();
+  };
+
+  window.clearPricesSearch = function() {
+    const input = document.getElementById("pricesSearchInput");
+    if (input) {
+      input.value = "";
+      handlePricesSearchInput("");
+    }
   };
 
   window.clearAllWatchlist = function() {
@@ -291,6 +310,8 @@
     const coinSelect = document.getElementById("coinFilterSelect");
     const activeFilteredCoin = coinSelect ? coinSelect.value : "all";
 
+    const coinsWithFills = new Set((typeof fills !== "undefined" && Array.isArray(fills)) ? fills.map(f => f.coin) : []);
+
     let filtered = allAssetsData;
 
     if (activeTab === "watchlist") {
@@ -321,12 +342,24 @@
 
       const formattedPrice = item.markPx >= 1 ? item.markPx.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : item.markPx.toFixed(6);
 
+      const hasFills = coinsWithFills.has(item.coin);
       const isCurrentlyFiltered = activeFilteredCoin === item.coin;
-      const actionLabel = isCurrentlyFiltered ? "Unfilter" : "Filter Fills";
-      const actionClass = isCurrentlyFiltered ? "btn-ghost" : "secondary";
-      const actionStyle = isCurrentlyFiltered 
-        ? "height: 26px; padding: 0 8px; font-size: 10px; color: var(--coinglass-red); border-color: var(--coinglass-red);" 
-        : "height: 26px; padding: 0 8px; font-size: 10px;";
+
+      let actionLabel = "Filter Fills";
+      let actionClass = "secondary";
+      let actionStyle = "height: 26px; padding: 0 8px; font-size: 10px;";
+
+      if (isCurrentlyFiltered) {
+        actionLabel = "Unfilter";
+        actionClass = "btn-ghost";
+        actionStyle = "height: 26px; padding: 0 8px; font-size: 10px; color: var(--coinglass-red); border-color: var(--coinglass-red);";
+      } else if (!hasFills) {
+        actionLabel = "No Fills";
+        actionClass = "secondary";
+        actionStyle = "height: 26px; padding: 0 8px; font-size: 10px; opacity: 0.4; cursor: not-allowed; background: transparent; border-color: var(--panel-border); color: var(--text-muted);";
+      }
+
+      const clickHandler = hasFills || isCurrentlyFiltered ? `toggleCoinFilter('${item.coin}')` : `alert('This asset (${item.coin}) does not have any trade fills recorded in your statement.')`;
 
       const isThisExpanded = (expandedMobileCoin === item.coin) ? "expanded" : "";
 
@@ -339,16 +372,12 @@
             <div class="mobile-card-header">
               <span class="coin-name">${item.coin}</span>
               <div class="mobile-header-right">
-                <span class="prices-mobile-price-preview" style="font-weight:700;">$${formattedPrice}</span>
+                <span class="prices-mobile-price-preview" style="font-weight:700; color: var(--text-main);">$${formattedPrice}</span>
                 <button class="mobile-card-toggle-btn" type="button" aria-label="Toggle details">▼</button>
               </div>
             </div>
             <div class="asset-detail-wrapper">
               <div class="asset-detail-inner">
-                <div class="collapsible-detail-row">
-                  <span class="mobile-label-text">MARK PRICE</span>
-                  <span>$${formattedPrice}</span>
-                </div>
                 <div class="collapsible-detail-row">
                   <span class="mobile-label-text">24H CHANGE</span>
                   <span class="${changeClass}">${changeStr}</span>
@@ -362,7 +391,7 @@
                   <span>${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</span>
                 </div>
                 <div class="collapsible-detail-row" style="border-bottom: none; justify-content: flex-end; padding-top: 8px;" onclick="event.stopPropagation()">
-                  <button class="${actionClass}" style="${actionStyle}" onclick="toggleCoinFilter('${item.coin}')">${actionLabel}</button>
+                  <button class="${actionClass}" style="${actionStyle}" onclick="${clickHandler}">${actionLabel}</button>
                 </div>
               </div>
             </div>
@@ -374,7 +403,7 @@
           <td class="pc-col pc-col-right ${fundingClass}">${fundingPct}</td>
           <td class="pc-col pc-col-right">${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</td>
           <td class="pc-col pc-col-right" style="text-align: right;" onclick="event.stopPropagation()">
-            <button class="${actionClass}" style="${actionStyle}" onclick="toggleCoinFilter('${item.coin}')">${actionLabel}</button>
+            <button class="${actionClass}" style="${actionStyle}" onclick="${clickHandler}">${actionLabel}</button>
           </td>
         </tr>
       `;
@@ -393,7 +422,5 @@
     }
     document.getElementById("pricesModal")?.classList.add("hidden");
   };
-
-  window.loadCoinFilter = window.toggleCoinFilter;
 
 })();
