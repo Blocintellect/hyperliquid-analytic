@@ -114,6 +114,12 @@ let watchlist = [];
 let currentPage = 1;
 const rowsPerPage = 50;
 
+// Track expanded state across re-renders
+let expandedContractKey = null;
+let expandedTradeId = null;
+let expandedDailyKey = null;
+let expandedMonthlyKey = null;
+
 const SAVED_WALLET_KEY = "hyperliquid_saved_wallet";
 const SAVED_THEME_KEY = "hyperliquid_theme";
 const SAVED_WATCHLIST_KEY = "hyperliquid_watchlist";
@@ -680,7 +686,6 @@ window.showRiskInfo = function(coin, currentPx, liqPx, distance) {
   alert(`Liquidation Risk for ${coin}:\n\n• Current Price: $${Number(currentPx).toLocaleString()}\n• Est. Liquidation Price: $${Number(liqPx).toLocaleString()}\n• Distance to Liquidation: ${distance.toFixed(1)}%\n\nIf the asset moves this percentage against your position, you will reach liquidation.`);
 };
 
-// Live update function for active contracts without collapsing accordion rows
 function updateActiveContractsLiveValues() {
   if (!activePositions || activePositions.length === 0) return;
   let totalUnrealizedPnl = 0;
@@ -957,32 +962,29 @@ function getFilteredFills() {
   });
 }
 
-const expandedContractsCoins = new Set();
-const expandedTradesIds = new Set();
-const expandedDailyKeys = new Set();
-const expandedMonthlyKeys = new Set();
-
-window.toggleMobileCard = function(btnElement, identifier = "") {
+window.toggleMobileCard = function(target, identifier = "", type = "contracts") {
   if (window.innerWidth <= 768) {
-    const tr = btnElement.closest("tr");
+    const tr = target.closest("tr");
     if (tr) {
-      const isAlreadyExpanded = tr.classList.contains("expanded");
-      document.querySelectorAll("#contractsBody tr.expanded, #tradeBody tr.expanded, #dailyBody tr.expanded, #monthlyBody tr.expanded").forEach(row => {
-        row.classList.remove("expanded");
-      });
-      expandedContractsCoins.clear();
-      expandedTradesIds.clear();
-      expandedDailyKeys.clear();
-      expandedMonthlyKeys.clear();
+      const wasExpanded = tr.classList.contains("expanded");
+      const tbody = tr.closest("tbody");
+      if (tbody) {
+        tbody.querySelectorAll("tr.expanded").forEach(row => {
+          row.classList.remove("expanded");
+        });
+      }
 
-      if (!isAlreadyExpanded) {
+      if (type === "contracts") expandedContractKey = null;
+      if (type === "trades") expandedTradeId = null;
+      if (type === "daily") expandedDailyKey = null;
+      if (type === "monthly") expandedMonthlyKey = null;
+
+      if (!wasExpanded) {
         tr.classList.add("expanded");
-        if (identifier) {
-          if (tr.closest("#contractsBody")) expandedContractsCoins.add(identifier);
-          if (tr.closest("#tradeBody")) expandedTradesIds.add(identifier);
-          if (tr.closest("#dailyBody")) expandedDailyKeys.add(identifier);
-          if (tr.closest("#monthlyBody")) expandedMonthlyKeys.add(identifier);
-        }
+        if (type === "contracts") expandedContractKey = identifier;
+        if (type === "trades") expandedTradeId = identifier;
+        if (type === "daily") expandedDailyKey = identifier;
+        if (type === "monthly") expandedMonthlyKey = identifier;
       }
     }
   }
@@ -1055,34 +1057,79 @@ function renderContracts() {
     const unPnlId = `contract-unpnl-${coin}-${index}`;
     const pnlClass = liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : "";
 
-    const isExpanded = expandedContractsCoins.has(coin);
+    const isThisExpanded = (expandedContractKey === coin) ? "expanded" : "";
 
     rows.push(`
-      <tr class="${isExpanded ? "expanded" : ""}" onclick="toggleMobileCard(this, '${coin}')">
-        <td style="text-align: left; font-weight: 800;" class="coin-name mobile-card-header">
-          <span>${esc(coin)}</span>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="mobile-preview-badge">
-              <span>Mark: ${plainMoney(currentMarkPx, 2)}</span>
-              <span class="${pnlClass}">P&L: ${money(liveUnPnl, 2)}</span>
-            </div>
-            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this, '${coin}')">▼</button>
+      <tr class="asset-card-row ${isThisExpanded}" onclick="toggleMobileCard(this, '${coin}', 'contracts')">
+        <!-- PC Columns -->
+        <td class="pc-col pc-col-left coin-name">${esc(coin)}</td>
+        <td class="pc-col pc-col-right ${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</td>
+        <td class="pc-col pc-col-right">${Math.abs(sizeNum).toLocaleString()}</td>
+        <td class="pc-col pc-col-right">${plainMoney(positionValue, 2)}</td>
+        <td class="pc-col pc-col-right">${plainMoney(marginUsed, 2)}</td>
+        <td class="pc-col pc-col-right">${plainMoney(entryPx, 4)}</td>
+        <td class="pc-col pc-col-right">${plainMoney(currentMarkPx, 4)}</td>
+        <td class="pc-col pc-col-right">${plainMoney(estLiqPx, 4)}</td>
+        <td class="pc-col pc-col-right">${proximityHtml}</td>
+        <td class="pc-col pc-col-right ${fundingClass}">${money(positionFunding, 2)}</td>
+        <td class="pc-col pc-col-right">
+          <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px;">
+            <span id="${unPnlId}" class="${pnlClass}">${money(liveUnPnl, 2)}</span>
+            <button class="secondary" style="height: 26px; padding: 0 6px; font-size: 10px;" onclick="event.stopPropagation(); openCloseSimulation('${esc(coin)}', ${sizeNum}, ${entryPx}, ${currentMarkPx})">Simulate</button>
           </div>
         </td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Position / Lev</span><span class="${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Size</span><span>${Math.abs(sizeNum).toLocaleString()}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Position Value</span><span>${plainMoney(positionValue, 2)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Margin Used</span><span>${plainMoney(marginUsed, 2)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Entry Price</span><span>${plainMoney(entryPx, 4)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Mark Price</span><span>${plainMoney(currentMarkPx, 4)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Est. Liq. Price</span><span>${plainMoney(estLiqPx, 4)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Risk Proximity</span><span>${proximityHtml}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Funding</span><span class="${fundingClass}">${money(positionFunding, 2)}</span></td>
-        <td class="collapsible-detail">
-          <span class="mobile-label-text">Unrealized P&L</span>
-          <div style="display: inline-flex; align-items: center;">
-            <span id="${unPnlId}" class="${pnlClass}">${money(liveUnPnl, 2)}</span>
-            <button class="secondary" style="margin-left: 8px; height: 26px; padding: 0 6px; font-size: 10px;" onclick="event.stopPropagation(); openCloseSimulation('${esc(coin)}', ${sizeNum}, ${entryPx}, ${currentMarkPx})">Simulate</button>
+
+        <!-- Mobile Card Wrapper Cell -->
+        <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
+          <div class="mobile-card-header">
+            <span class="coin-name">${esc(coin)}</span>
+            <div class="mobile-header-right">
+              <span class="${pnlClass}" style="font-weight:700;">${money(liveUnPnl, 2)}</span>
+              <button class="mobile-card-toggle-btn" type="button" aria-label="Toggle details">▼</button>
+            </div>
+          </div>
+          <div class="asset-detail-wrapper">
+            <div class="asset-detail-inner">
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">POSITION / LEV</span>
+                <span class="${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">SIZE</span>
+                <span>${Math.abs(sizeNum).toLocaleString()}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">POSITION VALUE</span>
+                <span>${plainMoney(positionValue, 2)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">MARGIN USED</span>
+                <span>${plainMoney(marginUsed, 2)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">ENTRY PRICE</span>
+                <span>${plainMoney(entryPx, 4)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">MARK PRICE</span>
+                <span>${plainMoney(currentMarkPx, 4)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">EST. LIQ. PRICE</span>
+                <span>${plainMoney(estLiqPx, 4)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">RISK PROXIMITY</span>
+                <span>${proximityHtml}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">FUNDING</span>
+                <span class="${fundingClass}">${money(positionFunding, 2)}</span>
+              </div>
+              <div class="collapsible-detail-row" style="border-bottom: none; justify-content: flex-end; padding-top: 8px;" onclick="event.stopPropagation()">
+                <button class="secondary" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="openCloseSimulation('${esc(coin)}', ${sizeNum}, ${entryPx}, ${currentMarkPx})">Simulate Close</button>
+              </div>
+            </div>
           </div>
         </td>
       </tr>
@@ -1370,24 +1417,52 @@ function renderDailyPnl() {
     const day = dailyMap[k];
     const pnlClass = day.netPnl > 0 ? "text-positive" : day.netPnl < 0 ? "text-negative" : "";
     const closedClass = day.closedPnl > 0 ? "text-positive" : day.closedPnl < 0 ? "text-negative" : "";
-    const isExpanded = expandedDailyKeys.has(day.label);
+    const isThisExpanded = (expandedDailyKey === day.label) ? "expanded" : "";
 
     return `
-      <tr class="${isExpanded ? "expanded" : ""}" onclick="toggleMobileCard(this, '${day.label}')">
-        <td style="text-align: left; font-weight: 800;" class="mobile-card-header">
-          <span>${esc(day.label)}</span>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="mobile-preview-badge">
-              <span class="${pnlClass}">Net P&L: ${money(day.netPnl, 2)}</span>
+      <tr class="asset-card-row ${isThisExpanded}" onclick="toggleMobileCard(this, '${day.label}', 'daily')">
+        <!-- PC Columns -->
+        <td class="pc-col pc-col-left coin-name">${esc(day.label)}</td>
+        <td class="pc-col pc-col-right ${closedClass}">${money(day.closedPnl, 2)}</td>
+        <td class="pc-col pc-col-right">${plainMoney(day.fees, 2)}</td>
+        <td class="pc-col pc-col-right ${pnlClass}">${money(day.netPnl, 2)}</td>
+        <td class="pc-col pc-col-right">${plainMoney(day.volume, 2)}</td>
+        <td class="pc-col pc-col-right">${day.fillsCount.toLocaleString()}</td>
+
+        <!-- Mobile Card Wrapper Cell -->
+        <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
+          <div class="mobile-card-header">
+            <span class="coin-name">${esc(day.label)}</span>
+            <div class="mobile-header-right">
+              <span class="${pnlClass}" style="font-weight:700;">${money(day.netPnl, 2)}</span>
+              <button class="mobile-card-toggle-btn" type="button" aria-label="Toggle details">▼</button>
             </div>
-            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this, '${day.label}')">▼</button>
+          </div>
+          <div class="asset-detail-wrapper">
+            <div class="asset-detail-inner">
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">CLOSED P&L</span>
+                <span class="${closedClass}">${money(day.closedPnl, 2)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">NET FEES & FUNDING</span>
+                <span>${plainMoney(day.fees, 2)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">NET P&L</span>
+                <span class="${pnlClass}">${money(day.netPnl, 2)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">TOTAL VOLUME</span>
+                <span>${plainMoney(day.volume, 2)}</span>
+              </div>
+              <div class="collapsible-detail-row" style="border-bottom: none;">
+                <span class="mobile-label-text">TOTAL FILLS</span>
+                <span>${day.fillsCount.toLocaleString()}</span>
+              </div>
+            </div>
           </div>
         </td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Closed P&L</span><span class="${closedClass}">${money(day.closedPnl, 2)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Net Fees & Funding</span><span>${plainMoney(day.fees, 2)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Net P&L</span><span class="${pnlClass}">${money(day.netPnl, 2)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Total Volume</span><span>${plainMoney(day.volume, 2)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Total Fills</span><span>${day.fillsCount.toLocaleString()}</span></td>
       </tr>
     `;
   }).join("");
@@ -1451,24 +1526,52 @@ function renderMonthlyPnl() {
     const m = monthlyMap[k];
     const pnlClass = m.netPnl > 0 ? "text-positive" : m.netPnl < 0 ? "text-negative" : "";
     const closedClass = m.closedPnl > 0 ? "text-positive" : m.closedPnl < 0 ? "text-negative" : "";
-    const isExpanded = expandedMonthlyKeys.has(m.label);
+    const isThisExpanded = (expandedMonthlyKey === m.label) ? "expanded" : "";
 
     return `
-      <tr class="${isExpanded ? "expanded" : ""}" onclick="toggleMobileCard(this, '${m.label}')">
-        <td style="text-align: left; font-weight: 800;" class="mobile-card-header">
-          <span>${esc(m.label)}</span>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="mobile-preview-badge">
-              <span class="${pnlClass}">Net P&L: ${money(m.netPnl, 2)}</span>
+      <tr class="asset-card-row ${isThisExpanded}" onclick="toggleMobileCard(this, '${m.label}', 'monthly')">
+        <!-- PC Columns -->
+        <td class="pc-col pc-col-left coin-name">${esc(m.label)}</td>
+        <td class="pc-col pc-col-right ${closedClass}">${money(m.closedPnl, 2)}</td>
+        <td class="pc-col pc-col-right">${plainMoney(m.fees, 2)}</td>
+        <td class="pc-col pc-col-right ${pnlClass}">${money(m.netPnl, 2)}</td>
+        <td class="pc-col pc-col-right">${plainMoney(m.volume, 2)}</td>
+        <td class="pc-col pc-col-right">${m.fillsCount.toLocaleString()}</td>
+
+        <!-- Mobile Card Wrapper Cell -->
+        <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
+          <div class="mobile-card-header">
+            <span class="coin-name">${esc(m.label)}</span>
+            <div class="mobile-header-right">
+              <span class="${pnlClass}" style="font-weight:700;">${money(m.netPnl, 2)}</span>
+              <button class="mobile-card-toggle-btn" type="button" aria-label="Toggle details">▼</button>
             </div>
-            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this, '${m.label}')">▼</button>
+          </div>
+          <div class="asset-detail-wrapper">
+            <div class="asset-detail-inner">
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">CLOSED P&L</span>
+                <span class="${closedClass}">${money(m.closedPnl, 2)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">NET FEES & FUNDING</span>
+                <span>${plainMoney(m.fees, 2)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">NET P&L</span>
+                <span class="${pnlClass}">${money(m.netPnl, 2)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">TOTAL VOLUME</span>
+                <span>${plainMoney(m.volume, 2)}</span>
+              </div>
+              <div class="collapsible-detail-row" style="border-bottom: none;">
+                <span class="mobile-label-text">TOTAL FILLS</span>
+                <span>${m.fillsCount.toLocaleString()}</span>
+              </div>
+            </div>
           </div>
         </td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Closed P&L</span><span class="${closedClass}">${money(m.closedPnl, 2)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Net Fees & Funding</span><span>${plainMoney(m.fees, 2)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Net P&L</span><span class="${pnlClass}">${money(m.netPnl, 2)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Total Volume</span><span>${plainMoney(m.volume, 2)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Total Fills</span><span>${m.fillsCount.toLocaleString()}</span></td>
       </tr>
     `;
   }).join("");
@@ -1760,34 +1863,74 @@ function renderTrades() {
     const hasHash = rawHash && rawHash !== "null" && rawHash !== "undefined";
     const pnlClass = p > 0 ? "text-positive" : p < 0 ? "text-negative" : "";
     const fillId = f.tid || f.oid || f.time;
-    const isExpanded = expandedTradesIds.has(fillId);
+    const isThisExpanded = (expandedTradeId === fillId) ? "expanded" : "";
 
     const hashCell = hasHash 
       ? `<a href="${EXPLORER_URL}${esc(rawHash)}" target="_blank" rel="noopener noreferrer" class="hash" title="View Explorer">${esc(rawHash)}</a>`
       : '—';
 
     return `
-      <tr class="${isExpanded ? "expanded" : ""}" onclick="toggleMobileCard(this, '${fillId}')">
-        <td style="text-align: left;" class="mobile-card-header">
-          <span>${esc(formatDate(f.time))}</span>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <div class="mobile-preview-badge">
-              <span class="${pnlClass}">P&L: ${money(p, 2)}</span>
+      <tr class="asset-card-row ${isThisExpanded}" onclick="toggleMobileCard(this, '${fillId}', 'trades')">
+        <!-- PC Columns -->
+        <td class="pc-col pc-col-left">${esc(formatDate(f.time))}</td>
+        <td class="pc-col pc-col-right coin-name">${esc(f.coin)}</td>
+        <td class="pc-col pc-col-right ${dc}">${esc(d)}</td>
+        <td class="pc-col pc-col-right">${esc(mapSide(f.side))}</td>
+        <td class="pc-col pc-col-right">${esc(f.px)}</td>
+        <td class="pc-col pc-col-right">${esc(f.sz)}</td>
+        <td class="pc-col pc-col-right">${plainMoney(Math.abs(num(f.px) * num(f.sz)), 2)}</td>
+        <td class="pc-col pc-col-right ${pnlClass}">${money(p, 4)}</td>
+        <td class="pc-col pc-col-right">${plainMoney(f.fee, 4)}</td>
+        <td class="pc-col pc-col-right">${esc(f.feeToken)}</td>
+        <td class="pc-col pc-col-right">${esc(f.oid)}</td>
+        <td class="pc-col pc-col-right">${hashCell}</td>
+
+        <!-- Mobile Card Wrapper Cell -->
+        <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
+          <div class="mobile-card-header">
+            <span class="coin-name">${esc(f.coin)} — ${esc(mapSide(f.side))}</span>
+            <div class="mobile-header-right">
+              <span class="${pnlClass}" style="font-weight:700;">${money(p, 2)}</span>
+              <button class="mobile-card-toggle-btn" type="button" aria-label="Toggle details">▼</button>
             </div>
-            <button class="mobile-card-toggle-btn" type="button" onclick="event.stopPropagation(); toggleMobileCard(this, '${fillId}')">▼</button>
+          </div>
+          <div class="asset-detail-wrapper">
+            <div class="asset-detail-inner">
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">DATE / TIME</span>
+                <span>${esc(formatDate(f.time))}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">DIR</span>
+                <span class="${dc}">${esc(d)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">PRICE</span>
+                <span>${esc(f.px)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">SIZE</span>
+                <span>${esc(f.sz)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">NOTIONAL</span>
+                <span>${plainMoney(Math.abs(num(f.px) * num(f.sz)), 2)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">CLOSED P&L</span>
+                <span class="${pnlClass}">${money(p, 4)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">FEE</span>
+                <span>${plainMoney(f.fee, 4)} (${esc(f.feeToken)})</span>
+              </div>
+              <div class="collapsible-detail-row" style="border-bottom: none;">
+                <span class="mobile-label-text">HASH / ID</span>
+                <span>${hashCell}</span>
+              </div>
+            </div>
           </div>
         </td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Coin</span><span class="coin-name">${esc(f.coin)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Dir</span><span class="${dc}">${esc(d)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Side</span><span>${esc(mapSide(f.side))}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Price</span><span>${esc(f.px)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Size</span><span>${esc(f.sz)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Notional</span><span>${plainMoney(Math.abs(num(f.px) * num(f.sz)), 2)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Closed P&L</span><span class="${pnlClass}">${money(p, 4)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Fee</span><span>${plainMoney(f.fee, 4)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Fee Token</span><span>${esc(f.feeToken)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Order ID</span><span>${esc(f.oid)}</span></td>
-        <td class="collapsible-detail"><span class="mobile-label-text">Hash</span><span>${hashCell}</span></td>
       </tr>
     `;
   }).join("");
