@@ -481,7 +481,10 @@ async function fetchActiveContractsOnly(cleanUser) {
 }
 
 function startFiveSecondPoller(cleanUser) {
-  if (pollTimer) clearInterval(pollTimer);
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
   pollTimer = setInterval(async () => {
     if (!cleanUser || !isAddress(cleanUser)) return;
     const freshPositions = await fetchActiveContractsOnly(cleanUser);
@@ -502,6 +505,7 @@ async function fetchAccountData(user, startMs, endMs) {
     const out = [], seen = new Set(), week = 7 * 86400000;
     let ws = startMs, limited = false;
 
+    // FIXED: Loop bounded strictly between startMs and endMs
     while (ws <= endMs) {
       const we = Math.min(ws + week - 1, endMs);
       let cursor = ws, pages = 0;
@@ -518,10 +522,13 @@ async function fetchAccountData(user, startMs, endMs) {
         if (!Array.isArray(data)) throw new Error("Invalid fills response format.");
 
         for (const f of data) {
-          const key = [f.tid ?? "", f.hash ?? "", f.oid ?? "", f.time ?? "", f.coin ?? "", f.px ?? "", f.sz ?? ""].join("|");
-          if (!seen.has(key)) {
-            seen.add(key);
-            out.push(f);
+          const t = Number(f.time);
+          if (t >= startMs && t <= endMs) {
+            const key = [f.tid ?? "", f.hash ?? "", f.oid ?? "", f.time ?? "", f.coin ?? "", f.px ?? "", f.sz ?? ""].join("|");
+            if (!seen.has(key)) {
+              seen.add(key);
+              out.push(f);
+            }
           }
         }
 
@@ -647,7 +654,10 @@ function esc(v) {
 }
 
 function initWebSocket(coins) {
-  if (wsConnection) wsConnection.close();
+  if (wsConnection) {
+    wsConnection.close();
+    wsConnection = null;
+  }
   if (!coins || coins.length === 0) return;
 
   wsConnection = new WebSocket(WS_URL);
@@ -716,7 +726,10 @@ function updateActiveContractsLiveValues() {
       estLiqPx = Math.max(0, estLiqPx);
     }
 
-    const distancePercent = Math.abs((currentMarkPx - estLiqPx) / currentMarkPx) * 100;
+    const distancePercent = sizeNum > 0 
+      ? Math.abs((currentMarkPx - estLiqPx) / currentMarkPx) * 100 
+      : Math.abs((estLiqPx - currentMarkPx) / currentMarkPx) * 100;
+
     let riskColor = "text-positive";
     let riskLabel = "Safe";
     if (distancePercent < 5) {
@@ -727,7 +740,8 @@ function updateActiveContractsLiveValues() {
       riskLabel = "Moderate";
     }
 
-    const riskEl = $(`contract-risk-${coin}-${index}`);
+    const riskId = `contract-risk-${coin}-${index}`;
+    const riskEl = $(riskId);
     if (riskEl) {
       riskEl.className = riskColor;
       riskEl.style.fontWeight = "700";
@@ -953,8 +967,12 @@ function updateCoinFilterOptions() {
 function getFilteredFills() {
   const pnlVal = pnlFilterSelect.value;
   const coinVal = coinFilterSelect.value;
+  const s = startEl.value ? msStart(startEl.value) : 0;
+  const e = endEl.value ? msEnd(endEl.value) : Date.now();
 
   return fills.filter(f => {
+    const t = Number(f.time);
+    if (t < s || t > e) return false;
     const pnl = num(f.closedPnl);
     if (pnlVal === "positive" && pnl <= 0) return false;
     if (pnlVal === "negative" && pnl >= 0) return false;
@@ -1038,7 +1056,10 @@ function renderContracts() {
       estLiqPx = Math.max(0, estLiqPx);
     }
 
-    const distancePercent = Math.abs((currentMarkPx - estLiqPx) / currentMarkPx) * 100;
+    const distancePercent = sizeNum > 0 
+      ? Math.abs((currentMarkPx - estLiqPx) / currentMarkPx) * 100 
+      : Math.abs((estLiqPx - currentMarkPx) / currentMarkPx) * 100;
+
     let riskColor = "text-positive";
     let riskLabel = "Safe";
     if (distancePercent < 5) {
@@ -1417,7 +1438,8 @@ $("downloadShareCardBtn")?.addEventListener("click", () => {
 });
 
 function renderDailyPnl() {
-  if (!fills.length && !fundingHistory.length) {
+  const targetFills = getFilteredFills();
+  if (!targetFills.length && !fundingHistory.length) {
     dailyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">No trade fills loaded to generate daily breakdown.</td></tr>';
     dailyMeta.textContent = "No data loaded.";
     return;
@@ -1425,7 +1447,7 @@ function renderDailyPnl() {
 
   const dailyMap = {};
 
-  fills.forEach(f => {
+  targetFills.forEach(f => {
     const d = new Date(Number(f.time));
     const dateKey = d.toISOString().split("T")[0];
 
@@ -1524,7 +1546,8 @@ function renderDailyPnl() {
 }
 
 function renderMonthlyPnl() {
-  if (!fills.length && !fundingHistory.length) {
+  const targetFills = getFilteredFills();
+  if (!targetFills.length && !fundingHistory.length) {
     monthlyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">No trade fills loaded to generate monthly breakdown.</td></tr>';
     monthlyMeta.textContent = "No data loaded.";
     return;
@@ -1532,7 +1555,7 @@ function renderMonthlyPnl() {
 
   const monthlyMap = {};
 
-  fills.forEach(f => {
+  targetFills.forEach(f => {
     const d = new Date(Number(f.time));
     const yearMonthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const label = d.toLocaleString(undefined, { month: 'long', year: 'numeric' });
@@ -2347,7 +2370,16 @@ jsonBtn.addEventListener("click", () => {
 
 function generatePDF() {
   const targetFills = getFilteredFills();
-  if (!targetFills.length) return;
+  if (!targetFills.length) {
+    alert("No trades found within the selected date range to export.");
+    return;
+  }
+
+  // Confirmation alert displaying the selected dates
+  const startDateStr = startEl.value || "Inception";
+  const endDateStr = endEl.value || "Present";
+  const confirmed = confirm(`This action will export a PDF statement of the trades within the selected dates: ${startDateStr} to ${endDateStr}. Click OK to proceed.`);
+  if (!confirmed) return;
 
   if (typeof window.jspdf === "undefined" || typeof window.jspdf.jsPDF === "undefined") {
     alert("PDF generator library is still loading. Please retry in a moment.");
@@ -2386,7 +2418,7 @@ function generatePDF() {
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 100, 100);
-    doc.text("OFFICIAL INSTITUTIONAL TRADE AUDIT STATEMENT", 40, 52);
+    doc.text("OFFICIAL TRADE AUDIT STATEMENT", 40, 52);
 
     doc.setFontSize(8);
     doc.setTextColor(60, 60, 60);
@@ -2436,8 +2468,11 @@ function generatePDF() {
     doc.setFontSize(10); doc.setTextColor(15, 23, 42);
     doc.text(targetFills.length.toLocaleString(), cardX + 10, 100);
 
+    // Uncapped fill list for the PDF
+    const pdfExportFills = targetFills;
+
     const tableHeaders = [["Date / Time", "Coin", "Dir", "Side", "Price", "Size", "Closed P&L", "Trade Fee"]];
-    const tableBody = targetFills.map(f => [
+    const tableBody = pdfExportFills.map(f => [
       formatDate(f.time),
       f.coin,
       f.dir ?? "",
