@@ -216,6 +216,15 @@
     width: 100% !important;
   }
 
+  /* Left-align asset name and subtitle cleanly */
+  .prices-table .mobile-card-header .asset-info-block,
+  .prices-table .mobile-card-header > div:first-child {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    text-align: left !important;
+  }
+
   .prices-table .mobile-header-right {
     display: flex !important;
     align-items: center !important;

@@ -505,7 +505,6 @@ async function fetchAccountData(user, startMs, endMs) {
     const out = [], seen = new Set(), week = 7 * 86400000;
     let ws = startMs, limited = false;
 
-    // FIXED: Loop bounded strictly between startMs and endMs
     while (ws <= endMs) {
       const we = Math.min(ws + week - 1, endMs);
       let cursor = ws, pages = 0;
@@ -1444,7 +1443,6 @@ $("downloadShareCardBtn")?.addEventListener("click", () => {
   ctx.font = "bold 56px sans-serif";
   ctx.fillText(money(netPnl, 2), 80, 260);
 
-  // Bottom info cards box
   ctx.fillStyle = "#121721";
   ctx.fillRect(80, 320, 1040, 220);
   ctx.strokeStyle = "#1e2638";
@@ -2416,7 +2414,6 @@ function generatePDF() {
     return;
   }
 
-  // Confirmation alert displaying the selected dates
   const startDateStr = startEl.value || "Inception";
   const endDateStr = endEl.value || "Present";
   const confirmed = confirm(`This action will export a PDF statement of the trades within the selected dates: ${startDateStr} to ${endDateStr}. Click OK to proceed.`);
@@ -2509,7 +2506,6 @@ function generatePDF() {
     doc.setFontSize(10); doc.setTextColor(15, 23, 42);
     doc.text(targetFills.length.toLocaleString(), cardX + 10, 100);
 
-    // Uncapped fill list for the PDF
     const pdfExportFills = targetFills;
 
     const tableHeaders = [["Date / Time", "Coin", "Dir", "Side", "Price", "Size", "Closed P&L", "Trade Fee"]];

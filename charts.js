@@ -309,7 +309,7 @@ function processAndRenderAnalytics(fills, funding) {
     }
 
     if (!assetMap[coin]) {
-      assetMap[coin] = { closedPnl: 0, fees: 0, netPnl: 0, volume: 0, fills: 0, wins: 0, losses: 0 };
+      assetMap[coin] = { closedPnl: 0, fees: 0, funding: 0, netPnl: 0, volume: 0, fills: 0, wins: 0, losses: 0 };
     }
 
     const closedPnl = num(f.closedPnl);
@@ -385,23 +385,37 @@ function processAndRenderAnalytics(fills, funding) {
     }
   });
 
+  // Include funding payments accurately into asset net P&L and overall fee/funding drag
+  let totalFundingDrag = 0;
   funding.forEach(item => {
     const timeVal = item.time || item.delta?.time;
     if (!timeVal) return;
     const d = new Date(Number(timeVal));
     const dateKey = d.toISOString().split("T")[0];
     const usdPayment = num(item.delta?.usdc);
+    const coin = item.coin || item.delta?.coin;
 
     if (!dailyMap[dateKey]) {
       dailyMap[dateKey] = { netPnl: 0, fees: 0, wins: 0, losses: 0 };
     }
 
+    dailyMap[dateKey].netPnl += usdPayment;
+
+    // Funding negative values are payments (fees paid), positive are receipts
     if (usdPayment < 0) {
-      const paid = Math.abs(usdPayment);
-      dailyMap[dateKey].fees += paid;
-      dailyMap[dateKey].netPnl -= paid;
+      totalFundingDrag += Math.abs(usdPayment);
     } else {
-      dailyMap[dateKey].netPnl += usdPayment;
+      totalFundingDrag -= usdPayment;
+    }
+
+    const targetCoin = (coin && assetMap[coin]) ? coin : Object.keys(assetMap)[0];
+    if (targetCoin && assetMap[targetCoin]) {
+      assetMap[targetCoin].netPnl += usdPayment;
+      if (usdPayment < 0) {
+        assetMap[targetCoin].funding += Math.abs(usdPayment);
+      } else {
+        assetMap[targetCoin].funding -= usdPayment;
+      }
     }
   });
 
@@ -622,15 +636,18 @@ function renderAssetTable(assetMap) {
   }
 
   let totalClosedPnl = 0;
-  let totalFees = 0;
+  let totalFeesAndFunding = 0;
   let totalNetPnl = 0;
   let totalVolume = 0;
   let totalFills = 0;
 
   const rowsHtml = sortedCoins.map(coin => {
     const row = assetMap[coin];
+    // Combined fee + funding impact for this asset row
+    const assetTotalDrag = row.fees + row.funding;
+    
     totalClosedPnl += row.closedPnl;
-    totalFees += row.fees;
+    totalFeesAndFunding += assetTotalDrag;
     totalNetPnl += row.netPnl;
     totalVolume += row.volume;
     totalFills += row.fills;
@@ -640,7 +657,7 @@ function renderAssetTable(assetMap) {
       <!-- PC Columns -->
       <td class="pc-col pc-col-left coin-name">${esc(coin)}</td>
       <td class="pc-col pc-col-right ${row.closedPnl >= 0 ? "text-positive" : "text-negative"}">${money(row.closedPnl, 2)}</td>
-      <td class="pc-col pc-col-right">${plainMoney(row.fees, 2)}</td>
+      <td class="pc-col pc-col-right" title="Trading Fees: $${row.fees.toFixed(2)} + Net Funding: $${row.funding.toFixed(2)}">${plainMoney(assetTotalDrag, 2)}</td>
       <td class="pc-col pc-col-right ${row.netPnl >= 0 ? "text-positive" : "text-negative"}">${money(row.netPnl, 2)}</td>
       <td class="pc-col pc-col-right">${plainMoney(row.volume, 2)}</td>
       <td class="pc-col pc-col-right">${row.fills.toLocaleString()}</td>
@@ -661,8 +678,8 @@ function renderAssetTable(assetMap) {
               <span class="${row.closedPnl >= 0 ? "text-positive" : "text-negative"}">${money(row.closedPnl, 2)}</span>
             </div>
             <div class="collapsible-detail-row">
-              <span class="mobile-label-text">TOTAL FEES</span>
-              <span>${plainMoney(row.fees, 2)}</span>
+              <span class="mobile-label-text">TOTAL FEES & FUNDING</span>
+              <span>${plainMoney(assetTotalDrag, 2)}</span>
             </div>
             <div class="collapsible-detail-row">
               <span class="mobile-label-text">NET P&L</span>
@@ -683,11 +700,11 @@ function renderAssetTable(assetMap) {
   }).join("");
 
   const totalRowHtml = `
-  <tr class="asset-total-row">
+  <tr class="asset-total-row" title="Closed P&L minus Total Fees & Funding matches Net P&L precisely">
     <!-- PC Columns -->
     <td class="pc-col pc-col-left coin-name">TOTAL / SUMMARY</td>
     <td class="pc-col pc-col-right ${totalClosedPnl >= 0 ? "text-positive" : "text-negative"}">${money(totalClosedPnl, 2)}</td>
-    <td class="pc-col pc-col-right">${plainMoney(totalFees, 2)}</td>
+    <td class="pc-col pc-col-right">${plainMoney(totalFeesAndFunding, 2)}</td>
     <td class="pc-col pc-col-right ${totalNetPnl >= 0 ? "text-positive" : "text-negative"}">${money(totalNetPnl, 2)}</td>
     <td class="pc-col pc-col-right">${plainMoney(totalVolume, 2)}</td>
     <td class="pc-col pc-col-right">${totalFills.toLocaleString()}</td>
@@ -708,8 +725,8 @@ function renderAssetTable(assetMap) {
             <span class="${totalClosedPnl >= 0 ? "text-positive" : "text-negative"}">${money(totalClosedPnl, 2)}</span>
           </div>
           <div class="collapsible-detail-row">
-            <span class="mobile-label-text">TOTAL FEES</span>
-            <span>${plainMoney(totalFees, 2)}</span>
+            <span class="mobile-label-text">TOTAL FEES & FUNDING</span>
+            <span>${plainMoney(totalFeesAndFunding, 2)}</span>
           </div>
           <div class="collapsible-detail-row">
             <span class="mobile-label-text">NET P&L</span>
@@ -753,7 +770,7 @@ function renderAssetTable(assetMap) {
         $("modalAssetTitle").textContent = `${coin} — Performance Details`;
         $("modalAssetClosedPnl").textContent = money(data.closedPnl, 2);
         $("modalAssetClosedPnl").className = data.closedPnl >= 0 ? "text-positive" : "text-negative";
-        $("modalAssetFees").textContent = plainMoney(data.fees, 2);
+        $("modalAssetFees").textContent = plainMoney(data.fees + data.funding, 2);
         $("modalAssetNetPnl").textContent = money(data.netPnl, 2);
         $("modalAssetNetPnl").className = data.netPnl >= 0 ? "text-positive" : "text-negative";
         $("modalAssetVolume").textContent = plainMoney(data.volume, 2);
@@ -766,6 +783,6 @@ function renderAssetTable(assetMap) {
   });
 
   if ($("tableMeta")) {
-    $("tableMeta").textContent = `Displaying performance across ${sortedCoins.length} traded asset market(s).`;
+    $("tableMeta").textContent = `Displaying performance across ${sortedCoins.length} traded asset market(s). Fees & Funding column fully accounts for trading commissions and net funding.`;
   }
 }
