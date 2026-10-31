@@ -25,24 +25,24 @@ body.dark-theme {
 }
 
 body.light-theme {
-  --bg-dark: #f4f6f9;
-  --panel-bg: #ffffff;
-  --panel-border: #e2e8f0;
-  --input-bg: #f8fafc;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --coinglass-green: #10b981;
-  --coinglass-green-bg: rgba(16, 185, 129, 0.12);
-  --coinglass-red: #ef4444;
-  --coinglass-red-bg: rgba(239, 68, 68, 0.12);
-  --coinglass-blue: #2563eb;
-  --coinglass-purple: #7c3aed;
-  --hover-bg: #f1f5f9;
-  --table-header-bg: #f8fafc;
-  --table-border: #e2e8f0;
-  --btn-secondary-bg: #f1f5f9;
-  --btn-secondary-border: #cbd5e1;
+  --bg-dark: #94a3b8;          /* Mid-tone steel blue page backdrop */
+  --panel-bg: #cbd5e1;         /* Lighter steel panel background */
+  --panel-border: #64748b;     /* Medium slate borders */
+  --input-bg: #e2e8f0;         /* Clear input fields */
+  --text-main: #020617;        /* Pitch dark text for maximum readability */
+  --text-muted: #334155;       /* Slate muted text */
+  --coinglass-green: #047857;  /* Emerald positive */
+  --coinglass-red: #b91c1c;    /* Crimson negative */
+  --coinglass-blue: #1d4ed8;   /* Primary blue accent */
+  --coinglass-purple: #6d28d9; /* Deep purple accent */
+  --hover-bg: #b0bec5;         /* Dynamic hover highlight */
+  --table-header-bg: #b0bec5;  /* Table header bar */
+  --table-border: #64748b;     /* Table border lines */
+  --btn-secondary-bg: #b0bec5; /* Secondary button styling */
+  --btn-secondary-border: #64748b;
 }
+
+
 
 html, body {
   margin: 0;
