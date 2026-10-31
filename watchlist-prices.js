@@ -12,8 +12,9 @@
   let pricesWs = null;
   let currentSearchQuery = "";
   let activeTab = "all";
+  let clearWatchlistTimeout = null;
+  let undoCountdownInterval = null;
   
-  // Track the currently expanded mobile coin across re-renders
   let expandedMobileCoin = null;
 
   const ASSET_NAME_MAP = {
@@ -21,6 +22,8 @@
     "BRENTOIL": "Brent Crude Oil",
     "GOLD": "Gold Spot / Futures",
     "SILVER": "Silver Spot / Futures",
+    "ILV": "Silver / Illuvium Asset",
+    "OP": "Copper / Optimism",
     "NATGAS": "Natural Gas Futures",
     "SP500": "S&P 500 Index",
     "GOOGL": "Alphabet / Google",
@@ -53,36 +56,43 @@
 
     const modalHTML = `
       <div id="pricesModal" class="modal hidden">
-        <div class="modal-content" style="width: 820px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column;">
+        <div class="modal-content" style="width: 860px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; box-sizing: border-box;">
           <div class="modal-header">
             <h3>Markets & Watchlist</h3>
             <button id="closePricesModal" class="btn-ghost">✕</button>
           </div>
-          <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px; overflow: hidden; flex: 1;">
+          <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px; overflow: hidden; flex: 1; box-sizing: border-box;">
             
-            <div style="display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
-              <div style="display: flex; gap: 6px; align-items: center;">
-                <button id="tabAllCoins" class="secondary active" style="height: 32px; padding: 0 12px; font-size: 11px;" onclick="switchPricesTab('all')">All Perpetual Markets</button>
-                <button id="tabWatchlistCoins" class="secondary" style="height: 32px; padding: 0 12px; font-size: 11px;" onclick="switchPricesTab('watchlist')">⭐ Watchlist (${priceWatchlist.length})</button>
-                <button id="clearWatchlistBtn" class="btn-ghost" style="height: 32px; padding: 0 8px; font-size: 10px; color: var(--coinglass-red);" onclick="clearAllWatchlist()" title="Clear Watchlist">Clear All</button>
+            <div class="prices-header-controls" style="display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; width: 100%; box-sizing: border-box;">
+              <div class="prices-tabs-group" style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap; flex: 1; min-width: 0;">
+                <button id="tabAllCoins" class="secondary active" style="height: 32px; padding: 0 8px; font-size: 10px;" onclick="switchPricesTab('all')">All Markets</button>
+                <button id="tabWatchlistCoins" class="secondary" style="height: 32px; padding: 0 8px; font-size: 10px;" onclick="switchPricesTab('watchlist')">⭐ Watchlist (<span id="watchlistCountBadge">${priceWatchlist.length}</span>)</button>
+                <button id="tabHasFillsCoins" class="secondary" style="height: 32px; padding: 0 8px; font-size: 10px;" onclick="switchPricesTab('hasFills')">🎯 Has Fills</button>
+                <button id="clearWatchlistBtn" class="btn-ghost" style="height: 32px; padding: 0 8px; font-size: 10px; color: var(--coinglass-red); border-color: rgba(246, 70, 93, 0.3);" onclick="clearAllWatchlist()" title="Clear Watchlist">Clear All</button>
               </div>
-              <div style="position: relative; display: flex; align-items: center; max-width: 260px; width: 100%;">
-                <input id="pricesSearchInput" type="text" placeholder="Search asset (e.g. BTC, WTI, OIL, GOLD)..." style="width: 100%; height: 34px; font-size: 11px; padding-right: 28px;" oninput="handlePricesSearchInput(this.value)">
-                <button id="clearSearchBtn" class="btn-ghost hidden" style="position: absolute; right: 4px; height: 26px; width: 26px; padding: 0; font-size: 12px; color: var(--text-muted); display: flex; align-items: center; justify-content: center;" onclick="clearPricesSearch()" title="Clear search">✕</button>
+              <div class="prices-search-group" style="position: relative; display: flex; align-items: center; max-width: 200px; width: 100%; box-sizing: border-box; flex-shrink: 0;">
+                <input id="pricesSearchInput" type="text" placeholder="Search asset..." style="width: 100%; height: 32px; font-size: 11px; padding-right: 32px; box-sizing: border-box;" oninput="handlePricesSearchInput(this.value)">
+                <button id="clearSearchBtn" class="btn-ghost hidden" style="position: absolute; right: 4px; height: 24px; width: 24px; padding: 0; font-size: 11px; color: var(--text-muted); display: flex; align-items: center; justify-content: center;" onclick="clearPricesSearch()" title="Clear search">✕</button>
               </div>
             </div>
 
-            <div class="table-wrap" style="overflow-y: auto; overflow-x: hidden; max-height: 52vh; border: 1px solid var(--panel-border); border-radius: 6px; width: 100%;">
-              <table class="coinglass-table prices-table" style="font-size: 11.5px; width: 100%; table-layout: fixed;">
+            <!-- Undo Banner Container -->
+            <div id="undoClearBanner" class="hidden" style="background: rgba(246, 70, 93, 0.12); border: 1px solid rgba(246, 70, 93, 0.35); padding: 8px 12px; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: var(--text-main); box-sizing: border-box;">
+              <span id="undoClearText">Watchlist cleared. Clearing in 5s...</span>
+              <button class="secondary" style="height: 26px; padding: 0 10px; font-size: 10.5px; background: var(--coinglass-red); color: #fff; border: none; font-weight: 700;" onclick="undoClearWatchlist()">Undo</button>
+            </div>
+
+            <div class="table-wrap" style="overflow-y: auto; overflow-x: hidden; max-height: 52vh; border: 1px solid var(--panel-border); border-radius: 6px; width: 100%; box-sizing: border-box;">
+              <table class="coinglass-table prices-table" style="font-size: 11px; width: 100%; table-layout: fixed;">
                 <thead>
                   <tr>
-                    <th style="text-align: left; width: 40px;">⭐</th>
-                    <th style="text-align: left;">PERP PAIR / ASSET</th>
-                    <th class="pc-col pc-col-right">MARK PRICE</th>
-                    <th class="pc-col pc-col-right">24H CHANGE</th>
-                    <th class="pc-col pc-col-right">FUNDING RATE</th>
-                    <th class="pc-col pc-col-right">OPEN INTEREST</th>
-                    <th class="pc-col pc-col-right" style="text-align: right;">ACTION</th>
+                    <th style="text-align: left; width: 35px; padding-left: 6px;">⭐</th>
+                    <th style="text-align: left; width: 28%;">ASSET</th>
+                    <th class="pc-col pc-col-right" style="width: 16%;">PRICE</th>
+                    <th class="pc-col pc-col-right" style="width: 14%;">24H</th>
+                    <th class="pc-col pc-col-right" style="width: 14%;">FUNDING</th>
+                    <th class="pc-col pc-col-right" style="width: 15%;">OI</th>
+                    <th class="pc-col pc-col-right" style="text-align: right; width: 18%; padding-right: 8px;">ACTION</th>
                   </tr>
                 </thead>
                 <tbody id="pricesTableBody">
@@ -122,6 +132,7 @@
     activeTab = tab;
     document.getElementById("tabAllCoins")?.classList.toggle("active", tab === "all");
     document.getElementById("tabWatchlistCoins")?.classList.toggle("active", tab === "watchlist");
+    document.getElementById("tabHasFillsCoins")?.classList.toggle("active", tab === "hasFills");
     renderPricesTable();
   };
 
@@ -146,12 +157,64 @@
     }
   };
 
+  let cachedWatchlistBeforeClear = [];
+
   window.clearAllWatchlist = function() {
+    if (priceWatchlist.length === 0) return;
+    cachedWatchlistBeforeClear = [...priceWatchlist];
+    
     priceWatchlist = [];
     savePriceWatchlist();
-    document.getElementById("tabWatchlistCoins").textContent = `⭐ Watchlist (0)`;
+    updateWatchlistCountUI();
+    renderPricesTable();
+
+    const banner = document.getElementById("undoClearBanner");
+    const textSpan = document.getElementById("undoClearText");
+    if (banner && textSpan) {
+      banner.classList.remove("hidden");
+      let secondsLeft = 5;
+      textSpan.textContent = `Watchlist cleared. Undoing available for ${secondsLeft}s...`;
+
+      if (undoCountdownInterval) clearInterval(undoCountdownInterval);
+      if (clearWatchlistTimeout) clearTimeout(clearWatchlistTimeout);
+
+      undoCountdownInterval = setInterval(() => {
+        secondsLeft--;
+        if (secondsLeft > 0) {
+          textSpan.textContent = `Watchlist cleared. Undoing available for ${secondsLeft}s...`;
+        } else {
+          clearInterval(undoCountdownInterval);
+        }
+      }, 1000);
+
+      clearWatchlistTimeout = setTimeout(() => {
+        banner.classList.add("hidden");
+        cachedWatchlistBeforeClear = [];
+      }, 5000);
+    }
+  };
+
+  window.undoClearWatchlist = function() {
+    if (cachedWatchlistBeforeClear.length > 0) {
+      priceWatchlist = [...cachedWatchlistBeforeClear];
+      savePriceWatchlist();
+      cachedWatchlistBeforeClear = [];
+    }
+
+    if (clearWatchlistTimeout) clearTimeout(clearWatchlistTimeout);
+    if (undoCountdownInterval) clearInterval(undoCountdownInterval);
+
+    const banner = document.getElementById("undoClearBanner");
+    if (banner) banner.classList.add("hidden");
+
+    updateWatchlistCountUI();
     renderPricesTable();
   };
+
+  function updateWatchlistCountUI() {
+    const badge = document.getElementById("watchlistCountBadge");
+    if (badge) badge.textContent = priceWatchlist.length;
+  }
 
   window.togglePriceWatchlist = function(coin) {
     const idx = priceWatchlist.indexOf(coin);
@@ -168,7 +231,7 @@
       btn.textContent = isStarred ? "★" : "☆";
       btn.style.color = isStarred ? "#f59e0b" : "var(--text-muted)";
     }
-    document.getElementById("tabWatchlistCoins").textContent = `⭐ Watchlist (${priceWatchlist.length})`;
+    updateWatchlistCountUI();
     if (activeTab === "watchlist") renderPricesTable();
   };
 
@@ -219,7 +282,7 @@
           parsedAssets.push({
             coin,
             pair: `${coin}-PERP`,
-            fullName: ASSET_NAME_MAP[coin] || coin,
+            fullName: ASSET_NAME_MAP[coin] || `${coin} Perpetual`,
             markPx,
             change24h: prevDayPx > 0 ? ((markPx - prevDayPx) / prevDayPx) * 100 : 0,
             funding: Number(ctx.funding || 0),
@@ -242,7 +305,7 @@
             parsedAssets.push({
               coin,
               pair: `xyz:${coin}-PERP`,
-              fullName: ASSET_NAME_MAP[coin] || coin,
+              fullName: ASSET_NAME_MAP[coin] || `${coin} Perpetual`,
               markPx,
               change24h: prevDayPx > 0 ? ((markPx - prevDayPx) / prevDayPx) * 100 : 0,
               funding: Number(ctx.funding || 0),
@@ -309,13 +372,32 @@
 
     const coinSelect = document.getElementById("coinFilterSelect");
     const activeFilteredCoin = coinSelect ? coinSelect.value : "all";
+    const cleanActiveFiltered = activeFilteredCoin.toUpperCase().replace("XYZ:", "").replace("-PERP", "").trim();
 
-    const coinsWithFills = new Set((typeof fills !== "undefined" && Array.isArray(fills)) ? fills.map(f => f.coin) : []);
+    const normalizedFillsCoins = new Set();
+    if (typeof fills !== "undefined" && Array.isArray(fills)) {
+      fills.forEach(f => {
+        if (f.coin) {
+          const raw = String(f.coin).toUpperCase().trim();
+          const clean = raw.replace("-PERP", "").replace("XYZ:", "").trim();
+          normalizedFillsCoins.add(raw);
+          normalizedFillsCoins.add(clean);
+        }
+      });
+    }
 
     let filtered = allAssetsData;
 
     if (activeTab === "watchlist") {
       filtered = filtered.filter(item => priceWatchlist.includes(item.coin));
+    } else if (activeTab === "hasFills") {
+      filtered = filtered.filter(item => {
+        const itemCoinRaw = String(item.coin || "").toUpperCase().trim();
+        const itemCoinClean = itemCoinRaw.replace("-PERP", "").replace("XYZ:", "").trim();
+        return normalizedFillsCoins.has(itemCoinRaw) || 
+               normalizedFillsCoins.has(itemCoinClean) ||
+               Array.from(normalizedFillsCoins).some(c => c.includes(itemCoinClean) || itemCoinClean.includes(c));
+      });
     }
 
     if (currentSearchQuery) {
@@ -342,21 +424,33 @@
 
       const formattedPrice = item.markPx >= 1 ? item.markPx.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : item.markPx.toFixed(6);
 
-      const hasFills = coinsWithFills.has(item.coin);
-      const isCurrentlyFiltered = activeFilteredCoin === item.coin;
+      const itemCoinRaw = String(item.coin || "").toUpperCase().trim();
+      const itemCoinClean = itemCoinRaw.replace("-PERP", "").replace("XYZ:", "").trim();
+      
+      const hasFills = normalizedFillsCoins.has(itemCoinRaw) || 
+                       normalizedFillsCoins.has(itemCoinClean) ||
+                       Array.from(normalizedFillsCoins).some(c => c.includes(itemCoinClean) || itemCoinClean.includes(c));
+
+      const isCurrentlyFiltered = activeFilteredCoin.toUpperCase() !== "ALL" && (
+        activeFilteredCoin.toUpperCase() === itemCoinRaw || 
+        activeFilteredCoin.toUpperCase() === itemCoinClean ||
+        cleanActiveFiltered === itemCoinClean ||
+        cleanActiveFiltered.includes(itemCoinClean) ||
+        itemCoinClean.includes(cleanActiveFiltered)
+      );
 
       let actionLabel = "Filter Fills";
       let actionClass = "secondary";
-      let actionStyle = "height: 26px; padding: 0 8px; font-size: 10px;";
+      let actionStyle = "height: 24px; padding: 0 6px; font-size: 9.5px; white-space: nowrap;";
 
       if (isCurrentlyFiltered) {
         actionLabel = "Unfilter";
         actionClass = "btn-ghost";
-        actionStyle = "height: 26px; padding: 0 8px; font-size: 10px; color: var(--coinglass-red); border-color: var(--coinglass-red);";
+        actionStyle = "height: 24px; padding: 0 6px; font-size: 9.5px; color: var(--coinglass-red); border-color: var(--coinglass-red); white-space: nowrap;";
       } else if (!hasFills) {
         actionLabel = "No Fills";
         actionClass = "secondary";
-        actionStyle = "height: 26px; padding: 0 8px; font-size: 10px; opacity: 0.4; cursor: not-allowed; background: transparent; border-color: var(--panel-border); color: var(--text-muted);";
+        actionStyle = "height: 24px; padding: 0 6px; font-size: 9.5px; opacity: 0.4; cursor: not-allowed; background: transparent; border-color: var(--panel-border); color: var(--text-muted); white-space: nowrap;";
       }
 
       const clickHandler = hasFills || isCurrentlyFiltered ? `toggleCoinFilter('${item.coin}')` : `alert('This asset (${item.coin}) does not have any trade fills recorded in your statement.')`;
@@ -365,12 +459,15 @@
 
       return `
         <tr class="asset-card-row ${isThisExpanded}" onclick="togglePricesMobileCard(this, '${item.coin}')" style="cursor: pointer;">
-          <td style="text-align: left; width: 40px;" onclick="event.stopPropagation()">
-            <button id="watchlist-btn-${item.coin}" class="btn-ghost" style="padding: 0 4px; font-size: 16px; color: ${starColor};" onclick="togglePriceWatchlist('${item.coin}')" title="Toggle Watchlist">${starIcon}</button>
+          <td style="text-align: left; width: 35px; padding-left: 6px;" onclick="event.stopPropagation()">
+            <button id="watchlist-btn-${item.coin}" class="btn-ghost" style="padding: 0 4px; font-size: 15px; color: ${starColor};" onclick="togglePriceWatchlist('${item.coin}')" title="Toggle Watchlist">${starIcon}</button>
           </td>
           <td style="text-align: left; font-weight: 800; color: var(--text-main);" class="coin-name-cell">
             <div class="mobile-card-header">
-              <span class="coin-name">${item.coin}</span>
+              <div style="display: flex; flex-direction: column;">
+                <span class="coin-name" style="font-size: 13px;">${item.coin}</span>
+                <span style="font-size: 10px; font-weight: normal; color: var(--text-muted);">${item.fullName}</span>
+              </div>
               <div class="mobile-header-right">
                 <span class="prices-mobile-price-preview" style="font-weight:700; color: var(--text-main);">$${formattedPrice}</span>
                 <button class="mobile-card-toggle-btn" type="button" aria-label="Toggle details">▼</button>
@@ -397,12 +494,16 @@
             </div>
           </td>
           
-          <!-- PC Columns -->
+          <!-- PC Columns with explicit widths and compact alignment -->
+          <td class="pc-col pc-col-right" style="text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <div style="font-weight: 800; color: var(--text-main);">${item.coin}</div>
+            <div style="font-size: 9.5px; font-weight: normal; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis;">${item.fullName}</div>
+          </td>
           <td class="pc-col pc-col-right">$${formattedPrice}</td>
           <td class="pc-col pc-col-right ${changeClass}">${changeStr}</td>
           <td class="pc-col pc-col-right ${fundingClass}">${fundingPct}</td>
           <td class="pc-col pc-col-right">${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</td>
-          <td class="pc-col pc-col-right" style="text-align: right;" onclick="event.stopPropagation()">
+          <td class="pc-col pc-col-right" style="text-align: right; padding-right: 8px;" onclick="event.stopPropagation()">
             <button class="${actionClass}" style="${actionStyle}" onclick="${clickHandler}">${actionLabel}</button>
           </td>
         </tr>
@@ -413,13 +514,45 @@
   window.toggleCoinFilter = function(coin) {
     const coinSelect = document.getElementById("coinFilterSelect");
     if (coinSelect) {
-      if (coinSelect.value === coin) {
+      let targetOptionValue = coin;
+      let options = Array.from(coinSelect.options);
+      
+      const cleanTarget = coin.toUpperCase().replace("XYZ:", "").replace("-PERP", "").trim();
+
+      let matchedOpt = options.find(opt => {
+        const optVal = opt.value.toUpperCase();
+        const cleanOpt = optVal.replace("XYZ:", "").replace("-PERP", "").trim();
+        return cleanOpt === cleanTarget || 
+               cleanOpt.includes(cleanTarget) || 
+               cleanTarget.includes(cleanOpt) ||
+               (cleanTarget === "SILVER" && cleanOpt.includes("SILVER")) ||
+               (cleanTarget === "SP500" && (cleanOpt.includes("SP500") || cleanOpt.includes("SPX")));
+      });
+
+      if (matchedOpt) {
+        targetOptionValue = matchedOpt.value;
+      }
+
+      const currentVal = coinSelect.value.toUpperCase();
+      const cleanCurrent = currentVal.replace("XYZ:", "").replace("-PERP", "").trim();
+
+      if (currentVal === "ALL") {
+        coinSelect.value = targetOptionValue;
+      } else if (cleanCurrent === cleanTarget || cleanCurrent.includes(cleanTarget) || cleanTarget.includes(cleanCurrent)) {
         coinSelect.value = "all";
       } else {
-        coinSelect.value = coin;
+        coinSelect.value = targetOptionValue;
       }
+      
       coinSelect.dispatchEvent(new Event("change"));
     }
+
+    const viewSelect = document.getElementById("viewSelect");
+    if (viewSelect) {
+      viewSelect.value = "trades";
+      viewSelect.dispatchEvent(new Event("change"));
+    }
+
     document.getElementById("pricesModal")?.classList.add("hidden");
   };
 

@@ -3,7 +3,7 @@
 /* ================================================================= */
 
 #pricesModal .modal-content {
-  width: 820px;
+  width: 860px;
   max-width: 95vw;
   max-height: 85vh;
   display: flex;
@@ -44,10 +44,75 @@
 }
 
 /* ================================================================= */
-/* MOBILE CARD ACCORDION OVERRIDES FOR PRICES MODAL                  */
+/* MOBILE RESPONSIVE OVERRIDES (max-width: 768px)                    */
 /* ================================================================= */
 
 @media (max-width: 768px) {
+  /* Container for filter buttons and search stack vertically on mobile */
+  #pricesModal .prices-header-controls {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  /* Filter buttons row -> 2x2 uniform grid for all 4 buttons */
+  #pricesModal .prices-tabs-group {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+
+  /* Make ALL four buttons identical in height, padding, and font styling */
+  #pricesModal .prices-tabs-group button.secondary, 
+  #pricesModal .prices-tabs-group button.btn-ghost {
+    height: 36px !important;
+    padding: 0 8px !important;
+    font-size: 10.5px !important;
+    font-weight: 600 !important;
+    justify-content: center !important;
+    text-align: center !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    border-radius: 6px !important;
+  }
+
+  /* Clear All button styling on mobile */
+  #pricesModal #clearWatchlistBtn {
+    grid-column: auto !important;
+    background: rgba(246, 70, 93, 0.08) !important;
+    border: 1px solid rgba(246, 70, 93, 0.25) !important;
+  }
+
+  /* Search input container full width on mobile */
+  #pricesModal .prices-search-group {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  #pricesModal #pricesSearchInput {
+    height: 38px !important;
+    font-size: 12px !important;
+  }
+
+  /* Professional mobile search clear button (✕) styling */
+  #pricesModal #clearSearchBtn {
+    right: 6px !important;
+    height: 24px !important;
+    width: 24px !important;
+    background: var(--panel-border, #233047) !important;
+    color: var(--text-main, #fff) !important;
+    border-radius: 50% !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    border: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  /* Prices Table Mobile Card Overviews */
   .prices-table thead {
     display: none !important;
   }
@@ -77,7 +142,6 @@
     border: none !important;
   }
 
-  /* Position the star button nicely at top-left */
   .prices-table .asset-card-row td:first-child {
     position: absolute;
     top: 8px;
@@ -87,10 +151,9 @@
   }
 
   .prices-table .asset-card-row td:nth-child(2) {
-    padding-left: 32px !important; /* space for star */
+    padding-left: 32px !important;
   }
 
-  /* Hide PC columns on mobile */
   .prices-table td.pc-col {
     display: none !important;
   }
@@ -134,7 +197,6 @@
     color: var(--coinglass-blue, #2962ff);
   }
 
-  /* Smooth Grid Transition Animation */
   .prices-table .asset-detail-wrapper {
     display: grid;
     grid-template-rows: 0fr;
@@ -191,7 +253,6 @@
   .prices-table .prices-mobile-price-preview {
     display: none !important;
   }
-  /* Hide the mobile card toggle arrow on PC view */
   .prices-table .mobile-card-toggle-btn {
     display: none !important;
   }
