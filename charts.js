@@ -424,7 +424,7 @@ function processAndRenderAnalytics(fills, funding) {
     if (!timeVal) return;
     const d = new Date(Number(timeVal));
     const dateKey = d.toISOString().split("T")[0];
-    const usdPayment = num(item.delta?.usdc);
+    const usdPayment = num(item.delta?.usdc || item.usdc);
     const coin = item.coin || item.delta?.coin;
 
     if (!dailyMap[dateKey]) {
@@ -433,13 +433,17 @@ function processAndRenderAnalytics(fills, funding) {
 
     dailyMap[dateKey].netPnl += usdPayment;
 
+    // Accumulate funding paid into fee drag / daily fees if negative
+    if (usdPayment < 0) {
+      const paid = Math.abs(usdPayment);
+      dailyMap[dateKey].fees += paid;
+    }
+
     const targetCoin = (coin && assetMap[coin]) ? coin : Object.keys(assetMap)[0];
     if (targetCoin && assetMap[targetCoin]) {
       assetMap[targetCoin].netPnl += usdPayment;
       if (usdPayment < 0) {
         assetMap[targetCoin].funding += Math.abs(usdPayment);
-      } else {
-        assetMap[targetCoin].funding -= usdPayment;
       }
     }
   });
@@ -681,7 +685,7 @@ function renderAssetTable(assetMap) {
       <!-- PC Columns -->
       <td class="pc-col pc-col-left coin-name">${esc(coin)}</td>
       <td class="pc-col pc-col-right ${row.closedPnl >= 0 ? "text-positive" : "text-negative"}">${money(row.closedPnl, 2)}</td>
-      <td class="pc-col pc-col-right" title="Trading Fees: $${row.fees.toFixed(2)} + Net Funding: $${row.funding.toFixed(2)}">${plainMoney(assetTotalDrag, 2)}</td>
+      <td class="pc-col pc-col-right" title="Trading Fees: $${row.fees.toFixed(2)} + Net Funding Paid: $${row.funding.toFixed(2)}">${plainMoney(assetTotalDrag, 2)}</td>
       <td class="pc-col pc-col-right ${row.netPnl >= 0 ? "text-positive" : "text-negative"}">${money(row.netPnl, 2)}</td>
       <td class="pc-col pc-col-right">${plainMoney(row.volume, 2)}</td>
       <td class="pc-col pc-col-right">${row.fills.toLocaleString()}</td>
@@ -807,6 +811,6 @@ function renderAssetTable(assetMap) {
   });
 
   if ($("tableMeta")) {
-    $("tableMeta").textContent = `Displaying performance across ${sortedCoins.length} traded asset market(s). Fees & Funding column fully accounts for trading commissions and net funding.`;
+    $("tableMeta").textContent = `Displaying performance across ${sortedCoins.length} traded asset market(s). Fees & Funding column fully accounts for trading commissions and net funding paid.`;
   }
 }
