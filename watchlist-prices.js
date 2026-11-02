@@ -413,106 +413,143 @@
       return;
     }
 
-    tbody.innerHTML = filtered.map(item => {
-      const isStarred = priceWatchlist.includes(item.coin);
-      const starIcon = isStarred ? "★" : "☆";
-      const starColor = isStarred ? "#f59e0b" : "var(--text-muted)";
-      const changeClass = item.change24h > 0 ? "text-positive" : item.change24h < 0 ? "text-negative" : "";
-      const changeStr = (item.change24h > 0 ? "+" : "") + item.change24h.toFixed(2) + "%";
-      const fundingPct = (item.funding * 100).toFixed(4) + "%";
-      const fundingClass = item.funding > 0 ? "text-positive" : item.funding < 0 ? "text-negative" : "";
+    // Group filtered assets into categories
+    const grouped = {
+      "Metals & Commodities": [],
+      "Indices & Equities": [],
+      "Cryptocurrencies": []
+    };
 
-      const formattedPrice = item.markPx >= 1 ? item.markPx.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : item.markPx.toFixed(6);
-
-      const itemCoinRaw = String(item.coin || "").toUpperCase().trim();
-      const itemCoinClean = itemCoinRaw.replace("-PERP", "").replace("XYZ:", "").trim();
-      
-      const hasFills = normalizedFillsCoins.has(itemCoinRaw) || 
-                       normalizedFillsCoins.has(itemCoinClean) ||
-                       Array.from(normalizedFillsCoins).some(c => c.includes(itemCoinClean) || itemCoinClean.includes(c));
-
-      const isCurrentlyFiltered = activeFilteredCoin.toUpperCase() !== "ALL" && (
-        activeFilteredCoin.toUpperCase() === itemCoinRaw || 
-        activeFilteredCoin.toUpperCase() === itemCoinClean ||
-        cleanActiveFiltered === itemCoinClean ||
-        cleanActiveFiltered.includes(itemCoinClean) ||
-        itemCoinClean.includes(cleanActiveFiltered)
-      );
-
-      let actionLabel = "Filter Fills";
-      let actionClass = "secondary";
-      let actionStyle = "height: 26px; padding: 0 8px; font-size: 10px; white-space: nowrap;";
-
-      if (isCurrentlyFiltered) {
-        actionLabel = "Unfilter";
-        actionClass = "btn-ghost";
-        actionStyle = "height: 26px; padding: 0 8px; font-size: 10px; color: var(--coinglass-red); border-color: var(--coinglass-red); white-space: nowrap;";
-      } else if (!hasFills) {
-        actionLabel = "No Fills";
-        actionClass = "secondary";
-        actionStyle = "height: 26px; padding: 0 8px; font-size: 10px; opacity: 0.4; cursor: not-allowed; background: transparent; border-color: var(--panel-border); color: var(--text-muted); white-space: nowrap;";
+    filtered.forEach(item => {
+      const upperCoin = item.coin.toUpperCase();
+      if (["GOLD", "SILVER", "CL", "BRENTOIL", "NATGAS"].includes(upperCoin)) {
+        grouped["Metals & Commodities"].push(item);
+      } else if (["SP500", "GOOGL", "NVDA", "AAPL"].includes(upperCoin)) {
+        grouped["Indices & Equities"].push(item);
+      } else {
+        grouped["Cryptocurrencies"].push(item);
       }
+    });
 
-      const clickHandler = hasFills || isCurrentlyFiltered ? `toggleCoinFilter('${item.coin}')` : `alert('This asset (${item.coin}) does not have any trade fills recorded in your statement.')`;
+    let finalHtml = "";
 
-      const isThisExpanded = (expandedMobileCoin === item.coin) ? "expanded" : "";
+    // Render each category only if it contains visible assets
+    Object.keys(grouped).forEach(categoryName => {
+      const assetsInCat = grouped[categoryName];
+      if (!assetsInCat || assetsInCat.length === 0) return; // Hidden if category has no active assets
 
-      return `
-        <tr class="asset-card-row ${isThisExpanded}" onclick="togglePricesMobileCard(this, '${item.coin}')">
-          <!-- PC Columns -->
-          <td class="pc-col" style="text-align: left; width: 35px; padding-left: 8px;" onclick="event.stopPropagation()">
-            <button id="watchlist-btn-${item.coin}" class="btn-ghost" style="padding: 0 4px; font-size: 15px; color: ${starColor};" onclick="togglePriceWatchlist('${item.coin}')" title="Toggle Watchlist">${starIcon}</button>
-          </td>
-          <td class="pc-col" style="text-align: left;">
-            <div style="font-weight: 800; color: var(--text-main);">${item.coin}</div>
-            <div style="font-size: 9.5px; font-weight: normal; color: var(--text-muted);">${item.fullName}</div>
-          </td>
-          <td class="pc-col" style="text-align: right; font-weight: 700;">$${formattedPrice}</td>
-          <td class="pc-col" style="text-align: right;" class="${changeClass}">${changeStr}</td>
-          <td class="pc-col" style="text-align: right;" class="${fundingClass}">${fundingPct}</td>
-          <td class="pc-col" style="text-align: right;">${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</td>
-          <td class="pc-col" style="text-align: right; padding-right: 12px;" onclick="event.stopPropagation()">
-            <button class="${actionClass}" style="${actionStyle}" onclick="${clickHandler}">${actionLabel}</button>
-          </td>
-
-          <!-- Mobile Card Wrapper Cell (Original Mobile Layout) -->
-          <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
-            <div style="position: absolute; top: 8px; left: 8px; z-index: 2;" onclick="event.stopPropagation()">
-              <button class="btn-ghost" style="padding: 0 4px; font-size: 15px; color: ${starColor};" onclick="togglePriceWatchlist('${item.coin}')">${starIcon}</button>
-            </div>
-            <div class="mobile-card-header" style="padding-left: 28px;">
-              <div style="display: flex; flex-direction: column;">
-                <span class="coin-name" style="font-size: 13px;">${item.coin}</span>
-                <span style="font-size: 10px; font-weight: normal; color: var(--text-muted);">${item.fullName}</span>
-              </div>
-              <div class="mobile-header-right">
-                <span class="prices-mobile-price-preview" style="font-weight:700; color: var(--text-main);">$${formattedPrice}</span>
-                <button class="mobile-card-toggle-btn" type="button" aria-label="Toggle details">▼</button>
-              </div>
-            </div>
-            <div class="asset-detail-wrapper">
-              <div class="asset-detail-inner">
-                <div class="collapsible-detail-row">
-                  <span class="mobile-label-text">24H CHANGE</span>
-                  <span class="${changeClass}">${changeStr}</span>
-                </div>
-                <div class="collapsible-detail-row">
-                  <span class="mobile-label-text">FUNDING RATE</span>
-                  <span class="${fundingClass}">${fundingPct}</span>
-                </div>
-                <div class="collapsible-detail-row">
-                  <span class="mobile-label-text">OPEN INTEREST</span>
-                  <span>${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</span>
-                </div>
-                <div class="collapsible-detail-row" style="border-bottom: none; justify-content: flex-end; padding-top: 8px;" onclick="event.stopPropagation()">
-                  <button class="${actionClass}" style="${actionStyle}" onclick="${clickHandler}">${actionLabel}</button>
-                </div>
-              </div>
-            </div>
+      // Category Subheader Row
+      finalHtml += `
+        <tr class="category-header-row" style="background: var(--input-bg); border-top: 2px solid var(--panel-border); border-bottom: 1px solid var(--panel-border);">
+          <td colspan="7" style="padding: 8px 12px; font-size: 11px; font-weight: 800; color: var(--coinglass-blue); letter-spacing: 0.8px; text-transform: uppercase;">
+            📁 ${categoryName} (${assetsInCat.length})
           </td>
         </tr>
       `;
-    }).join("");
+
+      // Render asset rows for this category
+      assetsInCat.forEach(item => {
+        const isStarred = priceWatchlist.includes(item.coin);
+        const starIcon = isStarred ? "★" : "☆";
+        const starColor = isStarred ? "#f59e0b" : "var(--text-muted)";
+        const changeClass = item.change24h > 0 ? "text-positive" : item.change24h < 0 ? "text-negative" : "";
+        const changeStr = (item.change24h > 0 ? "+" : "") + item.change24h.toFixed(2) + "%";
+        const fundingPct = (item.funding * 100).toFixed(4) + "%";
+        const fundingClass = item.funding > 0 ? "text-positive" : item.funding < 0 ? "text-negative" : "";
+
+        const formattedPrice = item.markPx >= 1 ? item.markPx.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : item.markPx.toFixed(6);
+
+        const itemCoinRaw = String(item.coin || "").toUpperCase().trim();
+        const itemCoinClean = itemCoinRaw.replace("-PERP", "").replace("XYZ:", "").trim();
+        
+        const hasFills = normalizedFillsCoins.has(itemCoinRaw) || 
+                         normalizedFillsCoins.has(itemCoinClean) ||
+                         Array.from(normalizedFillsCoins).some(c => c.includes(itemCoinClean) || itemCoinClean.includes(c));
+
+        const isCurrentlyFiltered = activeFilteredCoin.toUpperCase() !== "ALL" && (
+          activeFilteredCoin.toUpperCase() === itemCoinRaw || 
+          activeFilteredCoin.toUpperCase() === itemCoinClean ||
+          cleanActiveFiltered === itemCoinClean ||
+          cleanActiveFiltered.includes(itemCoinClean) ||
+          itemCoinClean.includes(cleanActiveFiltered)
+        );
+
+        let actionLabel = "Filter Fills";
+        let actionClass = "secondary";
+        let actionStyle = "height: 26px; padding: 0 8px; font-size: 10px; white-space: nowrap;";
+
+        if (isCurrentlyFiltered) {
+          actionLabel = "Unfilter";
+          actionClass = "btn-ghost";
+          actionStyle = "height: 26px; padding: 0 8px; font-size: 10px; color: var(--coinglass-red); border-color: var(--coinglass-red); white-space: nowrap;";
+        } else if (!hasFills) {
+          actionLabel = "No Fills";
+          actionClass = "secondary";
+          actionStyle = "height: 26px; padding: 0 8px; font-size: 10px; opacity: 0.4; cursor: not-allowed; background: transparent; border-color: var(--panel-border); color: var(--text-muted); white-space: nowrap;";
+        }
+
+        const clickHandler = hasFills || isCurrentlyFiltered ? `toggleCoinFilter('${item.coin}')` : `alert('This asset (${item.coin}) does not have any trade fills recorded in your statement.')`;
+        const isThisExpanded = (expandedMobileCoin === item.coin) ? "expanded" : "";
+
+        finalHtml += `
+          <tr class="asset-card-row ${isThisExpanded}" onclick="togglePricesMobileCard(this, '${item.coin}')">
+            <!-- PC Columns -->
+            <td class="pc-col" style="text-align: left; width: 35px; padding-left: 8px;" onclick="event.stopPropagation()">
+              <button id="watchlist-btn-${item.coin}" class="btn-ghost" style="padding: 0 4px; font-size: 15px; color: ${starColor};" onclick="togglePriceWatchlist('${item.coin}')" title="Toggle Watchlist">${starIcon}</button>
+            </td>
+            <td class="pc-col" style="text-align: left;">
+              <div style="font-weight: 800; color: var(--text-main);">${item.coin}</div>
+              <div style="font-size: 9.5px; font-weight: normal; color: var(--text-muted);">${item.fullName}</div>
+            </td>
+            <td class="pc-col" style="text-align: right; font-weight: 700;">$${formattedPrice}</td>
+            <td class="pc-col" style="text-align: right;" class="${changeClass}">${changeStr}</td>
+            <td class="pc-col" style="text-align: right;" class="${fundingClass}">${fundingPct}</td>
+            <td class="pc-col" style="text-align: right;">${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</td>
+            <td class="pc-col" style="text-align: right; padding-right: 12px;" onclick="event.stopPropagation()">
+              <button class="${actionClass}" style="${actionStyle}" onclick="${clickHandler}">${actionLabel}</button>
+            </td>
+
+            <!-- Mobile Card Wrapper Cell -->
+            <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
+              <div style="position: absolute; top: 8px; left: 8px; z-index: 2;" onclick="event.stopPropagation()">
+                <button class="btn-ghost" style="padding: 0 4px; font-size: 15px; color: ${starColor};" onclick="togglePriceWatchlist('${item.coin}')">${starIcon}</button>
+              </div>
+              <div class="mobile-card-header" style="padding-left: 28px;">
+                <div style="display: flex; flex-direction: column;">
+                  <span class="coin-name" style="font-size: 13px;">${item.coin}</span>
+                  <span style="font-size: 10px; font-weight: normal; color: var(--text-muted);">${item.fullName}</span>
+                </div>
+                <div class="mobile-header-right">
+                  <span class="prices-mobile-price-preview" style="font-weight:700; color: var(--text-main);">$${formattedPrice}</span>
+                  <button class="mobile-card-toggle-btn" type="button" aria-label="Toggle details">▼</button>
+                </div>
+              </div>
+              <div class="asset-detail-wrapper">
+                <div class="asset-detail-inner">
+                  <div class="collapsible-detail-row">
+                    <span class="mobile-label-text">24H CHANGE</span>
+                    <span class="${changeClass}">${changeStr}</span>
+                  </div>
+                  <div class="collapsible-detail-row">
+                    <span class="mobile-label-text">FUNDING RATE</span>
+                    <span class="${fundingClass}">${fundingPct}</span>
+                  </div>
+                  <div class="collapsible-detail-row">
+                    <span class="mobile-label-text">OPEN INTEREST</span>
+                    <span>${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</span>
+                  </div>
+                  <div class="collapsible-detail-row" style="border-bottom: none; justify-content: flex-end; padding-top: 8px;" onclick="event.stopPropagation()">
+                    <button class="${actionClass}" style="${actionStyle}" onclick="${clickHandler}">${actionLabel}</button>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+    });
+
+    tbody.innerHTML = finalHtml;
   }
 
   window.toggleCoinFilter = function(coin) {
@@ -540,8 +577,6 @@
       const currentVal = coinSelect.value.toUpperCase();
       const cleanCurrent = currentVal.replace("XYZ:", "").replace("-PERP", "").trim();
 
-      // If the user clicks "Unfilter" on the currently selected asset, reset to "all".
-      // Otherwise, instantly switch the filter to the new target asset.
       if (cleanCurrent === cleanTarget || cleanCurrent.includes(cleanTarget) || cleanTarget.includes(cleanCurrent)) {
         coinSelect.value = "all";
       } else {
