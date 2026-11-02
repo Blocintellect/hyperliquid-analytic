@@ -1544,6 +1544,20 @@ $("downloadShareCardBtn")?.addEventListener("click", () => {
   link.click();
 });
 
+function showGlobalLoader(title = "Loading Trade Statement...", subtext = "Scanning historical fills and blockchain ledger updates.") {
+  const loader = $("globalLoader");
+  const titleEl = $("loaderTitle");
+  const subEl = $("loaderSubtext");
+  if (titleEl) titleEl.textContent = title;
+  if (subEl) subEl.textContent = subtext;
+  if (loader) loader.classList.remove("hidden");
+}
+
+function hideGlobalLoader() {
+  const loader = $("globalLoader");
+  if (loader) loader.classList.add("hidden");
+}
+
 function renderDailyPnl() {
   const targetFills = getFilteredFills();
   if (!targetFills.length && !fundingHistory.length) {
@@ -2337,7 +2351,10 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   if (actualWalletValue && isAddress(actualWalletValue)) {
     try {
+      showGlobalLoader("Detecting Wallet Inception...", "Finding the date of your very first trade on Hyperliquid.");
       await setInceptionPreset();
+      
+      showGlobalLoader("Syncing Historical Trade Data...", "Fetching lifetime fills, funding, ledger updates, and open orders...");
       const cleanUser = actualWalletValue.toLowerCase();
       const s = msStart(startEl.value), e = msEnd(endEl.value);
 
@@ -2378,6 +2395,8 @@ window.addEventListener("DOMContentLoaded", async () => {
       localStorage.setItem("hyperliquid_controls_hidden", "true");
     } catch (e) {
       console.warn("Auto-fetch all-time data on load error:", e);
+    } finally {
+      hideGlobalLoader();
     }
   }
 });
@@ -2412,7 +2431,7 @@ fetchBtn.addEventListener("click", async () => {
   }
 
   fetchBtn.disabled = true;
-  fetchBtn.innerHTML = `<span style="display:inline-block; width:12px; height:12px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 0.8s linear infinite; margin-right:6px; vertical-align:middle;"></span> Fetching...`;
+  showGlobalLoader("Fetching Account Data...", "Querying Hyperliquid public info nodes for statement records...");
 
   fills = [];
   fundingHistory = [];
@@ -2475,6 +2494,7 @@ fetchBtn.addEventListener("click", async () => {
     console.error(err);
     setStatus("Error fetching data: " + (err?.message || "Check network connection or wallet address."), "error");
   } finally {
+    hideGlobalLoader();
     fetchBtn.disabled = false;
     fetchBtn.innerHTML = "Fetch Data";
   }

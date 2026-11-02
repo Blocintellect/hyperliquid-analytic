@@ -18,6 +18,15 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="dark-theme">
+  <!-- Global Loading Overlay -->
+  <div id="globalLoader" class="global-loader hidden">
+    <div class="loader-spinner-box">
+      <div class="spinner-ring"></div>
+      <h3 id="loaderTitle">Loading Trade Statement...</h3>
+      <p id="loaderSubtext">Scanning historical fills and blockchain ledger updates.</p>
+    </div>
+  </div>
+
   <div class="app">
     <!-- Header / Topbar -->
     <header class="topbar">
@@ -111,7 +120,7 @@
         <span class="subtext">Profitable fills</span>
       </div>
       <div class="metric-card interactive-card" id="holdingsCard" title="Click to view account equity and balance details">
-        <span class="label">PREP HOLDINGS ⓘ</span>
+        <span class="label">PERP HOLDINGS ⓘ</span>
         <strong id="mWalletHoldings" class="value">—</strong>
         <span class="subtext">Account balance & collateral</span>
       </div>
