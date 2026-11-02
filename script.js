@@ -119,6 +119,7 @@ let expandedTradeId = null;
 let expandedDailyKey = null;
 let expandedMonthlyKey = null;
 let expandedDepositHash = null;
+let expandedOpenOrderId = null;
 
 const SAVED_WALLET_KEY = "hyperliquid_saved_wallet";
 const SAVED_THEME_KEY = "hyperliquid_theme";
@@ -188,12 +189,11 @@ function loadWatchlist() {
   renderWatchlistUI();
 }
 
-let pendingWalletDeletions = new Map(); // address -> { item, timeoutId, intervalId, originalIndex }
+let pendingWalletDeletions = new Map();
 
 window.removeWalletWithUndo = function(address) {
   const cleanAddr = address.toLowerCase();
   
-  // If this wallet was already pending deletion, clear its old timer first
   if (pendingWalletDeletions.has(cleanAddr)) {
     const existing = pendingWalletDeletions.get(cleanAddr);
     clearTimeout(existing.timeoutId);
@@ -206,7 +206,6 @@ window.removeWalletWithUndo = function(address) {
 
   const watchItem = watchlist[itemIndex];
 
-  // Temporarily remove from active array
   watchlist.splice(itemIndex, 1);
   renderWatchlistUI();
 
@@ -223,14 +222,12 @@ window.removeWalletWithUndo = function(address) {
   const timeoutId = setTimeout(() => {
     clearInterval(intervalId);
     pendingWalletDeletions.delete(cleanAddr);
-    
-    // Permanently commit changes to localStorage after 5 seconds
     localStorage.setItem(SAVED_WATCHLIST_KEY, JSON.stringify(watchlist));
     renderWatchlistUI();
   }, 5000);
 
   pendingWalletDeletions.set(cleanAddr, { watchItem, timeoutId, intervalId, originalIndex: itemIndex });
-  renderWatchlistUI(); // Re-render to show all active undo banners
+  renderWatchlistUI();
 };
 
 window.undoWalletRemoval = function(address) {
@@ -242,7 +239,6 @@ window.undoWalletRemoval = function(address) {
   clearInterval(pending.intervalId);
   pendingWalletDeletions.delete(cleanAddr);
 
-  // Restore wallet back to its original position safely
   watchlist.splice(pending.originalIndex, 0, pending.watchItem);
   renderWatchlistUI();
 };
@@ -256,7 +252,6 @@ function renderWatchlistUI() {
     return;
   }
 
-  // Generate undo banners for ALL items currently pending deletion
   let undoBannersHTML = "";
   pendingWalletDeletions.forEach((pending, cleanAddr) => {
     undoBannersHTML += `
@@ -647,11 +642,12 @@ async function fetchAccountData(user, startMs, endMs) {
 
   const ordersPromise = (async () => {
     try {
-      const ordersData = await postInfo({
-        type: "openOrders",
-        user: cleanUser
-      });
-      if (Array.isArray(ordersData)) return ordersData;
+      const [nativeOrders, xyzOrders] = await Promise.all([
+        postInfo({ type: "openOrders", user: cleanUser }).catch(() => []),
+        postInfo({ type: "openOrders", user: cleanUser, dex: "xyz" }).catch(() => [])
+      ]);
+      const combined = [...(Array.isArray(nativeOrders) ? nativeOrders : []), ...(Array.isArray(xyzOrders) ? xyzOrders : [])];
+      return combined;
     } catch (e) {
       console.warn("Open orders fetch warning:", e);
     }
@@ -1067,6 +1063,7 @@ window.toggleMobileCard = function(target, identifier = "", type = "contracts") 
       if (type === "trades") expandedTradeId = null;
       if (type === "daily") expandedDailyKey = null;
       if (type === "monthly") expandedMonthlyKey = null;
+      if (type === "openOrders") expandedOpenOrderId = null;
 
       if (!wasExpanded) {
         tr.classList.add("expanded");
@@ -1074,6 +1071,7 @@ window.toggleMobileCard = function(target, identifier = "", type = "contracts") 
         if (type === "trades") expandedTradeId = identifier;
         if (type === "daily") expandedDailyKey = identifier;
         if (type === "monthly") expandedMonthlyKey = identifier;
+        if (type === "openOrders") expandedOpenOrderId = identifier;
       }
     }
   }
@@ -1902,6 +1900,14 @@ $("depositFetchBtn")?.addEventListener("click", () => {
   }, 300);
 });
 
+function parseOrderCoin(o) {
+  if (o.coin) return o.coin;
+  if (o.asset) return o.asset;
+  if (o.order?.coin) return o.order.coin;
+  if (o.triggerCondition?.coin) return o.triggerCondition.coin;
+  return "PERP";
+}
+
 function renderOpenOrders() {
   if (!openOrdersList || !openOrdersList.length) {
     openOrdersBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">No open orders (limit, TP/SL) currently resting.</td></tr>';
@@ -1909,25 +1915,75 @@ function renderOpenOrders() {
     return;
   }
 
-  openOrdersBodyEl.innerHTML = openOrdersList.map(o => {
-    const coin = o.coin || "PERP";
-    const oid = o.oid || "—";
-    const side = mapSide(o.side);
-    const limitPx = plainMoney(o.limitPx, 4);
-    const triggerPx = o.triggerPx ? plainMoney(o.triggerPx, 4) : '—';
-    const sz = num(o.sz).toLocaleString();
-    const reduceOnly = o.reduceOnly ? "Yes" : "No";
-    const orderType = o.triggerCondition ? "Trigger (TP/SL)" : "Limit Order";
+  openOrdersBodyEl.innerHTML = openOrdersList.map((o, idx) => {
+    const coin = parseOrderCoin(o);
+    const oid = o.oid || o.orderId || `order-${idx}`;
+    const rawSide = o.side || o.order?.side;
+    const side = mapSide(rawSide);
+    
+    const limitPxVal = num(o.limitPx || o.px || o.order?.limitPx);
+    const limitPx = limitPxVal > 0 ? plainMoney(limitPxVal, 4) : '—';
+    
+    const triggerPxVal = num(o.triggerPx || o.triggerCondition?.triggerPx);
+    const triggerPx = triggerPxVal > 0 ? plainMoney(triggerPxVal, 4) : '—';
+    
+    const szVal = num(o.sz || o.size || o.order?.sz);
+    const sz = szVal.toLocaleString();
+    
+    const reduceOnly = (o.reduceOnly || o.order?.reduceOnly) ? "Yes" : "No";
+    const isTrigger = !!(o.triggerCondition || o.isTrigger || o.triggerPx);
+    const orderType = isTrigger ? "Trigger (TP/SL)" : "Limit Order";
+    const isBuy = rawSide === 'B' || String(side).toLowerCase() === 'buy';
 
-    return `<tr>
-      <td style="text-align: left; font-weight: 800;" class="coin-name">${esc(coin)}</td>
-      <td>${esc(oid)}</td>
-      <td class="${o.side === 'B' ? "text-positive" : "text-negative"}">${esc(orderType)} (${esc(side)})</td>
-      <td>${limitPx}</td>
-      <td>${triggerPx}</td>
-      <td>${sz}</td>
-      <td>${reduceOnly}</td>
-    </tr>`;
+    const isThisExpanded = (expandedOpenOrderId === String(oid)) ? "expanded" : "";
+
+    return `
+      <tr class="asset-card-row ${isThisExpanded}" onclick="toggleMobileCard(this, '${esc(oid)}', 'openOrders')">
+        <!-- PC Columns -->
+        <td class="pc-col pc-col-left coin-name" style="text-align: left; font-weight: 800;">${esc(coin)}</td>
+        <td class="pc-col pc-col-right">${esc(oid)}</td>
+        <td class="pc-col pc-col-right ${isBuy ? "text-positive" : "text-negative"}">${esc(orderType)} (${esc(side)})</td>
+        <td class="pc-col pc-col-right">${limitPx}</td>
+        <td class="pc-col pc-col-right">${triggerPx}</td>
+        <td class="pc-col pc-col-right">${sz}</td>
+        <td class="pc-col pc-col-right">${reduceOnly}</td>
+
+        <!-- Mobile Card Wrapper Cell -->
+        <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
+          <div class="mobile-card-header">
+            <span class="coin-name">${esc(coin)} — <span class="${isBuy ? "text-positive" : "text-negative"}">${esc(side)}</span></span>
+            <div class="mobile-header-right">
+              <span class="${isBuy ? "text-positive" : "text-negative"}" style="font-weight:700; font-size: 11.5px;">${esc(orderType)}</span>
+              <button class="mobile-card-toggle-btn" type="button" aria-label="Toggle details">▼</button>
+            </div>
+          </div>
+          <div class="asset-detail-wrapper">
+            <div class="asset-detail-inner">
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">ORDER ID</span>
+                <span style="font-family: monospace;">${esc(oid)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">LIMIT PRICE</span>
+                <span>${limitPx}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">TRIGGER PRICE</span>
+                <span>${triggerPx}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">SIZE</span>
+                <span>${sz}</span>
+              </div>
+              <div class="collapsible-detail-row" style="border-bottom: none;">
+                <span class="mobile-label-text">REDUCE ONLY</span>
+                <span>${reduceOnly}</span>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    `;
   }).join("");
 
   openOrdersMeta.textContent = `Displaying ${openOrdersList.length} active open order(s).`;
@@ -2636,7 +2692,6 @@ $("clearBtn").addEventListener("click", () => {
   walletEl.value = "";
   if (pollTimer) clearInterval(pollTimer);
   if (wsConnection) wsConnection.close();
-  // Clear all storage
   localStorage.removeItem(SAVED_WALLET_KEY);
   localStorage.removeItem(SAVED_VIEW_KEY);
   localStorage.removeItem(CACHE_FILLS_KEY);

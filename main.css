@@ -42,8 +42,6 @@ body.light-theme {
   --btn-secondary-border: #64748b;
 }
 
-
-
 html, body {
   margin: 0;
   min-height: 100%;
@@ -562,6 +560,31 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 }
 
 /* ================================================================= */
+/* SOCIAL SHARE CARD CONTAINER STYLING                              */
+/* ================================================================= */
+
+#panelShareCard .table-wrap {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.share-card-container {
+  background: #0b0e14;
+  border: 1px solid #1e2638;
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 520px;
+  box-sizing: border-box;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+/* ================================================================= */
 /* MOBILE CARD ACCORDION & FULL-ROW MOBILE CARD STYLING              */
 /* ================================================================= */
 
@@ -610,7 +633,7 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     width: 100% !important;
   }
 
-  #contractsBody, #tradeBody, #dailyBody, #monthlyBody {
+  #contractsBody, #tradeBody, #dailyBody, #monthlyBody, #openOrdersBody {
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -735,20 +758,35 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
     letter-spacing: 0.5px;
   }
 
-  /* Force Full-Row Cards on Mobile for VIP Fee Calculator & Deposit/Withdrawal Ledgers */
+  /* Force Full-Row Cards on Mobile for VIP Fee Calculator, Deposit/Withdrawal Ledgers, & Open Orders */
   .fee-cards-grid {
     grid-template-columns: 1fr !important;
     gap: 10px !important;
   }
 
-  #panelDepositsWithdrawals .coinglass-table tbody {
+  #panelShareCard .table-wrap {
+    padding: 10px !important;
+  }
+
+  .share-card-container {
+    padding: 16px !important;
+    border-radius: 8px !important;
+  }
+
+  #shareCardPnl {
+    font-size: 26px !important;
+  }
+
+  #panelDepositsWithdrawals .coinglass-table tbody,
+  #panelOpenOrders .coinglass-table tbody {
     display: flex !important;
     flex-direction: column !important;
     gap: 10px !important;
     width: 100% !important;
   }
 
-  #panelDepositsWithdrawals .coinglass-table tbody tr {
+  #panelDepositsWithdrawals .coinglass-table tbody tr,
+  #panelOpenOrders .coinglass-table tbody tr {
     margin-bottom: 0 !important;
     display: block !important;
     width: 100% !important;
