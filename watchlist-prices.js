@@ -1,5 +1,5 @@
 /**
- * Hyperliquid Pro - Watchlist & Live Prices Module (Optimized Vertical & Horizontal Spacing)
+ * Hyperliquid Pro - Watchlist & Live Prices Module (Fixed Non-Scrolling & Event Propagation)
  */
 
 (function () {
@@ -62,8 +62,8 @@
 
     const containerDiv = document.createElement("div");
     containerDiv.innerHTML = `
-      <div id="pricesModal" class="modal hidden">
-        <div class="modal-content" style="width: 860px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; box-sizing: border-box;">
+      <div id="pricesModal" class="modal hidden" onclick="event.stopPropagation()">
+        <div class="modal-content" onclick="event.stopPropagation()" style="width: 860px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; box-sizing: border-box;">
           <div class="modal-header">
             <h3>Markets & Watchlist</h3>
             <button id="closePricesModal" class="btn-ghost">✕</button>
@@ -113,8 +113,8 @@
       </div>
 
       <!-- Asset Chart Popup Modal -->
-      <div id="assetChartModal" class="modal hidden">
-        <div class="modal-content" style="width: 960px; max-width: 95vw; height: 88vh; display: flex; flex-direction: column; box-sizing: border-box;">
+      <div id="assetChartModal" class="modal hidden" onclick="event.stopPropagation()">
+        <div class="modal-content" onclick="event.stopPropagation()" style="width: 960px; max-width: 95vw; height: 85vh; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden;">
           <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
             <div style="display: flex; align-items: center; gap: 12px;">
               <h3 id="chartModalTitle" style="margin: 0;">Asset Chart</h3>
@@ -127,7 +127,6 @@
             <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
               <button id="tf15m" class="secondary" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('15m')">15m</button>
               <button id="tf30m" class="secondary" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('30m')">30m</button>
-              <button id="tf45m" class="secondary" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('45m')">45m</button>
               <button id="tf1h" class="secondary" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('1h')">1h</button>
               <button id="tf4h" class="secondary" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('4h')">4h</button>
               <button id="tf12h" class="secondary" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('12h')">12h</button>
@@ -138,11 +137,9 @@
               <button id="closeChartModal" class="btn-ghost" style="margin-left: 6px;">✕</button>
             </div>
           </div>
-          <div class="modal-body" style="flex: 1; padding: 16px; display: flex; flex-direction: column; background: #0b0e14; overflow: hidden; position: relative;">
-            <div style="position: relative; width: 100%; height: 100%; flex: 1; overflow-x: auto; overflow-y: hidden;">
-              <div id="canvasContainerBox" style="position: relative; height: 100%; width: 100%; min-width: 900px;">
-                <canvas id="assetPopupCanvas"></canvas>
-              </div>
+          <div class="modal-body" style="flex: 1; padding: 16px; display: flex; flex-direction: column; background: #0b0e14; overflow: hidden; position: relative;" onclick="event.stopPropagation()">
+            <div style="position: relative; width: 100%; height: 100%; flex: 1; overflow: hidden;" onclick="event.stopPropagation()">
+              <canvas id="assetPopupCanvas"></canvas>
             </div>
           </div>
         </div>
@@ -153,11 +150,13 @@
       document.body.appendChild(containerDiv.firstChild);
     }
 
-    document.getElementById("closePricesModal")?.addEventListener("click", () => {
+    document.getElementById("closePricesModal")?.addEventListener("click", (e) => {
+      e.stopPropagation();
       document.getElementById("pricesModal").classList.add("hidden");
     });
 
-    document.getElementById("closeChartModal")?.addEventListener("click", () => {
+    document.getElementById("closeChartModal")?.addEventListener("click", (e) => {
+      e.stopPropagation();
       document.getElementById("assetChartModal").classList.add("hidden");
       if (activePopupChart) {
         activePopupChart.destroy();
@@ -208,7 +207,7 @@
   };
 
   function updateChartControlsUI() {
-    ["15m", "30m", "45m", "1h", "4h", "12h", "1d", "1w", "2w", "1M"].forEach(tf => {
+    ["15m", "30m", "1h", "4h", "12h", "1d", "1w", "2w", "1M"].forEach(tf => {
       const btn = document.getElementById(`tf${tf}`);
       if (btn) {
         if (tf === currentChartInterval) {
@@ -262,7 +261,7 @@
       if (interval === "2w") binanceInterval = "1w";
       if (interval === "1M") binanceInterval = "1M";
 
-      const limit = ["15m", "30m", "45m", "1h"].includes(interval) ? 120 : 70;
+      const limit = 60; // Keep fixed so candles fit nicely without scrolling
 
       const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${apiSymbol}&interval=${binanceInterval}&limit=${limit}`);
       if (!res.ok) throw new Error("Network response failed");
@@ -270,28 +269,21 @@
 
       if (!Array.isArray(rawData) || rawData.length === 0) throw new Error("No data");
 
-      const box = document.getElementById("canvasContainerBox");
-      if (box) {
-        const dynamicWidth = Math.max(900, rawData.length * 14);
-        box.style.minWidth = `${dynamicWidth}px`;
-      }
-
       const labels = rawData.map(k => {
         const d = new Date(k[0]);
-        return ["15m", "30m", "45m", "1h", "4h", "12h"].includes(interval)
+        return ["15m", "30m", "1h", "4h", "12h"].includes(interval)
           ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
           : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' });
       });
 
-      // Calculate min and max price bounds across both wicks/highs/lows for clean vertical auto-scaling
       let allPrices = [];
       rawData.forEach(k => {
-        allPrices.push(parseFloat(k[2])); // high
-        allPrices.push(parseFloat(k[3])); // low
+        allPrices.push(parseFloat(k[2]));
+        allPrices.push(parseFloat(k[3]));
       });
       const minPrice = Math.min(...allPrices);
       const maxPrice = Math.max(...allPrices);
-      const pricePadding = (maxPrice - minPrice) * 0.08; // 8% padding top and bottom
+      const pricePadding = (maxPrice - minPrice) * 0.08;
 
       const canvasCtx = document.getElementById("assetPopupCanvas").getContext("2d");
 
@@ -314,7 +306,7 @@
                 backgroundColor: candleColors,
                 borderColor: candleColors,
                 borderWidth: 1.5,
-                barThickness: 2,
+                barThickness: 1.5,
                 borderRadius: 0
               },
               {
@@ -323,7 +315,7 @@
                 backgroundColor: candleColors,
                 borderColor: candleColors,
                 borderWidth: 0,
-                barThickness: 6,
+                barThickness: 5,
                 borderRadius: 1
               }
             ]
@@ -351,7 +343,7 @@
             scales: {
               x: {
                 grid: { color: '#161b22' },
-                ticks: { color: '#8492a6', font: { size: 9 }, maxTicksLimit: 15 }
+                ticks: { color: '#8492a6', font: { size: 9 }, maxTicksLimit: 12 }
               },
               y: {
                 min: minPrice - pricePadding,
@@ -402,7 +394,7 @@
             scales: {
               x: {
                 grid: { color: '#161b22' },
-                ticks: { color: '#8492a6', font: { size: 9 }, maxTicksLimit: 15 }
+                ticks: { color: '#8492a6', font: { size: 9 }, maxTicksLimit: 12 }
               },
               y: {
                 min: minPrice - pricePadding,
