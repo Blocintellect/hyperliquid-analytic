@@ -16,6 +16,7 @@
 
   <!-- Chart.js for Animated Charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body class="dark-theme">
   <!-- Global Loading Overlay -->
@@ -259,13 +260,14 @@
               <th>MARK PRICE</th>
               <th>EST. LIQ. PRICE</th>
               <th>RISK PROXIMITY</th>
-              <th>FUNDING</th>
+              <th>FUNDING RATE</th>
+              <th>CUMULATIVE FUNDING</th>
               <th>UNREALIZED P&L</th>
             </tr>
           </thead>
           <tbody id="contractsBody">
             <tr class="empty-row">
-              <td colspan="11">Enter a valid wallet address to view active contracts.</td>
+              <td colspan="12">Enter a valid wallet address to view active contracts.</td>
             </tr>
           </tbody>
         </table>
@@ -645,7 +647,7 @@
       </div>
     </section>
 
-    <!-- Open Orders Panel -->
+<!-- Open Orders Panel -->
     <section id="panelOpenOrders" class="panel table-panel hidden">
       <div class="table-header">
         <div class="table-header-info">
@@ -663,12 +665,14 @@
               <th>LIMIT PRICE</th>
               <th>TRIGGER PRICE</th>
               <th>SIZE</th>
+              <th>POSITION VALUE</th>
+              <th>MARGIN USED</th>
               <th>REDUCE ONLY</th>
             </tr>
           </thead>
           <tbody id="openOrdersBody">
             <tr class="empty-row">
-              <td colspan="7">Enter a valid wallet address to view open orders.</td>
+              <td colspan="9">Enter a valid wallet address to view open orders.</td>
             </tr>
           </tbody>
         </table>

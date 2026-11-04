@@ -1079,7 +1079,7 @@ window.toggleMobileCard = function(target, identifier = "", type = "contracts") 
 
 function renderContracts() {
   if (!activePositions || activePositions.length === 0) {
-    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="11">No open perpetual positions currently active.</td></tr>';
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="12">No open perpetual positions currently active.</td></tr>';
     contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
@@ -1140,9 +1140,23 @@ function renderContracts() {
     const riskId = `contract-risk-${coin}-${index}`;
     const proximityHtml = `<span id="${riskId}" class="${riskColor}" style="font-weight: 700; cursor: pointer;" onclick="window.showRiskInfo('${esc(coin)}', ${currentMarkPx}, ${estLiqPx}, ${distancePercent})">${distancePercent.toFixed(1)}% (${riskLabel} !)</span>`;
 
+    // Robust funding lookup matching watchlist module data & fallback
+    const cleanCoin = String(coin || "").toUpperCase().replace("XYZ:", "").replace("-PERP", "").trim();
+    const rawFundingRate = Number(
+      assetFundingRates[coin] ?? 
+      assetFundingRates[cleanCoin] ?? 
+      (window.hyperliquidAllAssetsData?.find(a => a.coin.toUpperCase().includes(cleanCoin))?.funding) ?? 
+      0
+    );
+
+    const fundingPct = (rawFundingRate * 100).toFixed(4) + "%";
+    const fundingRateFormatted = (rawFundingRate > 0 ? "+" : "") + fundingPct;
+    const fundingRateClass = rawFundingRate > 0 ? "text-positive" : rawFundingRate < 0 ? "text-negative" : "";
+
+    // 2. Cumulative Funding Paid / Received ($)
     const rawCumFunding = num((pos.cumFunding || {}).sinceOpen ?? (pos.cumFunding || {}).allTime ?? 0);
     const positionFunding = -rawCumFunding; 
-    const fundingClass = positionFunding > 0 ? "text-positive" : positionFunding < 0 ? "text-negative" : "";
+    const cumFundingClass = positionFunding > 0 ? "text-positive" : positionFunding < 0 ? "text-negative" : "";
 
     const unPnlId = `contract-unpnl-${coin}-${index}`;
     const pnlClass = liveUnPnl > 0 ? "text-positive" : liveUnPnl < 0 ? "text-negative" : "";
@@ -1161,7 +1175,8 @@ function renderContracts() {
         <td class="pc-col pc-col-right">${plainMoney(currentMarkPx, 4)}</td>
         <td class="pc-col pc-col-right">${plainMoney(estLiqPx, 4)}</td>
         <td class="pc-col pc-col-right">${proximityHtml}</td>
-        <td class="pc-col pc-col-right ${fundingClass}">${money(positionFunding, 2)}</td>
+        <td class="pc-col pc-col-right ${fundingRateClass}">${fundingRateFormatted}</td>
+        <td class="pc-col pc-col-right ${cumFundingClass}">${money(positionFunding, 2)}</td>
         <td class="pc-col pc-col-right">
           <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px;">
             <span id="${unPnlId}" class="${pnlClass}">${money(liveUnPnl, 2)}</span>
@@ -1213,8 +1228,12 @@ function renderContracts() {
                 <span>${proximityHtml}</span>
               </div>
               <div class="collapsible-detail-row">
-                <span class="mobile-label-text">FUNDING</span>
-                <span class="${fundingClass}">${money(positionFunding, 2)}</span>
+                <span class="mobile-label-text">FUNDING RATE</span>
+                <span class="${fundingRateClass}">${fundingRateFormatted}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">CUMULATIVE FUNDING</span>
+                <span class="${cumFundingClass}">${money(positionFunding, 2)}</span>
               </div>
               <div class="collapsible-detail-row" style="border-bottom: none; justify-content: flex-end; padding-top: 8px;" onclick="event.stopPropagation()">
                 <button class="secondary" style="height: 28px; padding: 0 10px; font-size: 11px;" onclick="openCloseSimulation('${esc(coin)}', ${sizeNum}, ${entryPx}, ${currentMarkPx})">Simulate Close</button>
@@ -1227,7 +1246,7 @@ function renderContracts() {
   });
 
   if (rows.length === 0) {
-    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="11">No open perpetual positions currently active.</td></tr>';
+    contractsBodyEl.innerHTML = '<tr class="empty-row"><td colspan="12">No open perpetual positions currently active.</td></tr>';
     contractsMeta.textContent = "0 active derivative contracts | Total Unrealized P&L: $0.00";
     return;
   }
@@ -1922,9 +1941,69 @@ function parseOrderCoin(o) {
   return "PERP";
 }
 
+let assetFundingRates = {};
+
+async function fetchAssetFundingRates() {
+  if (window.hyperliquidAllAssetsData && Array.isArray(window.hyperliquidAllAssetsData) && window.hyperliquidAllAssetsData.length > 0) {
+    window.hyperliquidAllAssetsData.forEach(item => {
+      if (item && item.coin) {
+        const cleanCoin = item.coin.toUpperCase().replace("XYZ:", "").replace("-PERP", "").trim();
+        assetFundingRates[cleanCoin] = Number(item.funding || 0);
+        assetFundingRates[item.coin] = Number(item.funding || 0);
+      }
+    });
+    return;
+  }
+
+  try {
+    const [nativeRes, xyzRes] = await Promise.all([
+      fetch("https://api.hyperliquid.xyz/info", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "metaAndAssetCtxs" })
+      }).then(res => res.json()).catch(() => null),
+
+      fetch("https://api.hyperliquid.xyz/info", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "metaAndAssetCtxs", dex: "xyz" })
+      }).then(res => res.json()).catch(() => null)
+    ]);
+
+    if (Array.isArray(nativeRes) && nativeRes.length >= 2) {
+      const universe = nativeRes[0]?.universe || [];
+      const assetCtxs = nativeRes[1] || [];
+      universe.forEach((meta, index) => {
+        const ctx = assetCtxs[index] || {};
+        const coin = meta.name;
+        if (coin) {
+          assetFundingRates[coin] = Number(ctx.funding || 0);
+          assetFundingRates[coin.toUpperCase()] = Number(ctx.funding || 0);
+        }
+      });
+    }
+
+    if (Array.isArray(xyzRes) && xyzRes.length >= 2) {
+      const universe = xyzRes[0]?.universe || [];
+      const assetCtxs = xyzRes[1] || [];
+      universe.forEach((meta, index) => {
+        const ctx = assetCtxs[index] || {};
+        const rawName = meta.name;
+        const coin = rawName.includes(":") ? rawName.split(":")[1] : rawName;
+        if (coin) {
+          assetFundingRates[coin] = Number(ctx.funding || 0);
+          assetFundingRates[coin.toUpperCase()] = Number(ctx.funding || 0);
+        }
+      });
+    }
+  } catch (e) {
+    console.warn("Failed to fetch asset funding rates:", e);
+  }
+}
+
 function renderOpenOrders() {
   if (!openOrdersList || !openOrdersList.length) {
-    openOrdersBodyEl.innerHTML = '<tr class="empty-row"><td colspan="7">No open orders (limit, TP/SL) currently resting.</td></tr>';
+    openOrdersBodyEl.innerHTML = '<tr class="empty-row"><td colspan="9">No open orders (limit, TP/SL) currently resting.</td></tr>';
     openOrdersMeta.textContent = "0 active open orders.";
     return;
   }
@@ -1935,7 +2014,7 @@ function renderOpenOrders() {
     const rawSide = o.side || o.order?.side;
     const side = mapSide(rawSide);
     
-    const limitPxVal = num(o.limitPx || o.px || o.order?.limitPx);
+    const limitPxVal = num(o.limitPx || o.px || o.order?.limitPx) || num(livePrices[coin]) || 0;
     const limitPx = limitPxVal > 0 ? plainMoney(limitPxVal, 4) : '—';
     
     const triggerPxVal = num(o.triggerPx || o.triggerCondition?.triggerPx);
@@ -1944,6 +2023,16 @@ function renderOpenOrders() {
     const szVal = num(o.sz || o.size || o.order?.sz);
     const sz = szVal.toLocaleString();
     
+    const positionValue = Math.abs(szVal * limitPxVal);
+    
+    let leverage = 10;
+    const activePos = activePositions.find(p => (p.position || p).coin === coin);
+    if (activePos) {
+      const pos = activePos.position || activePos;
+      leverage = num(pos.leverage?.value) || 10;
+    }
+    const marginUsed = leverage > 0 ? positionValue / leverage : positionValue;
+
     const reduceOnly = (o.reduceOnly || o.order?.reduceOnly) ? "Yes" : "No";
     const isTrigger = !!(o.triggerCondition || o.isTrigger || o.triggerPx);
     const orderType = isTrigger ? "Trigger (TP/SL)" : "Limit Order";
@@ -1960,6 +2049,8 @@ function renderOpenOrders() {
         <td class="pc-col pc-col-right">${limitPx}</td>
         <td class="pc-col pc-col-right">${triggerPx}</td>
         <td class="pc-col pc-col-right">${sz}</td>
+        <td class="pc-col pc-col-right">${plainMoney(positionValue, 2)}</td>
+        <td class="pc-col pc-col-right">${plainMoney(marginUsed, 2)}</td>
         <td class="pc-col pc-col-right">${reduceOnly}</td>
 
         <!-- Mobile Card Wrapper Cell -->
@@ -1988,6 +2079,14 @@ function renderOpenOrders() {
               <div class="collapsible-detail-row">
                 <span class="mobile-label-text">SIZE</span>
                 <span>${sz}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">POSITION VALUE</span>
+                <span>${plainMoney(positionValue, 2)}</span>
+              </div>
+              <div class="collapsible-detail-row">
+                <span class="mobile-label-text">MARGIN USED</span>
+                <span>${plainMoney(marginUsed, 2)}</span>
               </div>
               <div class="collapsible-detail-row" style="border-bottom: none;">
                 <span class="mobile-label-text">REDUCE ONLY</span>
@@ -2366,6 +2465,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       holdingsData = accountData.holdings;
       spotHoldingsData = accountData.spotHoldings;
       activePositions = accountData.positions;
+      await fetchAssetFundingRates();
 
       localStorage.setItem(CACHE_FILLS_KEY, JSON.stringify(fills));
       localStorage.setItem(CACHE_FUNDING_KEY, JSON.stringify(fundingHistory));
@@ -2455,6 +2555,7 @@ fetchBtn.addEventListener("click", async () => {
     holdingsData = accountData.holdings;
     spotHoldingsData = accountData.spotHoldings;
     activePositions = accountData.positions;
+    await fetchAssetFundingRates();
 
     localStorage.setItem(CACHE_FILLS_KEY, JSON.stringify(fills));
     localStorage.setItem(CACHE_FUNDING_KEY, JSON.stringify(fundingHistory));
