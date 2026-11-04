@@ -380,6 +380,61 @@ themeToggleBtn.addEventListener("click", () => {
   applyTheme(isLight ? "dark" : "light");
 });
 
+// Mobile Burger Menu Toggle Logic
+const mobileMenuBtn = $("mobileMenuBtn");
+const mobileMenuDropdown = $("mobileMenuDropdown");
+
+window.toggleMobileMenu = function() {
+  if (mobileMenuDropdown) {
+    mobileMenuDropdown.classList.toggle("hidden");
+  }
+};
+
+mobileMenuBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleMobileMenu();
+});
+
+// Close mobile menu when clicking anywhere outside
+window.addEventListener("click", (e) => {
+  if (mobileMenuDropdown && !mobileMenuDropdown.classList.contains("hidden")) {
+    if (!mobileMenuDropdown.contains(e.target) && e.target !== mobileMenuBtn) {
+      mobileMenuDropdown.classList.add("hidden");
+    }
+  }
+});
+
+// Unified Theme Toggle Helper for both Desktop & Mobile buttons
+window.toggleAppTheme = function() {
+  const isLight = document.body.classList.contains("light-theme");
+  const newTheme = isLight ? "dark" : "light";
+  applyTheme(newTheme);
+  
+  // Sync mobile menu text/icon as well
+  const mobileThemeIcon = $("mobileThemeIcon");
+  const mobileThemeLabel = $("mobileThemeLabel");
+  if (mobileThemeIcon && mobileThemeLabel) {
+    if (newTheme === "light") {
+      mobileThemeIcon.textContent = "🌙";
+      mobileThemeLabel.textContent = "Dark Mode";
+    } else {
+      mobileThemeIcon.textContent = "☀️";
+      mobileThemeLabel.textContent = "Light Mode";
+    }
+  }
+};
+
+// Hook up existing desktop theme toggle to also sync mobile labels if needed
+themeToggleBtn.addEventListener("click", () => {
+  const isLight = document.body.classList.contains("light-theme");
+  const mobileThemeIcon = $("mobileThemeIcon");
+  const mobileThemeLabel = $("mobileThemeLabel");
+  if (mobileThemeIcon && mobileThemeLabel) {
+    mobileThemeIcon.textContent = isLight ? "☀️" : "🌙";
+    mobileThemeLabel.textContent = isLight ? "Light Mode" : "Dark Mode";
+  }
+});
+
 initTheme();
 
 function formatDateInput(d) {
@@ -545,22 +600,54 @@ async function fetchActiveContractsOnly(cleanUser) {
   }
 }
 
+// Replace or update your existing startFiveSecondPoller function in script.js
+
 function startFiveSecondPoller(cleanUser) {
   if (pollTimer) {
     clearInterval(pollTimer);
     pollTimer = null;
   }
+  
   pollTimer = setInterval(async () => {
     if (!cleanUser || !isAddress(cleanUser)) return;
-    const freshPositions = await fetchActiveContractsOnly(cleanUser);
-    if (freshPositions !== null) {
-      activePositions = freshPositions;
+    
+    try {
+      // 1. Fetch fresh positions, open orders, and clearinghouse state concurrently
+      const [defaultData, xyzData, spotData, nativeOrders, xyzOrders] = await Promise.all([
+        postInfo({ type: "clearinghouseState", user: cleanUser }).catch(() => null),
+        postInfo({ type: "clearinghouseState", user: cleanUser, dex: "xyz" }).catch(() => null),
+        postInfo({ type: "spotClearinghouseState", user: cleanUser }).catch(() => null),
+        postInfo({ type: "openOrders", user: cleanUser }).catch(() => []),
+        postInfo({ type: "openOrders", user: cleanUser, dex: "xyz" }).catch(() => [])
+      ]);
+
+      if (defaultData) holdingsData = defaultData;
+      if (xyzData) xyzHoldingsData = xyzData;
+      if (spotData) spotHoldingsData = spotData;
+
+      const rawAssetPositions = [
+        ...(defaultData?.assetPositions || []),
+        ...(xyzData?.assetPositions || [])
+      ];
+      
+      activePositions = rawAssetPositions.filter(item => num(item.position?.szi) !== 0);
+      openOrdersList = [...(Array.isArray(nativeOrders) ? nativeOrders : []), ...(Array.isArray(xyzOrders) ? xyzOrders : [])];
+
+      // 2. Persist updated states to localStorage cache
       localStorage.setItem(CACHE_POSITIONS_KEY, JSON.stringify(activePositions));
+      localStorage.setItem(CACHE_ORDERS_KEY, JSON.stringify(openOrdersList));
+      localStorage.setItem(CACHE_HOLDINGS_KEY, JSON.stringify(holdingsData));
+
+      // 3. Re-render UI components to immediately reflect changes
       renderContracts();
+      renderOpenOrders();
       updateMetrics();
       renderWalletDetails();
+
+    } catch (e) {
+      console.warn("Background user state poll error:", e);
     }
-  }, 5000);
+  }, 5000); // Poll every 5 seconds for seamless auto-sync without rate-limiting
 }
 
 async function fetchAccountData(user, startMs, endMs) {

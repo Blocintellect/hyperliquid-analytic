@@ -887,3 +887,71 @@ body.light-theme .global-loader {
   font-size: 11.5px;
   color: var(--text-muted);
 }
+
+/* ================================================================= */
+/* MOBILE BURGER MENU STYLING                                        */
+/* ================================================================= */
+
+.mobile-menu-dropdown {
+  position: absolute;
+  top: 70px;
+  right: 12px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  z-index: 1005;
+  width: 200px;
+  box-sizing: border-box;
+}
+
+.mobile-menu-dropdown.hidden {
+  display: none !important;
+}
+
+.mobile-menu-item {
+  width: 100% !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  height: 38px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  background: var(--btn-secondary-bg) !important;
+  border-color: var(--btn-secondary-border) !important;
+  color: var(--text-main) !important;
+  text-decoration: none !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.mobile-menu-item:hover {
+  background: var(--hover-bg) !important;
+  color: var(--coinglass-blue) !important;
+}
+
+/* Media Query for Mobile Viewport */
+@media (max-width: 768px) {
+  .desktop-actions {
+    display: none !important;
+  }
+  .mobile-burger-btn {
+    display: flex !important;
+  }
+  .header-right {
+    position: relative;
+    justify-content: flex-end !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-burger-btn,
+  .mobile-menu-dropdown {
+    display: none !important;
+  }
+}
