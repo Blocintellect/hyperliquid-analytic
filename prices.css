@@ -3,7 +3,7 @@
 /* ================================================================= */
 
 #pricesModal .modal-content {
-  width: 860px;
+  width: 940px;
   max-width: 95vw;
   max-height: 85vh;
   display: flex;
@@ -68,30 +68,31 @@
     text-overflow: ellipsis;
   }
 
-  /* Explicit Fixed Column Widths locked to fit within 860px modal width */
+  /* Explicit Fixed Column Widths rebalanced for 940px modal width */
   #pricesModal .prices-table th:nth-child(1), 
-  #pricesModal .prices-table td.pc-col:nth-child(1) { width: 6% !important; text-align: left; padding-left: 8px; }
+  #pricesModal .prices-table td.pc-col:nth-child(1) { width: 5% !important; text-align: left; padding-left: 8px; }
 
   #pricesModal .prices-table th:nth-child(2), 
-  #pricesModal .prices-table td.pc-col:nth-child(2) { width: 28% !important; text-align: left; }
+  #pricesModal .prices-table td.pc-col:nth-child(2) { width: 23% !important; text-align: left; }
 
   #pricesModal .prices-table th:nth-child(3), 
-  #pricesModal .prices-table td.pc-col:nth-child(3) { width: 15% !important; text-align: right; }
+  #pricesModal .prices-table td.pc-col:nth-child(3) { width: 14% !important; text-align: right; }
 
   #pricesModal .prices-table th:nth-child(4), 
-  #pricesModal .prices-table td.pc-col:nth-child(4) { width: 12% !important; text-align: right; }
+  #pricesModal .prices-table td.pc-col:nth-child(4) { width: 10% !important; text-align: right; }
 
   #pricesModal .prices-table th:nth-child(5), 
-  #pricesModal .prices-table td.pc-col:nth-child(5) { width: 12% !important; text-align: right; }
+  #pricesModal .prices-table td.pc-col:nth-child(5) { width: 10% !important; text-align: right; }
 
   #pricesModal .prices-table th:nth-child(6), 
-  #pricesModal .prices-table td.pc-col:nth-child(6) { width: 12% !important; text-align: right; }
+  #pricesModal .prices-table td.pc-col:nth-child(6) { width: 10% !important; text-align: right; }
 
   #pricesModal .prices-table th:nth-child(7), 
-  #pricesModal .prices-table td.pc-col:nth-child(7) { width: 15% !important; text-align: right; padding-right: 12px; }
+  #pricesModal .prices-table td.pc-col:nth-child(7) { width: 28% !important; text-align: right; padding-right: 12px; }
 
-  /* Keep Action buttons fully visible and contained within the final cell */
-  #pricesModal .prices-table td.pc-col button {
+  /* Keep Action buttons fully visible and contained within the final cell without wrapping */
+  #pricesModal .prices-table td.pc-col button,
+  #pricesModal .prices-table td.pc-col a {
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -99,6 +100,7 @@
     align-items: center;
     justify-content: center;
     padding: 0 8px;
+    flex-shrink: 0;
   }
 
   #pricesModal .prices-table .mobile-card-wrapper-cell {
@@ -304,4 +306,23 @@
     color: var(--text-muted, #8492a6);
     letter-spacing: 0.5px;
   }
+}
+
+//animation prices 
+@keyframes flashGreen {
+  0% { color: #00b87c; background: rgba(0, 184, 124, 0.25); }
+  100% { color: inherit; background: transparent; }
+}
+
+@keyframes flashRed {
+  0% { color: #f6465d; background: rgba(246, 70, 93, 0.25); }
+  100% { color: inherit; background: transparent; }
+}
+
+.flash-green {
+  animation: flashGreen 1s ease-out;
+}
+
+.flash-red {
+  animation: flashRed 1s ease-out;
 }

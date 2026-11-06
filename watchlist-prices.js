@@ -1,26 +1,20 @@
 /**
- * Hyperliquid Pro - Watchlist & Live Prices Module (Fixed Non-Scrolling & Event Propagation)
+ * Hyperliquid Pro - Watchlist & Live Prices Module (3-Second Polling Interval & Animations)
  */
 
 (function () {
   const PRICES_API = "https://api.hyperliquid.xyz/info";
-  const PRICES_WS_URL = "wss://api.hyperliquid.xyz/ws";
   const SAVED_PRICE_WATCHLIST_KEY = "hyperliquid_price_watchlist_coins";
 
   let allAssetsData = [];
   window.hyperliquidAllAssetsData = [];
 
   let priceWatchlist = [];
-  let pricesWs = null;
+  let pollIntervalId = null;
   let currentSearchQuery = "";
   let activeTab = "all";
   let clearWatchlistTimeout = null;
   let undoCountdownInterval = null;
-  let activePopupChart = null;
-  
-  let currentChartCoin = "BTC";
-  let currentChartInterval = "1d";
-  let currentChartType = "candles"; // 'candles' or 'line'
   let expandedMobileCoin = null;
 
   const ASSET_NAME_MAP = {
@@ -41,7 +35,7 @@
     loadPriceWatchlist();
     initPricesModuleDOM();
     fetchAssetPricesData();
-    startPricesWebSocket();
+    startThreeSecondPoller();
   });
 
   function loadPriceWatchlist() {
@@ -55,6 +49,16 @@
 
   function savePriceWatchlist() {
     localStorage.setItem(SAVED_PRICE_WATCHLIST_KEY, JSON.stringify(priceWatchlist));
+  }
+
+  function getTradingViewSymbol(coin) {
+    const upper = String(coin || "").toUpperCase().trim();
+    if (upper === "GOLD") return "PAXGUSDT";
+    if (upper === "SILVER") return "XAGUSDT";
+    if (upper === "SP500") return "SPXUSDT";
+    if (upper === "CL") return "USOIL";
+    if (upper === "BRENTOIL") return "UKOIL";
+    return `${upper}USDT`;
   }
 
   function initPricesModuleDOM() {
@@ -111,39 +115,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Asset Chart Popup Modal -->
-      <div id="assetChartModal" class="modal hidden" onclick="event.stopPropagation()">
-        <div class="modal-content" onclick="event.stopPropagation()" style="width: 960px; max-width: 95vw; height: 85vh; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden;">
-          <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <h3 id="chartModalTitle" style="margin: 0;">Asset Chart</h3>
-              <div style="display: flex; gap: 2px; background: var(--input-bg); padding: 2px; border-radius: 4px; border: 1px solid var(--panel-border);">
-                <button id="typeCandles" class="secondary active" style="height: 24px; padding: 0 8px; font-size: 9.5px;" onclick="setChartType('candles')">Candles</button>
-                <button id="typeLine" class="secondary" style="height: 24px; padding: 0 8px; font-size: 9.5px;" onclick="setChartType('line')">Line</button>
-              </div>
-            </div>
-            
-            <div style="display: flex; gap: 3px; align-items: center; flex-wrap: wrap;">
-              <button id="tf15m" class="secondary" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('15m')">15m</button>
-              <button id="tf30m" class="secondary" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('30m')">30m</button>
-              <button id="tf1h" class="secondary" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('1h')">1h</button>
-              <button id="tf4h" class="secondary" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('4h')">4h</button>
-              <button id="tf12h" class="secondary" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('12h')">12h</button>
-              <button id="tf1d" class="secondary active" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('1d')">1d</button>
-              <button id="tf1w" class="secondary" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('1w')">1w</button>
-              <button id="tf2w" class="secondary" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('2w')">2w</button>
-              <button id="tf1M" class="secondary" style="height: 26px; padding: 0 6px; font-size: 9.5px;" onclick="changeChartInterval('1M')">1M</button>
-              <button id="closeChartModal" class="btn-ghost" style="margin-left: 6px;">✕</button>
-            </div>
-          </div>
-          <div class="modal-body" style="flex: 1; padding: 16px; display: flex; flex-direction: column; background: #0b0e14; overflow: hidden; position: relative;" onclick="event.stopPropagation()">
-            <div style="position: relative; width: 100%; height: 100%; flex: 1; overflow: hidden;" onclick="event.stopPropagation()">
-              <canvas id="assetPopupCanvas"></canvas>
-            </div>
-          </div>
-        </div>
-      </div>
     `;
 
     while (containerDiv.firstChild) {
@@ -155,26 +126,9 @@
       document.getElementById("pricesModal").classList.add("hidden");
     });
 
-    document.getElementById("closeChartModal")?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      document.getElementById("assetChartModal").classList.add("hidden");
-      if (activePopupChart) {
-        activePopupChart.destroy();
-        activePopupChart = null;
-      }
-    });
-
     window.addEventListener("click", (e) => {
       const modal = document.getElementById("pricesModal");
-      const chartModal = document.getElementById("assetChartModal");
       if (e.target === modal) modal.classList.add("hidden");
-      if (e.target === chartModal) {
-        chartModal.classList.add("hidden");
-        if (activePopupChart) {
-          activePopupChart.destroy();
-          activePopupChart = null;
-        }
-      }
     });
   }
 
@@ -185,232 +139,6 @@
       renderPricesTable();
     }
   };
-
-  window.openAssetChart = function(coin) {
-    currentChartCoin = coin;
-    currentChartInterval = "1d";
-    currentChartType = "candles";
-    updateChartControlsUI();
-    fetchAndRenderAssetChart(currentChartCoin, currentChartInterval, currentChartType);
-  };
-
-  window.changeChartInterval = function(interval) {
-    currentChartInterval = interval;
-    updateChartControlsUI();
-    fetchAndRenderAssetChart(currentChartCoin, currentChartInterval, currentChartType);
-  };
-
-  window.setChartType = function(type) {
-    currentChartType = type;
-    updateChartControlsUI();
-    fetchAndRenderAssetChart(currentChartCoin, currentChartInterval, currentChartType);
-  };
-
-  function updateChartControlsUI() {
-    ["15m", "30m", "1h", "4h", "12h", "1d", "1w", "2w", "1M"].forEach(tf => {
-      const btn = document.getElementById(`tf${tf}`);
-      if (btn) {
-        if (tf === currentChartInterval) {
-          btn.classList.add("active");
-          btn.style.background = "var(--panel-border)";
-          btn.style.borderColor = "var(--coinglass-blue)";
-        } else {
-          btn.classList.remove("active");
-          btn.style.background = "transparent";
-          btn.style.borderColor = "var(--panel-border)";
-        }
-      }
-    });
-
-    ["candles", "line"].forEach(t => {
-      const btn = document.getElementById(`type${t.charAt(0).toUpperCase() + t.slice(1)}`);
-      if (btn) {
-        if (t === currentChartType) {
-          btn.classList.add("active");
-          btn.style.background = "var(--panel-border)";
-          btn.style.borderColor = "var(--coinglass-blue)";
-        } else {
-          btn.classList.remove("active");
-          btn.style.background = "transparent";
-          btn.style.borderColor = "var(--panel-border)";
-        }
-      }
-    });
-  }
-
-  async function fetchAndRenderAssetChart(coin, interval, chartType) {
-    const modal = document.getElementById("assetChartModal");
-    const title = document.getElementById("chartModalTitle");
-    if (!modal) return;
-
-    title.textContent = `${coin} — Live Price History (${interval.toUpperCase()} • ${chartType.toUpperCase()})`;
-    modal.classList.remove("hidden");
-
-    if (activePopupChart) {
-      activePopupChart.destroy();
-      activePopupChart = null;
-    }
-
-    let apiSymbol = `${coin.toUpperCase()}USDT`;
-    const upper = coin.toUpperCase();
-    if (upper === "GOLD") apiSymbol = "PAXGUSDT";
-    else if (upper === "SILVER" || upper === "CL" || upper === "BRENTOIL" || upper === "NATGAS" || upper === "SP500") apiSymbol = "BTCUSDT";
-
-    try {
-      let binanceInterval = interval;
-      if (interval === "2w") binanceInterval = "1w";
-      if (interval === "1M") binanceInterval = "1M";
-
-      const limit = 60; // Keep fixed so candles fit nicely without scrolling
-
-      const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${apiSymbol}&interval=${binanceInterval}&limit=${limit}`);
-      if (!res.ok) throw new Error("Network response failed");
-      const rawData = await res.json();
-
-      if (!Array.isArray(rawData) || rawData.length === 0) throw new Error("No data");
-
-      const labels = rawData.map(k => {
-        const d = new Date(k[0]);
-        return ["15m", "30m", "1h", "4h", "12h"].includes(interval)
-          ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-          : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' });
-      });
-
-      let allPrices = [];
-      rawData.forEach(k => {
-        allPrices.push(parseFloat(k[2]));
-        allPrices.push(parseFloat(k[3]));
-      });
-      const minPrice = Math.min(...allPrices);
-      const maxPrice = Math.max(...allPrices);
-      const pricePadding = (maxPrice - minPrice) * 0.08;
-
-      const canvasCtx = document.getElementById("assetPopupCanvas").getContext("2d");
-
-      if (chartType === "candles") {
-        const lows = rawData.map(k => parseFloat(k[3]));
-        const highs = rawData.map(k => parseFloat(k[2]));
-        const opens = rawData.map(k => parseFloat(k[1]));
-        const closes = rawData.map(k => parseFloat(k[4]));
-
-        const candleColors = closes.map((c, i) => c >= opens[i] ? "#00b87c" : "#f6465d");
-
-        activePopupChart = new Chart(canvasCtx, {
-          type: 'bar',
-          data: {
-            labels: labels,
-            datasets: [
-              {
-                label: 'Wick',
-                data: rawData.map(k => [parseFloat(k[3]), parseFloat(k[2])]),
-                backgroundColor: candleColors,
-                borderColor: candleColors,
-                borderWidth: 1.5,
-                barThickness: 1.5,
-                borderRadius: 0
-              },
-              {
-                label: 'Body',
-                data: rawData.map(k => [Math.min(parseFloat(k[1]), parseFloat(k[4])), Math.max(parseFloat(k[1]), parseFloat(k[4]))]),
-                backgroundColor: candleColors,
-                borderColor: candleColors,
-                borderWidth: 0,
-                barThickness: 5,
-                borderRadius: 1
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    const idx = context.dataIndex;
-                    const o = opens[idx], h = highs[idx], l = lows[idx], c = closes[idx];
-                    return [`Open: $${o}`, `High: $${h}`, `Low: $${l}`, `Close: $${c}`];
-                  }
-                },
-                backgroundColor: '#121721',
-                titleColor: '#f0f4f8',
-                bodyColor: '#00b87c',
-                borderColor: '#1e2638',
-                borderWidth: 1
-              }
-            },
-            scales: {
-              x: {
-                grid: { color: '#161b22' },
-                ticks: { color: '#8492a6', font: { size: 9 }, maxTicksLimit: 12 }
-              },
-              y: {
-                min: minPrice - pricePadding,
-                max: maxPrice + pricePadding,
-                grid: { color: '#161b22' },
-                ticks: { color: '#8492a6', font: { size: 10 } }
-              }
-            }
-          }
-        });
-
-      } else {
-        const prices = rawData.map(k => parseFloat(k[4]));
-        const isPositive = prices[prices.length - 1] >= prices[0];
-        const lineColor = isPositive ? "#00b87c" : "#f6465d";
-
-        activePopupChart = new Chart(canvasCtx, {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: `${coin} Price ($)`,
-              data: prices,
-              borderColor: lineColor,
-              backgroundColor: isPositive ? 'rgba(0, 184, 124, 0.1)' : 'rgba(246, 70, 93, 0.1)',
-              borderWidth: 2,
-              fill: true,
-              tension: 0.2,
-              pointRadius: 1,
-              pointHoverRadius: 5
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                mode: 'index',
-                intersect: false,
-                backgroundColor: '#121721',
-                titleColor: '#f0f4f8',
-                bodyColor: '#00b87c',
-                borderColor: '#1e2638',
-                borderWidth: 1
-              }
-            },
-            scales: {
-              x: {
-                grid: { color: '#161b22' },
-                ticks: { color: '#8492a6', font: { size: 9 }, maxTicksLimit: 12 }
-              },
-              y: {
-                min: minPrice - pricePadding,
-                max: maxPrice + pricePadding,
-                grid: { color: '#161b22' },
-                ticks: { color: '#8492a6', font: { size: 10 } }
-              }
-            }
-          }
-        });
-      }
-
-    } catch (err) {
-      console.warn("Chart render failed:", err);
-    }
-  }
 
   window.switchPricesTab = function(tab) {
     activeTab = tab;
@@ -537,7 +265,7 @@
     }
   };
 
-  async function fetchAssetPricesData() {
+  async function fetchAssetPricesData(isInitial = true) {
     try {
       const [nativeRes, xyzRes] = await Promise.all([
         fetch(PRICES_API, {
@@ -600,57 +328,50 @@
         });
       }
 
-      allAssetsData = parsedAssets;
-      window.hyperliquidAllAssetsData = parsedAssets;
-      renderPricesTable();
+      if (!isInitial && allAssetsData.length > 0) {
+        // Update prices smoothly with animations instead of rebuilding the whole table
+        parsedAssets.forEach(newItem => {
+          const existing = allAssetsData.find(a => a.coin === newItem.coin && a.venue === newItem.venue);
+          if (existing && existing.markPx !== newItem.markPx) {
+            const oldPx = existing.markPx;
+            existing.markPx = newItem.markPx;
+            existing.change24h = newItem.change24h;
+            existing.funding = newItem.funding;
+            existing.openInterest = newItem.openInterest;
+
+            const modalOpen = !document.getElementById("pricesModal")?.classList.contains("hidden");
+            if (modalOpen) {
+              const priceEl = document.getElementById(`price-val-${newItem.coin}`);
+              const mobilePriceEl = document.getElementById(`mobile-price-val-${newItem.coin}`);
+              const formattedPrice = newItem.markPx >= 1 ? newItem.markPx.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : newItem.markPx.toFixed(6);
+
+              [priceEl, mobilePriceEl].forEach(el => {
+                if (el) {
+                  el.textContent = `$${formattedPrice}`;
+                  el.classList.remove("flash-green", "flash-red");
+                  void el.offsetWidth;
+                  el.classList.add(newItem.markPx > oldPx ? "flash-green" : "flash-red");
+                }
+              });
+            }
+          }
+        });
+      } else {
+        allAssetsData = parsedAssets;
+        renderPricesTable();
+      }
+
+      window.hyperliquidAllAssetsData = allAssetsData;
     } catch (e) {
       console.warn("Failed to fetch perpetual asset prices:", e);
     }
   }
 
-  function startPricesWebSocket() {
-    if (pricesWs) pricesWs.close();
-    pricesWs = new WebSocket(PRICES_WS_URL);
-
-    pricesWs.onopen = () => {
-      pricesWs.send(JSON.stringify({
-        method: "subscribe",
-        subscription: { type: "allMids" }
-      }));
-    };
-
-    pricesWs.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.channel === "allMids" && msg.data?.mids) {
-          const mids = msg.data.mids;
-          let updated = false;
-
-          allAssetsData.forEach(item => {
-            const key = item.venue === "XYZ" ? `xyz:${item.coin}` : item.coin;
-            if (mids[key] !== undefined || mids[item.coin] !== undefined) {
-              const newPx = Number(mids[key] || mids[item.coin]);
-              if (newPx !== item.markPx) {
-                item.markPx = newPx;
-                updated = true;
-              }
-            }
-          });
-
-          window.hyperliquidAllAssetsData = allAssetsData;
-
-          if (updated && !document.getElementById("pricesModal")?.classList.contains("hidden")) {
-            renderPricesTable();
-          }
-        }
-      } catch (err) {
-        console.error("Prices WS parse error:", err);
-      }
-    };
-
-    pricesWs.onclose = () => {
-      setTimeout(startPricesWebSocket, 5000);
-    };
+  function startThreeSecondPoller() {
+    if (pollIntervalId) clearInterval(pollIntervalId);
+    pollIntervalId = setInterval(() => {
+      fetchAssetPricesData(false);
+    }, 3000); // Poll every 3 seconds reliably
   }
 
   function renderPricesTable() {
@@ -773,6 +494,7 @@
 
         const clickHandler = hasFills || isCurrentlyFiltered ? `toggleCoinFilter('${item.coin}')` : `alert('This asset (${item.coin}) does not have any trade fills recorded in your statement.')`;
         const isThisExpanded = (expandedMobileCoin === item.coin) ? "expanded" : "";
+        const tvSymbol = getTradingViewSymbol(item.coin);
 
         finalHtml += `
           <tr class="asset-card-row ${isThisExpanded}" onclick="togglePricesMobileCard(this, '${item.coin}')">
@@ -784,13 +506,13 @@
               <div style="font-weight: 800; color: var(--text-main);">${item.coin}</div>
               <div style="font-size: 9.5px; font-weight: normal; color: var(--text-muted);">${item.fullName}</div>
             </td>
-            <td class="pc-col" style="text-align: right; font-weight: 700;">$${formattedPrice}</td>
+            <td class="pc-col" style="text-align: right; font-weight: 700;"><span id="price-val-${item.coin}">$${formattedPrice}</span></td>
             <td class="pc-col" style="text-align: right;" class="${changeClass}">${changeStr}</td>
             <td class="pc-col" style="text-align: right;" class="${fundingClass}">${fundingPct}</td>
             <td class="pc-col" style="text-align: right;">${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</td>
             <td class="pc-col" style="text-align: right; padding-right: 8px;" onclick="event.stopPropagation()">
               <div style="display: flex; gap: 4px; justify-content: flex-end; align-items: center;">
-                <button class="secondary" style="height: 26px; padding: 0 6px; font-size: 10px; white-space: nowrap;" onclick="openAssetChart('${item.coin}')" title="View Chart">Chart</button>
+                <a href="https://www.tradingview.com/chart/?symbol=${tvSymbol}" target="_blank" rel="noopener noreferrer" class="secondary" style="height: 26px; padding: 0 8px; font-size: 10px; white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center;" title="View on TradingView">TradingView ↗</a>
                 <button class="${actionClass}" style="${actionStyle}" onclick="${clickHandler}">${actionLabel}</button>
               </div>
             </td>
@@ -806,7 +528,7 @@
                   <span style="font-size: 10px; font-weight: normal; color: var(--text-muted);">${item.fullName}</span>
                 </div>
                 <div class="mobile-header-right">
-                  <span class="prices-mobile-price-preview" style="font-weight:700; color: var(--text-main);">$${formattedPrice}</span>
+                  <span class="prices-mobile-price-preview" style="font-weight:700; color: var(--text-main);"><span id="mobile-price-val-${item.coin}">$${formattedPrice}</span></span>
                   <button class="mobile-card-toggle-btn" type="button" aria-label="Toggle details">▼</button>
                 </div>
               </div>
@@ -825,7 +547,7 @@
                     <span>${item.openInterest > 0 ? Math.round(item.openInterest).toLocaleString() : "—"}</span>
                   </div>
                   <div class="collapsible-detail-row" style="border-bottom: none; justify-content: flex-end; gap: 6px; padding-top: 8px;" onclick="event.stopPropagation()">
-                    <button class="secondary" style="height: 26px; padding: 0 8px; font-size: 10px;" onclick="openAssetChart('${item.coin}')">Chart</button>
+                    <a href="https://www.tradingview.com/chart/?symbol=${tvSymbol}" target="_blank" rel="noopener noreferrer" class="secondary" style="height: 26px; padding: 0 8px; font-size: 10px; text-decoration: none; display: inline-flex; align-items: center;">TradingView ↗</a>
                     <button class="${actionClass}" style="${actionStyle}" onclick="${clickHandler}">${actionLabel}</button>
                   </div>
                 </div>
