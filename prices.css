@@ -308,7 +308,7 @@
   }
 }
 
-//animation prices 
+/* animation prices  */
 @keyframes flashGreen {
   0% { color: #00b87c; background: rgba(0, 184, 124, 0.25); }
   100% { color: inherit; background: transparent; }

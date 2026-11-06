@@ -92,9 +92,7 @@ window.addEventListener("click", e => {
 });
 
 unhideBtn?.addEventListener("click", () => {
-  controlsPanel.classList.remove("hidden");
-  unhideBtn.classList.add("hidden");
-  localStorage.setItem("hyperliquid_controls_hidden", "false");
+  window.showControls();
 });
 
 let fills = [];
@@ -384,6 +382,40 @@ themeToggleBtn.addEventListener("click", () => {
 const mobileMenuBtn = $("mobileMenuBtn");
 const mobileMenuDropdown = $("mobileMenuDropdown");
 
+// --- Hide Controls Handler ---
+window.hideControlsFromMenu = function() {
+  if (controlsPanel && unhideBtn) {
+    controlsPanel.classList.add("hidden");
+    unhideBtn.classList.remove("hidden");
+    
+    const pcHideBtn = document.getElementById("desktopHideControlsBtn");
+    const mobileHideBtn = document.getElementById("mobileHideControlsBtn");
+    if (pcHideBtn) pcHideBtn.classList.add("hidden");
+    if (mobileHideBtn) mobileHideBtn.classList.add("hidden");
+
+    localStorage.setItem("hyperliquid_controls_hidden", "true");
+  }
+};
+
+// --- Show Controls Handler ---
+window.showControls = function() {
+  if (controlsPanel && unhideBtn) {
+    controlsPanel.classList.remove("hidden");
+    unhideBtn.classList.add("hidden");
+    
+    const pcHideBtn = document.getElementById("desktopHideControlsBtn");
+    const mobileHideBtn = document.getElementById("mobileHideControlsBtn");
+    if (pcHideBtn) pcHideBtn.classList.remove("hidden");
+    if (mobileHideBtn) mobileHideBtn.classList.remove("hidden");
+
+    localStorage.setItem("hyperliquid_controls_hidden", "false");
+  }
+};
+
+unhideBtn?.addEventListener("click", () => {
+  window.showControls();
+});
+
 window.toggleMobileMenu = function() {
   if (mobileMenuDropdown) {
     mobileMenuDropdown.classList.toggle("hidden");
@@ -395,7 +427,6 @@ mobileMenuBtn?.addEventListener("click", (e) => {
   toggleMobileMenu();
 });
 
-// Close mobile menu when clicking anywhere outside
 window.addEventListener("click", (e) => {
   if (mobileMenuDropdown && !mobileMenuDropdown.classList.contains("hidden")) {
     if (!mobileMenuDropdown.contains(e.target) && e.target !== mobileMenuBtn) {
@@ -404,13 +435,11 @@ window.addEventListener("click", (e) => {
   }
 });
 
-// Unified Theme Toggle Helper for both Desktop & Mobile buttons
 window.toggleAppTheme = function() {
   const isLight = document.body.classList.contains("light-theme");
   const newTheme = isLight ? "dark" : "light";
   applyTheme(newTheme);
   
-  // Sync mobile menu text/icon as well
   const mobileThemeIcon = $("mobileThemeIcon");
   const mobileThemeLabel = $("mobileThemeLabel");
   if (mobileThemeIcon && mobileThemeLabel) {
@@ -424,7 +453,6 @@ window.toggleAppTheme = function() {
   }
 };
 
-// Hook up existing desktop theme toggle to also sync mobile labels if needed
 themeToggleBtn.addEventListener("click", () => {
   const isLight = document.body.classList.contains("light-theme");
   const mobileThemeIcon = $("mobileThemeIcon");
@@ -447,7 +475,7 @@ function formatDateInput(d) {
 async function setInceptionPreset() {
   const wallet = actualWalletValue || walletEl.value.trim();
   [allInceptionBtn, monthBtn, ytdBtn, todayBtn].forEach(b => b && b.classList.remove("active"));
-  allInceptionBtn.classList.add("active");
+  if (allInceptionBtn) allInceptionBtn.classList.add("active");
 
   const today = new Date();
   endEl.value = formatDateInput(today);
@@ -577,31 +605,6 @@ async function postInfo(body) {
   return r.json();
 }
 
-async function fetchActiveContractsOnly(cleanUser) {
-  try {
-    const [defaultData, xyzData, spotData] = await Promise.all([
-      postInfo({ type: "clearinghouseState", user: cleanUser }).catch(() => null),
-      postInfo({ type: "clearinghouseState", user: cleanUser, dex: "xyz" }).catch(() => null),
-      postInfo({ type: "spotClearinghouseState", user: cleanUser }).catch(() => null)
-    ]);
-    
-    if (defaultData) holdingsData = defaultData;
-    if (xyzData) xyzHoldingsData = xyzData;
-    if (spotData) spotHoldingsData = spotData;
-
-    const rawAssetPositions = [
-      ...(defaultData?.assetPositions || []),
-      ...(xyzData?.assetPositions || [])
-    ];
-    return rawAssetPositions.filter(item => num(item.position?.szi) !== 0);
-  } catch (e) {
-    console.warn("Fast contracts poll error:", e);
-    return null;
-  }
-}
-
-// Replace or update your existing startFiveSecondPoller function in script.js
-
 function startFiveSecondPoller(cleanUser) {
   if (pollTimer) {
     clearInterval(pollTimer);
@@ -612,7 +615,6 @@ function startFiveSecondPoller(cleanUser) {
     if (!cleanUser || !isAddress(cleanUser)) return;
     
     try {
-      // 1. Fetch fresh positions, open orders, and clearinghouse state concurrently
       const [defaultData, xyzData, spotData, nativeOrders, xyzOrders] = await Promise.all([
         postInfo({ type: "clearinghouseState", user: cleanUser }).catch(() => null),
         postInfo({ type: "clearinghouseState", user: cleanUser, dex: "xyz" }).catch(() => null),
@@ -633,12 +635,10 @@ function startFiveSecondPoller(cleanUser) {
       activePositions = rawAssetPositions.filter(item => num(item.position?.szi) !== 0);
       openOrdersList = [...(Array.isArray(nativeOrders) ? nativeOrders : []), ...(Array.isArray(xyzOrders) ? xyzOrders : [])];
 
-      // 2. Persist updated states to localStorage cache
       localStorage.setItem(CACHE_POSITIONS_KEY, JSON.stringify(activePositions));
       localStorage.setItem(CACHE_ORDERS_KEY, JSON.stringify(openOrdersList));
       localStorage.setItem(CACHE_HOLDINGS_KEY, JSON.stringify(holdingsData));
 
-      // 3. Re-render UI components to immediately reflect changes
       renderContracts();
       renderOpenOrders();
       updateMetrics();
@@ -647,7 +647,7 @@ function startFiveSecondPoller(cleanUser) {
     } catch (e) {
       console.warn("Background user state poll error:", e);
     }
-  }, 5000); // Poll every 5 seconds for seamless auto-sync without rate-limiting
+  }, 5000);
 }
 
 async function fetchAccountData(user, startMs, endMs) {
@@ -1227,7 +1227,6 @@ function renderContracts() {
     const riskId = `contract-risk-${coin}-${index}`;
     const proximityHtml = `<span id="${riskId}" class="${riskColor}" style="font-weight: 700; cursor: pointer;" onclick="window.showRiskInfo('${esc(coin)}', ${currentMarkPx}, ${estLiqPx}, ${distancePercent})">${distancePercent.toFixed(1)}% (${riskLabel} !)</span>`;
 
-    // Robust funding lookup matching watchlist module data & fallback
     const cleanCoin = String(coin || "").toUpperCase().replace("XYZ:", "").replace("-PERP", "").trim();
     const rawFundingRate = Number(
       assetFundingRates[coin] ?? 
@@ -1240,7 +1239,6 @@ function renderContracts() {
     const fundingRateFormatted = (rawFundingRate > 0 ? "+" : "") + fundingPct;
     const fundingRateClass = rawFundingRate > 0 ? "text-positive" : rawFundingRate < 0 ? "text-negative" : "";
 
-    // 2. Cumulative Funding Paid / Received ($)
     const rawCumFunding = num((pos.cumFunding || {}).sinceOpen ?? (pos.cumFunding || {}).allTime ?? 0);
     const positionFunding = -rawCumFunding; 
     const cumFundingClass = positionFunding > 0 ? "text-positive" : positionFunding < 0 ? "text-negative" : "";
@@ -1252,7 +1250,6 @@ function renderContracts() {
 
     rows.push(`
       <tr class="asset-card-row ${isThisExpanded}" onclick="toggleMobileCard(this, '${coin}', 'contracts')">
-        <!-- PC Columns -->
         <td class="pc-col pc-col-left coin-name">${esc(coin)}</td>
         <td class="pc-col pc-col-right ${sizeNum > 0 ? "text-positive" : "text-negative"}">${dirLabel}</td>
         <td class="pc-col pc-col-right">${Math.abs(sizeNum).toLocaleString()}</td>
@@ -1271,7 +1268,6 @@ function renderContracts() {
           </div>
         </td>
 
-        <!-- Mobile Card Wrapper Cell -->
         <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
           <div class="mobile-card-header">
             <span class="coin-name">${esc(coin)}</span>
@@ -1723,7 +1719,6 @@ function renderDailyPnl() {
 
     return `
       <tr class="asset-card-row ${isThisExpanded}" onclick="toggleMobileCard(this, '${day.label}', 'daily')">
-        <!-- PC Columns -->
         <td class="pc-col pc-col-left coin-name">${esc(day.label)}</td>
         <td class="pc-col pc-col-right ${closedClass}">${money(day.closedPnl, 2)}</td>
         <td class="pc-col pc-col-right">${plainMoney(day.fees, 2)}</td>
@@ -1731,7 +1726,6 @@ function renderDailyPnl() {
         <td class="pc-col pc-col-right">${plainMoney(day.volume, 2)}</td>
         <td class="pc-col pc-col-right">${day.fillsCount.toLocaleString()}</td>
 
-        <!-- Mobile Card Wrapper Cell -->
         <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
           <div class="mobile-card-header">
             <span class="coin-name">${esc(day.label)}</span>
@@ -1833,7 +1827,6 @@ function renderMonthlyPnl() {
 
     return `
       <tr class="asset-card-row ${isThisExpanded}" onclick="toggleMobileCard(this, '${m.label}', 'monthly')">
-        <!-- PC Columns -->
         <td class="pc-col pc-col-left coin-name">${esc(m.label)}</td>
         <td class="pc-col pc-col-right ${closedClass}">${money(m.closedPnl, 2)}</td>
         <td class="pc-col pc-col-right">${plainMoney(m.fees, 2)}</td>
@@ -1841,7 +1834,6 @@ function renderMonthlyPnl() {
         <td class="pc-col pc-col-right">${plainMoney(m.volume, 2)}</td>
         <td class="pc-col pc-col-right">${m.fillsCount.toLocaleString()}</td>
 
-        <!-- Mobile Card Wrapper Cell -->
         <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
           <div class="mobile-card-header">
             <span class="coin-name">${esc(m.label)}</span>
@@ -1939,14 +1931,12 @@ function renderDepositsWithdrawals() {
 
     return `
       <tr class="asset-card-row ${isThisExpanded}" onclick="toggleDepositCard(this, '${rowId}')">
-        <!-- PC Columns -->
         <td class="pc-col pc-col-left" style="text-align: left;">${esc(formatDate(t))}</td>
         <td class="pc-col pc-col-right" style="font-weight: 700; text-transform: capitalize; text-align: left;">${esc(displayType)}</td>
         <td class="pc-col pc-col-right" style="text-align: right;">${esc(token)}</td>
         <td class="pc-col pc-col-right ${amountClass}" style="text-align: right;">${money(formattedAmount, 2)}</td>
         <td class="pc-col pc-col-right" style="text-align: right;">${hashCell}</td>
 
-        <!-- Mobile Card Wrapper Cell -->
         <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
           <div class="mobile-card-header">
             <span class="coin-name" style="text-transform: capitalize;">${esc(displayType)} (${esc(token)})</span>
@@ -2129,7 +2119,6 @@ function renderOpenOrders() {
 
     return `
       <tr class="asset-card-row ${isThisExpanded}" onclick="toggleMobileCard(this, '${esc(oid)}', 'openOrders')">
-        <!-- PC Columns -->
         <td class="pc-col pc-col-left coin-name" style="text-align: left; font-weight: 800;">${esc(coin)}</td>
         <td class="pc-col pc-col-right">${esc(oid)}</td>
         <td class="pc-col pc-col-right ${isBuy ? "text-positive" : "text-negative"}">${esc(orderType)} (${esc(side)})</td>
@@ -2140,7 +2129,6 @@ function renderOpenOrders() {
         <td class="pc-col pc-col-right">${plainMoney(marginUsed, 2)}</td>
         <td class="pc-col pc-col-right">${reduceOnly}</td>
 
-        <!-- Mobile Card Wrapper Cell -->
         <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
           <div class="mobile-card-header">
             <span class="coin-name">${esc(coin)} — <span class="${isBuy ? "text-positive" : "text-negative"}">${esc(side)}</span></span>
@@ -2393,7 +2381,6 @@ function renderTrades() {
 
     return `
       <tr class="asset-card-row ${isThisExpanded}" onclick="toggleMobileCard(this, '${fillId}', 'trades')">
-        <!-- PC Columns -->
         <td class="pc-col pc-col-left">${esc(formatDate(f.time))}</td>
         <td class="pc-col pc-col-right coin-name">${esc(f.coin)}</td>
         <td class="pc-col pc-col-right ${dc}">${esc(d)}</td>
@@ -2407,7 +2394,6 @@ function renderTrades() {
         <td class="pc-col pc-col-right">${esc(f.oid)}</td>
         <td class="pc-col pc-col-right">${hashCell}</td>
 
-        <!-- Mobile Card Wrapper Cell -->
         <td class="mobile-card-wrapper-cell" style="display:none; padding:0; width:100%;">
           <div class="mobile-card-header">
             <span class="coin-name">${esc(f.coin)} — ${esc(mapSide(f.side))}</span>
@@ -2476,8 +2462,9 @@ function renderTrades() {
 window.addEventListener("DOMContentLoaded", async () => {
   const savedControlsHidden = localStorage.getItem("hyperliquid_controls_hidden");
   if (savedControlsHidden === "true") {
-    controlsPanel.classList.add("hidden");
-    unhideBtn.classList.remove("hidden");
+    window.hideControlsFromMenu();
+  } else {
+    window.showControls();
   }
 
   const cacheTime = Number(localStorage.getItem(CACHE_TIME_KEY) || 0);

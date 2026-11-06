@@ -5,8 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hyperliquid Pro Analytics | Trade Statement</title>
   
-  <!-- <link rel="stylesheet" href="style.css"> -->
-   <link rel="stylesheet" href="main.css">
+  <link rel="stylesheet" href="main.css">
   <link rel="stylesheet" href="prices.css">
   <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/4807/4807923.png">
 
@@ -34,7 +33,7 @@
       <div class="brand-title">
         <div class="logo-badge"><span class="logo-dot"></span> HYPERLIQUID PRO</div>
         <h1>Trade Statement & Analytics</h1>
-        <p class="subtitle">Institutional execution history, P&L audit, and risk analytics.</p>
+        <p class="subtitle">Execution history, P&L audit, and risk analytics.</p>
       </div>
       <div class="header-right">
         <!-- Desktop / Tablet Action Buttons -->
@@ -44,6 +43,8 @@
           <button id="themeToggleBtn" class="theme-toggle-btn" title="Toggle Theme">
             <span id="themeIcon">☀️</span> <span id="themeLabel">Light Mode</span>
           </button>
+          <button class="secondary" onclick="location.reload();" style="font-weight: 700; display: flex; align-items: center; padding: 0 14px; height: 40px;" title="Refresh Page">🔄 Refresh</button>
+          <button id="desktopHideControlsBtn" class="secondary" onclick="hideControlsFromMenu();" style="font-weight: 700; display: flex; align-items: center; padding: 0 14px; height: 40px;" title="Hide Controls">👁️ Hide Controls</button>
         </div>
 
         <!-- Mobile Burger Menu Button -->
@@ -61,6 +62,12 @@
           </a>
           <button id="mobileThemeToggleBtn" class="secondary mobile-menu-item" onclick="toggleAppTheme(); toggleMobileMenu();">
             <span id="mobileThemeIcon">☀️</span> <span id="mobileThemeLabel">Light Mode</span>
+          </button>
+          <button class="secondary mobile-menu-item" onclick="location.reload();">
+            🔄 Refresh Page
+          </button>
+          <button id="mobileHideControlsBtn" class="secondary mobile-menu-item" onclick="hideControlsFromMenu(); toggleMobileMenu();">
+            👁️ Hide Controls
           </button>
         </div>
       </div>
@@ -668,7 +675,7 @@
       </div>
     </section>
 
-<!-- Open Orders Panel -->
+    <!-- Open Orders Panel -->
     <section id="panelOpenOrders" class="panel table-panel hidden">
       <div class="table-header">
         <div class="table-header-info">
