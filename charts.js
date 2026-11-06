@@ -47,17 +47,23 @@ function initTheme() {
 function applyTheme(theme) {
   const themeIcon = $("themeIcon");
   const themeLabel = $("themeLabel");
+  const mobileIcon = $("mobileThemeIcon");
+  const mobileLabel = $("mobileThemeLabel");
 
   if (theme === "light") {
     document.body.classList.remove("dark-theme");
     document.body.classList.add("light-theme");
     if (themeIcon) themeIcon.textContent = "🌙";
     if (themeLabel) themeLabel.textContent = "Dark Mode";
+    if (mobileIcon) mobileIcon.textContent = "🌙";
+    if (mobileLabel) mobileLabel.textContent = "Dark Mode";
   } else {
     document.body.classList.remove("light-theme");
     document.body.classList.add("dark-theme");
     if (themeIcon) themeIcon.textContent = "☀️";
     if (themeLabel) themeLabel.textContent = "Light Mode";
+    if (mobileIcon) mobileIcon.textContent = "☀️";
+    if (mobileLabel) mobileLabel.textContent = "Light Mode";
   }
   localStorage.setItem(SAVED_THEME_KEY, theme);
   
@@ -72,6 +78,29 @@ $("themeToggleBtn")?.addEventListener("click", () => {
 });
 
 initTheme();
+
+// Mobile Menu Toggle Functions
+function toggleMobileMenu() {
+  const dropdown = $("mobileMenuDropdown");
+  if (dropdown) {
+    dropdown.classList.toggle("hidden");
+  }
+}
+
+$("mobileMenuBtn")?.addEventListener("click", toggleMobileMenu);
+
+window.addEventListener("click", (e) => {
+  const dropdown = $("mobileMenuDropdown");
+  const btn = $("mobileMenuBtn");
+  if (dropdown && btn && !dropdown.contains(e.target) && !btn.contains(e.target)) {
+    dropdown.classList.add("hidden");
+  }
+});
+
+function toggleAppTheme() {
+  const isLight = document.body.classList.contains("light-theme");
+  applyTheme(isLight ? "dark" : "light");
+}
 
 // Listen for clear triggers from the main statement page
 window.addEventListener("storage", (e) => {
@@ -418,7 +447,6 @@ function processAndRenderAnalytics(fills, funding) {
     }
   });
 
-  // Include funding payments accurately into asset net P&L and overall fee/funding drag
   funding.forEach(item => {
     const timeVal = item.time || item.delta?.time;
     if (!timeVal) return;
@@ -433,7 +461,6 @@ function processAndRenderAnalytics(fills, funding) {
 
     dailyMap[dateKey].netPnl += usdPayment;
 
-    // Accumulate funding paid into fee drag / daily fees if negative
     if (usdPayment < 0) {
       const paid = Math.abs(usdPayment);
       dailyMap[dateKey].fees += paid;

@@ -5,8 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hyperliquid Analytics | Performance & Growth Charts</title>
   
-  <!-- <link rel="stylesheet" href="style.css"> -->
-   <link rel="stylesheet" href="main.css">
+  <link rel="stylesheet" href="main.css">
   <link rel="stylesheet" href="charts.css">
   <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/4807/4807923.png">
 
@@ -23,10 +22,28 @@
         <p class="subtitle">Institutional-grade cumulative net equity and performance auditing.</p>
       </div>
       <div class="header-right">
-        <a href="index.html" class="secondary" style="text-decoration: none; display: flex; align-items: center; padding: 0 14px; height: 40px; font-weight: 700;">← Back to Statement</a>
-        <button id="themeToggleBtn" class="theme-toggle-btn" title="Toggle Theme">
-          <span id="themeIcon">☀️</span> <span id="themeLabel">Light Mode</span>
+        <!-- Desktop / Tablet Action Buttons -->
+        <div class="desktop-actions" style="display: flex; align-items: center; gap: 8px;">
+          <a href="index.html" class="secondary" style="text-decoration: none; display: flex; align-items: center; padding: 0 14px; height: 40px; font-weight: 700;">← Back to Statement</a>
+          <button id="themeToggleBtn" class="theme-toggle-btn" title="Toggle Theme">
+            <span id="themeIcon">☀️</span> <span id="themeLabel">Light Mode</span>
+          </button>
+        </div>
+
+        <!-- Mobile Burger Menu Button -->
+        <button id="mobileMenuBtn" class="secondary mobile-burger-btn" aria-label="Toggle Menu" style="display: none; align-items: center; justify-content: center; width: 40px; height: 40px; font-size: 18px; font-weight: 700;">
+          ☰
         </button>
+
+        <!-- Mobile Dropdown Menu Drawer -->
+        <div id="mobileMenuDropdown" class="mobile-menu-dropdown hidden">
+          <a href="index.html" class="secondary mobile-menu-item" style="text-decoration: none; display: block; text-align: center;">
+            ← Back to Statement
+          </a>
+          <button id="mobileThemeToggleBtn" class="secondary mobile-menu-item" onclick="toggleAppTheme(); toggleMobileMenu();">
+            <span id="mobileThemeIcon">☀️</span> <span id="mobileThemeLabel">Light Mode</span>
+          </button>
+        </div>
       </div>
     </header>
 
