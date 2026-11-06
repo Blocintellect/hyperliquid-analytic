@@ -591,8 +591,8 @@ function clearStatus() {
 }
 
 function isAddress(v) { return /^0x[a-fA-F0-9]{40}$/.test(String(v).trim()); }
-function msStart(v) { return new Date(v + "T00:00:00").getTime(); }
-function msEnd(v) { return new Date(v + "T23:59:59.999").getTime(); }
+function msStart(v) { return new Date(v + "T00:00:00.000Z").getTime(); }
+function msEnd(v) { return new Date(v + "T23:59:59.999Z").getTime(); }
 
 async function postInfo(body) {
   const r = await fetch(API, {
@@ -1019,12 +1019,18 @@ function updateMetrics() {
   const tradingFees = targetFills.reduce((s, f) => s + num(f.fee), 0);
   const builderFees = targetFills.reduce((s, f) => s + num(f.builderFee), 0);
   
+  const s = startEl.value ? msStart(startEl.value) : 0;
+  const e = endEl.value ? msEnd(endEl.value) : Date.now();
+
   let netFundingUsd = 0;
   let totalFundingPaid = 0;
   fundingHistory.forEach(item => {
-    const usdPayment = num(item.delta?.usdc);
-    netFundingUsd += usdPayment;
-    if (usdPayment < 0) totalFundingPaid += Math.abs(usdPayment);
+    const timeVal = Number(item.time || item.delta?.time || 0);
+    if (timeVal >= s && timeVal <= e) {
+      const usdPayment = num(item.delta?.usdc);
+      netFundingUsd += usdPayment;
+      if (usdPayment < 0) totalFundingPaid += Math.abs(usdPayment);
+    }
   });
 
   const totalFees = tradingFees + totalFundingPaid + builderFees;
@@ -1052,7 +1058,7 @@ function updateMetrics() {
     spotHoldingsData.balances.forEach(b => {
       const tokenSymbol = b.coin || b.token;
       const totalAmount = num(b.total);
-      const tokenPrice = num(livePrices[tokenSymbol]) || num(livePrices[tokenSymbol + "-PERP"]) || (tokenSymbol === "USDC" ? 1 : 1);
+      const tokenPrice = getTokenPrice(tokenSymbol);
       spotVal += totalAmount * tokenPrice;
     });
   }
@@ -1106,6 +1112,19 @@ function updateMetrics() {
   }
 
   renderShareCardPreview();
+}
+
+function getTokenPrice(tokenSymbol) {
+  const cleanSymbol = String(tokenSymbol || "").toUpperCase();
+  // Recognized stablecoins default to $1
+  if (cleanSymbol === "USDC" || cleanSymbol === "USDT" || cleanSymbol === "USDS" || cleanSymbol === "DAI") {
+    return 1;
+  }
+  // Check live prices, perp variations, or fallback to 0 for unpriced volatile tokens
+  return num(livePrices[cleanSymbol]) || 
+         num(livePrices[cleanSymbol + "-PERP"]) || 
+         num(livePrices["XYZ:" + cleanSymbol]) || 
+         0;
 }
 
 function updateCoinFilterOptions() {
@@ -1490,13 +1509,20 @@ function renderShareCardPreview() {
   const tradingFees = targetFills.reduce((s, f) => s + num(f.fee), 0);
   const builderFees = targetFills.reduce((s, f) => s + num(f.builderFee), 0);
   
+  const s = startEl.value ? msStart(startEl.value) : 0;
+  const e = endEl.value ? msEnd(endEl.value) : Date.now();
+
   let netFundingUsd = 0;
   let totalFundingPaid = 0;
   fundingHistory.forEach(item => {
-    const usdPayment = num(item.delta?.usdc);
-    netFundingUsd += usdPayment;
-    if (usdPayment < 0) totalFundingPaid += Math.abs(usdPayment);
+    const timeVal = Number(item.time || item.delta?.time || 0);
+    if (timeVal >= s && timeVal <= e) {
+      const usdPayment = num(item.delta?.usdc);
+      netFundingUsd += usdPayment;
+      if (usdPayment < 0) totalFundingPaid += Math.abs(usdPayment);
+    }
   });
+
   const currentUnrealizedPnl = calculateTotalUnrealizedPnl();
   const netPnl = closedPnl - tradingFees - builderFees + netFundingUsd + currentUnrealizedPnl;
   const totalFees = tradingFees + totalFundingPaid + builderFees;
@@ -1560,13 +1586,20 @@ $("downloadShareCardBtn")?.addEventListener("click", () => {
   const tradingFees = targetFills.reduce((s, f) => s + num(f.fee), 0);
   const builderFees = targetFills.reduce((s, f) => s + num(f.builderFee), 0);
   
+  const s = startEl.value ? msStart(startEl.value) : 0;
+  const e = endEl.value ? msEnd(endEl.value) : Date.now();
+
   let netFundingUsd = 0;
   let totalFundingPaid = 0;
   fundingHistory.forEach(item => {
-    const usdPayment = num(item.delta?.usdc);
-    netFundingUsd += usdPayment;
-    if (usdPayment < 0) totalFundingPaid += Math.abs(usdPayment);
+    const timeVal = Number(item.time || item.delta?.time || 0);
+    if (timeVal >= s && timeVal <= e) {
+      const usdPayment = num(item.delta?.usdc);
+      netFundingUsd += usdPayment;
+      if (usdPayment < 0) totalFundingPaid += Math.abs(usdPayment);
+    }
   });
+
   const currentUnrealizedPnl = calculateTotalUnrealizedPnl();
   const netPnl = closedPnl - tradingFees - builderFees + netFundingUsd + currentUnrealizedPnl;
   const totalFees = tradingFees + totalFundingPaid + builderFees;
@@ -1661,6 +1694,9 @@ function hideGlobalLoader() {
 
 function renderDailyPnl() {
   const targetFills = getFilteredFills();
+  const s = startEl.value ? msStart(startEl.value) : 0;
+  const e = endEl.value ? msEnd(endEl.value) : Date.now();
+
   if (!targetFills.length && !fundingHistory.length) {
     dailyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">No trade fills loaded to generate daily breakdown.</td></tr>';
     dailyMeta.textContent = "No data loaded.";
@@ -1690,9 +1726,10 @@ function renderDailyPnl() {
   });
 
   fundingHistory.forEach(item => {
-    const timeVal = item.time || item.delta?.time;
-    if (!timeVal) return;
-    const d = new Date(Number(timeVal));
+    const timeVal = Number(item.time || item.delta?.time || 0);
+    if (!timeVal || timeVal < s || timeVal > e) return;
+    
+    const d = new Date(timeVal);
     const dateKey = d.toISOString().split("T")[0];
 
     if (!dailyMap[dateKey]) {
@@ -1710,6 +1747,12 @@ function renderDailyPnl() {
   });
 
   const sortedKeys = Object.keys(dailyMap).sort().reverse();
+
+  if (!sortedKeys.length) {
+    dailyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">No data found in selected date range.</td></tr>';
+    dailyMeta.textContent = "0 active days in range.";
+    return;
+  }
 
   dailyBodyEl.innerHTML = sortedKeys.map(k => {
     const day = dailyMap[k];
@@ -1768,6 +1811,9 @@ function renderDailyPnl() {
 
 function renderMonthlyPnl() {
   const targetFills = getFilteredFills();
+  const s = startEl.value ? msStart(startEl.value) : 0;
+  const e = endEl.value ? msEnd(endEl.value) : Date.now();
+
   if (!targetFills.length && !fundingHistory.length) {
     monthlyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">No trade fills loaded to generate monthly breakdown.</td></tr>';
     monthlyMeta.textContent = "No data loaded.";
@@ -1798,9 +1844,10 @@ function renderMonthlyPnl() {
   });
 
   fundingHistory.forEach(item => {
-    const timeVal = item.time || item.delta?.time;
-    if (!timeVal) return;
-    const d = new Date(Number(timeVal));
+    const timeVal = Number(item.time || item.delta?.time || 0);
+    if (!timeVal || timeVal < s || timeVal > e) return;
+
+    const d = new Date(timeVal);
     const yearMonthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const label = d.toLocaleString(undefined, { month: 'long', year: 'numeric' });
 
@@ -1819,6 +1866,12 @@ function renderMonthlyPnl() {
   });
 
   const sortedKeys = Object.keys(monthlyMap).sort().reverse();
+
+  if (!sortedKeys.length) {
+    monthlyBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">No data found in selected date range.</td></tr>';
+    monthlyMeta.textContent = "0 active months in range.";
+    return;
+  }
 
   monthlyBodyEl.innerHTML = sortedKeys.map(k => {
     const m = monthlyMap[k];
@@ -2259,7 +2312,7 @@ function renderWalletDetails() {
     spotHoldingsData.balances.forEach(b => {
       const tokenSymbol = b.coin || b.token;
       const totalAmount = num(b.total);
-      const tokenPrice = num(livePrices[tokenSymbol]) || num(livePrices[tokenSymbol + "-PERP"]) || (tokenSymbol === "USDC" ? 1 : 1);
+      const tokenPrice = getTokenPrice(tokenSymbol);
       spotVal += totalAmount * tokenPrice;
     });
   }
@@ -2758,12 +2811,18 @@ function generatePDF() {
     const tradingFees = targetFills.reduce((s, f) => s + num(f.fee), 0);
     const builderFees = targetFills.reduce((s, f) => s + num(f.builderFee), 0);
     
+    const s = startEl.value ? msStart(startEl.value) : 0;
+    const e = endEl.value ? msEnd(endEl.value) : Date.now();
+
     let netFundingUsd = 0;
     let totalFundingPaid = 0;
     fundingHistory.forEach(item => {
-      const usdPayment = num(item.delta?.usdc);
-      netFundingUsd += usdPayment;
-      if (usdPayment < 0) totalFundingPaid += Math.abs(usdPayment);
+      const timeVal = Number(item.time || item.delta?.time || 0);
+      if (timeVal >= s && timeVal <= e) {
+        const usdPayment = num(item.delta?.usdc);
+        netFundingUsd += usdPayment;
+        if (usdPayment < 0) totalFundingPaid += Math.abs(usdPayment);
+      }
     });
 
     const totalFees = tradingFees + totalFundingPaid + builderFees;
