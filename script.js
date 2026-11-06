@@ -787,7 +787,7 @@ function num(v) {
 }
 
 function money(v, d = 2) {
-  const n = num(v), s = n > 0 ? "+" : n < 0 ? "−" : "";
+  const n = num(v), s = n > 0 ? "+" : n < 0 ? "-" : "";
   return s + "$" + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
