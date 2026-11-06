@@ -1680,10 +1680,11 @@ function renderDailyPnl() {
     const closedPnl = num(f.closedPnl);
     const tradingFee = num(f.fee);
     const builderFee = num(f.builderFee);
+    const totalFillCost = tradingFee + builderFee;
 
     dailyMap[dateKey].closedPnl += closedPnl;
-    dailyMap[dateKey].fees += (tradingFee + builderFee);
-    dailyMap[dateKey].netPnl += (closedPnl - tradingFee - builderFee);
+    dailyMap[dateKey].fees += totalFillCost;
+    dailyMap[dateKey].netPnl += (closedPnl - totalFillCost);
     dailyMap[dateKey].volume += Math.abs(num(f.px) * num(f.sz));
     dailyMap[dateKey].fillsCount += 1;
   });
@@ -1787,10 +1788,11 @@ function renderMonthlyPnl() {
     const closedPnl = num(f.closedPnl);
     const tradingFee = num(f.fee);
     const builderFee = num(f.builderFee);
+    const totalFillCost = tradingFee + builderFee;
 
     monthlyMap[yearMonthKey].closedPnl += closedPnl;
-    monthlyMap[yearMonthKey].fees += (tradingFee + builderFee);
-    monthlyMap[yearMonthKey].netPnl += (closedPnl - tradingFee - builderFee);
+    monthlyMap[yearMonthKey].fees += totalFillCost;
+    monthlyMap[yearMonthKey].netPnl += (closedPnl - totalFillCost);
     monthlyMap[yearMonthKey].volume += Math.abs(num(f.px) * num(f.sz));
     monthlyMap[yearMonthKey].fillsCount += 1;
   });
