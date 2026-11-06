@@ -343,3 +343,19 @@
     letter-spacing: 0.5px;
   }
 }
+
+/* Horizontal Scrollable Chart Wrapper */
+.chart-scroll-wrap::-webkit-scrollbar {
+  height: 6px;
+}
+.chart-scroll-wrap::-webkit-scrollbar-track {
+  background: var(--input-bg, #090c12);
+  border-radius: 3px;
+}
+.chart-scroll-wrap::-webkit-scrollbar-thumb {
+  background: var(--panel-border, #1e2638);
+  border-radius: 3px;
+}
+.chart-scroll-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--coinglass-blue, #2962ff);
+}

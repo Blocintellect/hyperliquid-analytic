@@ -646,10 +646,18 @@ function processAndRenderAnalytics(fills, funding) {
 function renderAssetBarChart(assetMap) {
   if (assetBarInstance) assetBarInstance.destroy();
 
-  const sortedCoins = Object.keys(assetMap).sort((a, b) => assetMap[b].netPnl - assetMap[a].netPnl).slice(0, 10);
+  // Sort all available coins instead of slicing to 10, enabling full asset exploration
+  const sortedCoins = Object.keys(assetMap).sort((a, b) => assetMap[b].netPnl - assetMap[a].netPnl);
   const labels = sortedCoins;
   const dataVals = sortedCoins.map(c => assetMap[c].netPnl);
   const backgroundColors = dataVals.map(v => v >= 0 ? 'rgba(0, 184, 124, 0.7)' : 'rgba(246, 70, 93, 0.7)');
+
+  // Dynamically set min-width based on item count to ensure horizontal scrolling triggers nicely
+  const barContainer = $("barChartContainer");
+  if (barContainer) {
+    const calculatedWidth = Math.max(600, sortedCoins.length * 55);
+    barContainer.style.width = calculatedWidth + "px";
+  }
 
   const ctxBar = $("assetBarChart").getContext("2d");
   const chartTextColor = getComputedStyle(document.body).getPropertyValue('--text-muted') || '#8492a6';
@@ -673,7 +681,7 @@ function renderAssetBarChart(assetMap) {
         tooltip: { callbacks: { label: c => ' Net P&L: ' + money(c.raw, 2) } }
       },
       scales: {
-        x: { ticks: { color: chartTextColor }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        x: { ticks: { color: chartTextColor, autoSkip: false }, grid: { color: 'rgba(255,255,255,0.04)' } },
         y: { ticks: { color: chartTextColor, callback: v => '$' + v.toLocaleString() }, grid: { color: 'rgba(255,255,255,0.04)' } }
       }
     }

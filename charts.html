@@ -341,11 +341,13 @@
         <div class="table-header" style="padding: 0 0 14px 0; border-bottom: 1px solid var(--panel-border); margin-bottom: 16px;">
           <div class="table-header-info">
             <h2>Asset Net P&L Distribution</h2>
-            <p class="meta-info">Visual ranking of net performance across traded markets.</p>
+            <p class="meta-info">Visual ranking of net performance across traded markets. Scroll horizontally to view all assets.</p>
           </div>
         </div>
-        <div style="position: relative; height: 300px; width: 100%;">
-          <canvas id="assetBarChart"></canvas>
+        <div class="chart-scroll-wrap" style="width: 100%; overflow-x: auto; overflow-y: hidden;">
+          <div id="barChartContainer" style="position: relative; height: 300px; min-width: 600px;">
+            <canvas id="assetBarChart"></canvas>
+          </div>
         </div>
       </section>
     </div>
