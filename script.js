@@ -397,7 +397,6 @@ window.hideControlsFromMenu = function() {
   }
 };
 
-// --- Show Controls Handler ---
 window.showControls = function() {
   if (controlsPanel && unhideBtn) {
     controlsPanel.classList.remove("hidden");

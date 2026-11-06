@@ -955,3 +955,7 @@ body.light-theme .global-loader {
     display: none !important;
   }
 }
+
+.mobile-menu-item.hidden {
+  display: none !important;
+}
