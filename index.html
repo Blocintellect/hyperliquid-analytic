@@ -149,9 +149,12 @@
         <span class="subtext">Profitable fills</span>
       </div>
       <div class="metric-card interactive-card" id="holdingsCard" title="Click to view account equity and balance details">
-        <span class="label">PERP HOLDINGS ⓘ</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+          <span class="label">PERP HOLDINGS ⓘ</span>
+          <button id="toggleHoldingsCurrencyBtn" class="secondary" style="height: 22px; padding: 0 6px; font-size: 9px; font-weight: 700;" onclick="event.stopPropagation(); toggleHoldingsCurrency();" title="Toggle USD / BTC">USD / ₿</button>
+        </div>
         <strong id="mWalletHoldings" class="value">—</strong>
-        <span class="subtext">Account balance & collateral</span>
+        <span class="subtext" id="holdingsSubtext">Account balance & collateral</span>
       </div>
     </section>
 

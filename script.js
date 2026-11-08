@@ -1039,6 +1039,50 @@ function calculateTotalUnrealizedPnl() {
   return totalUnrealizedPnl;
 }
 
+let holdingsInBtc = false;
+let latestBtcPrice = 0;
+let btcPriceCache = 0;
+let lastBtcFetchTime = 0;
+
+async function getBtcPrice() {
+  if (btcPriceCache > 0 && (Date.now() - lastBtcFetchTime < 15000)) {
+    return btcPriceCache;
+  }
+
+  if (livePrices["BTC"] && num(livePrices["BTC"]) > 0) {
+    btcPriceCache = num(livePrices["BTC"]);
+    lastBtcFetchTime = Date.now();
+    return btcPriceCache;
+  }
+  
+  for (const [k, v] of Object.entries(livePrices)) {
+    if (k.toUpperCase() === "BTC" && num(v) > 0) {
+      btcPriceCache = num(v);
+      lastBtcFetchTime = Date.now();
+      return btcPriceCache;
+    }
+  }
+
+  try {
+    const res = await postInfo({ type: "allMids" });
+    const midsMap = res.mids || res; 
+    if (midsMap) {
+      for (const [k, v] of Object.entries(midsMap)) {
+        if (k.toUpperCase() === "BTC" && num(v) > 0) {
+          livePrices["BTC"] = v;
+          btcPriceCache = num(v);
+          lastBtcFetchTime = Date.now();
+          return btcPriceCache;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Direct BTC price fetch fallback error:", e);
+  }
+
+  return btcPriceCache > 0 ? btcPriceCache : 0;
+}
+
 function updateMetrics() {
   const targetFills = getFilteredFills();
   const closedPnl = targetFills.reduce((s, f) => s + num(f.closedPnl), 0);
@@ -1130,15 +1174,78 @@ function updateMetrics() {
   setMetric("mFees", totalFees, null, true, 2, false);
   setMetric("mNet", netPnl, netPnl, true, 2, true);
   setMetric("mWinRate", winRate, winRate > 50 ? 1 : winRate < 50 ? -1 : 0, false, 1, false);
-  setMetric("mWalletHoldings", perpAccountVal, null, true, 2, false);
 
   const holdingsValEl = $("mWalletHoldings");
-  if (holdingsValEl) {
-    holdingsValEl.style.color = "var(--coinglass-purple)";
+  const holdingsSubtextEl = $("holdingsSubtext");
+
+  if (typeof holdingsInBtc !== "undefined" && holdingsInBtc) {
+    if (holdingsValEl) holdingsValEl.textContent = "Loading BTC...";
+    if (holdingsSubtextEl) holdingsSubtextEl.textContent = "Fetching live BTC price...";
+
+    getBtcPrice().then(btcPrice => {
+      latestBtcPrice = btcPrice;
+      const displayHoldingsVal = latestBtcPrice > 0 ? (perpAccountVal / latestBtcPrice) : 0;
+
+      if (holdingsValEl) {
+        if (latestBtcPrice > 0) {
+          holdingsValEl.textContent = "₿" + displayHoldingsVal.toLocaleString(undefined, { minimumFractionDigits: 7, maximumFractionDigits: 7 });
+        } else {
+          holdingsValEl.textContent = "Unavailable";
+        }
+        holdingsValEl.style.color = "var(--coinglass-purple)";
+      }
+
+      if (holdingsSubtextEl) {
+        holdingsSubtextEl.textContent = latestBtcPrice > 0 ? `BTC Price: $${latestBtcPrice.toLocaleString()}` : "Price feed error";
+      }
+    });
+  } else {
+    setMetric("mWalletHoldings", perpAccountVal, null, true, 2, false);
+    if (holdingsValEl) holdingsValEl.style.color = "var(--coinglass-purple)";
+    if (holdingsSubtextEl) holdingsSubtextEl.textContent = "Account balance & collateral";
   }
 
   renderShareCardPreview();
 }
+
+// Reliable 3-second auto-refresh for BTC price and holdings
+setInterval(() => {
+  if (typeof holdingsInBtc !== "undefined" && holdingsInBtc) {
+    const forceFresh = (Date.now() - lastBtcFetchTime > 2500);
+    if (forceFresh) {
+      btcPriceCache = 0; 
+    }
+
+    getBtcPrice().then(btcPrice => {
+      if (btcPrice > 0) {
+        latestBtcPrice = btcPrice;
+        let perpAccountVal = 0;
+        if (holdingsData?.marginSummary?.accountValue) {
+          perpAccountVal += num(holdingsData.marginSummary.accountValue);
+        }
+        if (xyzHoldingsData?.marginSummary?.accountValue) {
+          perpAccountVal += num(xyzHoldingsData.marginSummary.accountValue);
+        }
+        
+        const displayHoldingsVal = perpAccountVal / latestBtcPrice;
+        const holdingsValEl = $("mWalletHoldings");
+        const holdingsSubtextEl = $("holdingsSubtext");
+
+        if (holdingsValEl) {
+          holdingsValEl.textContent = "₿" + displayHoldingsVal.toLocaleString(undefined, { minimumFractionDigits: 7, maximumFractionDigits: 7 });
+        }
+        if (holdingsSubtextEl) {
+          holdingsSubtextEl.textContent = `BTC Price: $${latestBtcPrice.toLocaleString()}`;
+        }
+      }
+    });
+  }
+}, 3000);
+
+window.toggleHoldingsCurrency = function() {
+  holdingsInBtc = !holdingsInBtc;
+  updateMetrics();
+};
 
 function getTokenPrice(tokenSymbol) {
   const cleanSymbol = String(tokenSymbol || "").toUpperCase();
