@@ -329,7 +329,6 @@
       }
 
       if (!isInitial && allAssetsData.length > 0) {
-        // Update prices smoothly with animations instead of rebuilding the whole table
         parsedAssets.forEach(newItem => {
           const existing = allAssetsData.find(a => a.coin === newItem.coin && a.venue === newItem.venue);
           if (existing && existing.markPx !== newItem.markPx) {
@@ -371,14 +370,19 @@
     if (pollIntervalId) clearInterval(pollIntervalId);
     pollIntervalId = setInterval(() => {
       fetchAssetPricesData(false);
-    }, 3000); // Poll every 3 seconds reliably
+    }, 3000);
   }
 
   function renderPricesTable() {
     const tbody = document.getElementById("pricesTableBody");
     if (!tbody) return;
 
-    const coinSelect = document.getElementById("coinFilterSelect");
+    const coinSelect = document.getElementById("coinFilterSelect") || 
+                       document.getElementById("assetFilter") || 
+                       document.getElementById("marketSelect") ||
+                       document.getElementById("coinSelect") ||
+                       document.querySelector(".coin-filter-select");
+
     const activeFilteredCoin = coinSelect ? coinSelect.value : "all";
     const cleanActiveFiltered = activeFilteredCoin.toUpperCase().replace("XYZ:", "").replace("-PERP", "").trim();
 
@@ -562,43 +566,54 @@
   }
 
   window.toggleCoinFilter = function(coin) {
-    const coinSelect = document.getElementById("coinFilterSelect");
+    const coinSelect = document.getElementById("coinFilterSelect") || 
+                       document.getElementById("assetFilter") || 
+                       document.getElementById("marketSelect") ||
+                       document.getElementById("coinSelect") ||
+                       document.querySelector(".coin-filter-select");
+                       
     if (coinSelect) {
-      let targetOptionValue = coin;
-      let options = Array.from(coinSelect.options);
-      
       const cleanTarget = coin.toUpperCase().replace("XYZ:", "").replace("-PERP", "").trim();
-
-      let matchedOpt = options.find(opt => {
-        const optVal = opt.value.toUpperCase();
-        const cleanOpt = optVal.replace("XYZ:", "").replace("-PERP", "").trim();
-        return cleanOpt === cleanTarget || 
-               cleanOpt.includes(cleanTarget) || 
-               cleanTarget.includes(cleanOpt) ||
-               (cleanTarget === "SILVER" && cleanOpt.includes("SILVER")) ||
-               (cleanTarget === "SP500" && (cleanOpt.includes("SP500") || cleanOpt.includes("SPX")));
-      });
-
-      if (matchedOpt) {
-        targetOptionValue = matchedOpt.value;
-      }
-
-      const currentVal = coinSelect.value.toUpperCase();
+      const currentVal = (coinSelect.value || "").toUpperCase();
       const cleanCurrent = currentVal.replace("XYZ:", "").replace("-PERP", "").trim();
 
-      if (cleanCurrent === cleanTarget || cleanCurrent.includes(cleanTarget) || cleanTarget.includes(cleanTarget)) {
+      // If it's already filtered to this coin, unfilter it back to "all"
+      if (cleanCurrent === cleanTarget || cleanCurrent.includes(cleanTarget) || cleanTarget.includes(cleanCurrent)) {
         coinSelect.value = "all";
       } else {
-        coinSelect.value = targetOptionValue;
+        let matchedOpt = Array.from(coinSelect.options).find(opt => {
+          const cleanOpt = opt.value.toUpperCase().replace("XYZ:", "").replace("-PERP", "").trim();
+          return cleanOpt === cleanTarget || cleanOpt.includes(cleanTarget) || cleanTarget.includes(cleanOpt);
+        });
+
+        if (matchedOpt) {
+          coinSelect.value = matchedOpt.value;
+        } else {
+          const newOpt = document.createElement("option");
+          newOpt.value = coin;
+          newOpt.textContent = coin;
+          coinSelect.appendChild(newOpt);
+          coinSelect.value = coin;
+        }
       }
       
       coinSelect.dispatchEvent(new Event("change"));
     }
 
-    const viewSelect = document.getElementById("viewSelect");
+    const viewSelect = document.getElementById("viewSelect") || document.getElementById("mainViewSelect");
     if (viewSelect) {
-      viewSelect.value = "trades";
+      // If we unfiltered, we can keep the view or let the main app handle it, but triggering change ensures it updates
       viewSelect.dispatchEvent(new Event("change"));
+    }
+
+    if (typeof window.filterFillsByCoin === "function") {
+      window.filterFillsByCoin(coin);
+    }
+    if (typeof window.renderTrades === "function") {
+      window.renderTrades();
+    }
+    if (typeof window.updateDashboard === "function") {
+      window.updateDashboard();
     }
 
     document.getElementById("pricesModal")?.classList.add("hidden");
