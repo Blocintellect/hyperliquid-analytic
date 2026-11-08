@@ -993,3 +993,80 @@ body.light-theme .global-loader {
 .mobile-menu-item.hidden {
   display: none !important;
 }
+
+/* ================================================================= */
+/* MULTI-SELECT FILTER POPOVER STYLING                              */
+/* ================================================================= */
+
+.multi-filter-popover {
+  position: absolute;
+  top: 44px;
+  left: 0;
+  width: 270px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 14px;
+  z-index: 1000;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
+}
+
+.multi-filter-popover.hidden {
+  display: none !important;
+}
+
+.filter-section-title {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  letter-spacing: 0.8px;
+}
+
+.filter-section-title.divider {
+  border-top: 1px solid var(--panel-border);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+.filter-option-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11.5px;
+  color: var(--text-main);
+  margin-bottom: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+}
+
+.filter-option-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--coinglass-blue);
+  cursor: pointer;
+  border-radius: 4px;
+  margin: 0;
+}
+
+.filter-option-label:hover {
+  color: var(--coinglass-blue);
+}
+
+.filter-dropdown-footer {
+  border-top: 1px solid var(--panel-border);
+  margin-top: 10px;
+  padding-top: 8px;
+}
+
+/* Mobile Popover Responsiveness */
+@media (max-width: 768px) {
+  .multi-filter-popover {
+    left: auto;
+    right: 0;
+    width: 290px;
+    max-width: calc(100vw - 24px);
+  }
+}

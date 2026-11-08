@@ -55,6 +55,32 @@ const walletEl = $("wallet"),
       paginationContainer = $("paginationContainer"),
       controlsPanel = $("controlsPanel"),
       unhideBtn = $("unhideBtn");
+const multiFilterBtn = $("multiFilterBtn");
+const multiFilterDropdown = $("multiFilterDropdown");
+
+// Dropdown toggle logic
+multiFilterBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  multiFilterDropdown.classList.toggle("hidden");
+});
+
+window.addEventListener("click", (e) => {
+  if (multiFilterDropdown && !multiFilterDropdown.contains(e.target) && e.target !== multiFilterBtn) {
+    multiFilterDropdown.classList.add("hidden");
+  }
+});
+
+// Helper function to update the button text when options are checked
+function updateFilterButtonLabel() {
+  const selectedCount = document.querySelectorAll('input[name="filterPnl"]:checked, input[name="filterDir"]:checked').length;
+  const labelSpan = multiFilterBtn?.querySelector("span");
+  if (!labelSpan) return;
+  if (selectedCount === 0) {
+    labelSpan.textContent = "Select Filters (All)";
+  } else {
+    labelSpan.textContent = `Filters Active (${selectedCount})`;
+  }
+}
 
 // Modal Elements
 const fillsCard = $("fillsCard"), fillsModal = $("fillsModal"), closeFillsModal = $("closeFillsModal");
@@ -1135,19 +1161,37 @@ function updateCoinFilterOptions() {
 }
 
 function getFilteredFills() {
-  const pnlVal = pnlFilterSelect.value;
   const coinVal = coinFilterSelect.value;
   const s = startEl.value ? msStart(startEl.value) : 0;
   const e = endEl.value ? msEnd(endEl.value) : Date.now();
 
+  const checkedPnl = Array.from(document.querySelectorAll('input[name="filterPnl"]:checked')).map(cb => cb.value);
+  const checkedDir = Array.from(document.querySelectorAll('input[name="filterDir"]:checked')).map(cb => cb.value);
+
   return fills.filter(f => {
     const t = Number(f.time);
     if (t < s || t > e) return false;
+    
     const pnl = num(f.closedPnl);
-    if (pnlVal === "positive" && pnl <= 0) return false;
-    if (pnlVal === "negative" && pnl >= 0) return false;
-    if (pnlVal === "nonzero" && pnl === 0) return false;
+    
+    if (checkedPnl.length > 0) {
+      let matchesPnl = false;
+      if (checkedPnl.includes("positive") && pnl > 0) matchesPnl = true;
+      if (checkedPnl.includes("negative") && pnl < 0) matchesPnl = true;
+      if (checkedPnl.includes("nonzero") && pnl !== 0) matchesPnl = true;
+      if (!matchesPnl) return false;
+    }
+
+    if (checkedDir.length > 0) {
+      const directionStr = String(f.dir || "").toUpperCase();
+      let matchesDir = false;
+      if (checkedDir.includes("long") && directionStr.includes("LONG")) matchesDir = true;
+      if (checkedDir.includes("short") && directionStr.includes("SHORT")) matchesDir = true;
+      if (!matchesDir) return false;
+    }
+
     if (coinVal !== "all" && f.coin !== coinVal) return false;
+    
     return true;
   });
 }
@@ -2629,7 +2673,15 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-pnlFilterSelect.addEventListener("change", () => { currentPage = 1; updateMetrics(); renderTrades(); });
+// Re-render table whenever any filter checkbox changes
+document.querySelectorAll('input[name="filterPnl"], input[name="filterDir"]').forEach(cb => {
+  cb.addEventListener("change", () => {
+    currentPage = 1;
+    updateFilterButtonLabel();
+    updateMetrics();
+    renderTrades();
+  });
+});
 coinFilterSelect.addEventListener("change", () => { currentPage = 1; updateMetrics(); renderTrades(); });
 
 prevPageBtn.addEventListener("click", () => { if (currentPage > 1) { currentPage--; renderTrades(); } });
@@ -2977,7 +3029,9 @@ $("clearBtn").addEventListener("click", () => {
   spotHoldingsData = null;
   activePositions = [];
   previousNumericValues = {};
-  pnlFilterSelect.value = "all";
+  // Uncheck all filter checkboxes on clear
+  document.querySelectorAll('input[name="filterPnl"], input[name="filterDir"]').forEach(cb => { cb.checked = false; });
+  updateFilterButtonLabel();
   coinFilterSelect.innerHTML = '<option value="all">All Coins</option>';
   clearStatus();
   noticeEl.classList.add("hidden");
@@ -2994,6 +3048,17 @@ $("clearBtn").addEventListener("click", () => {
   depositsMeta.textContent = "No data loaded.";
   openOrdersMeta.textContent = "No data loaded.";
   resetMetrics();
+});
+
+$("clearFiltersBtn")?.addEventListener("click", () => {
+  document.querySelectorAll('input[name="filterPnl"], input[name="filterDir"]').forEach(cb => { cb.checked = false; });
+  updateFilterButtonLabel();
+  currentPage = 1;
+  updateMetrics();
+  renderTrades();
+  if (multiFilterDropdown) {
+    multiFilterDropdown.classList.add("hidden");
+  }
 });
 
 walletEl.addEventListener("keydown", e => { if (e.key === "Enter") fetchBtn.click(); });

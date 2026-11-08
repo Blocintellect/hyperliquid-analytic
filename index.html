@@ -316,15 +316,41 @@
               <option value="all">All Coins</option>
             </select>
           </div>
-          <div class="filter-dropdown-field">
-            <label for="pnlFilterSelect">FILTER P&L:</label>
-            <select id="pnlFilterSelect">
-              <option value="all">All Trades</option>
-              <option value="positive">Positive CLOSED P&L (> $0)</option>
-              <option value="negative">Negative CLOSED P&L (< $0)</option>
-              <option value="nonzero">Bigger & Smaller than $0 (≠ $0)</option>
-            </select>
+          
+          <!-- Updated Multi-Select Filter Block with Clean Popover Class -->
+          <div class="filter-dropdown-field filter-dropdown-wrapper" style="position: relative;">
+            <label>FILTERS:</label>
+            <button id="multiFilterBtn" class="secondary multi-filter-btn" type="button" style="height: 36px; padding: 0 12px; font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+              <span>Select Filters (All)</span> <span style="font-size: 9px;">▾</span>
+            </button>
+            
+            <!-- Clean Popover Menu -->
+            <div id="multiFilterDropdown" class="multi-filter-popover hidden">
+              <div class="filter-section-title">P&L STATUS</div>
+              <label class="filter-option-label">
+                <input type="checkbox" name="filterPnl" value="positive"> Positive Closed P&L (&gt; $0)
+              </label>
+              <label class="filter-option-label">
+                <input type="checkbox" name="filterPnl" value="negative"> Negative Closed P&L (&lt; $0)
+              </label>
+              <label class="filter-option-label">
+                <input type="checkbox" name="filterPnl" value="nonzero"> Non-zero P&L (&ne; $0)
+              </label>
+
+              <div class="filter-section-title divider">POSITION DIRECTION</div>
+              <label class="filter-option-label">
+                <input type="checkbox" name="filterDir" value="long"> Only Long Trades
+              </label>
+              <label class="filter-option-label">
+                <input type="checkbox" name="filterDir" value="short"> Only Short Trades
+              </label>
+
+              <div class="filter-dropdown-footer">
+                <button type="button" id="clearFiltersBtn" class="btn-ghost" style="width: 100%; height: 32px; font-size: 11px; font-weight: 700;">Clear All Filters</button>
+              </div>
+            </div>
           </div>
+
           <div class="export-actions">
             <button id="pdfBtn" class="btn-export pdf-export" disabled>PDF Statement</button>
             <button id="csvBtn" class="btn-export" disabled>Export CSV</button>
@@ -603,7 +629,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr><td style="text-align: left; font-weight: 700;">Tier 0</td><td>< $1,000,000</td><td>0.010%</td><td>0.035%</td></tr>
+              <tr><td style="text-align: left; font-weight: 700;">Tier 0</td><td>&lt; $1,000,000</td><td>0.010%</td><td>0.035%</td></tr>
               <tr><td style="text-align: left; font-weight: 700;">Tier 1 VIP</td><td>≥ $1,000,000</td><td>0.005%</td><td>0.028%</td></tr>
               <tr><td style="text-align: left; font-weight: 700;">Tier 2 VIP</td><td>≥ $10,000,000</td><td>0.000%</td><td>0.022%</td></tr>
               <tr><td style="text-align: left; font-weight: 700;">Tier 3+ VIP</td><td>≥ $100,000,000</td><td>0.000%</td><td>0.015%</td></tr>
