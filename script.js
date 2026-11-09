@@ -1220,6 +1220,7 @@ setInterval(() => {
       if (btcPrice > 0) {
         latestBtcPrice = btcPrice;
         let perpAccountVal = 0;
+        console.log("Updating holdings in BTC with latest BTC price:", latestBtcPrice);
         if (holdingsData?.marginSummary?.accountValue) {
           perpAccountVal += num(holdingsData.marginSummary.accountValue);
         }
@@ -1240,7 +1241,7 @@ setInterval(() => {
       }
     });
   }
-}, 3000);
+}, 2000);
 
 window.toggleHoldingsCurrency = function() {
   holdingsInBtc = !holdingsInBtc;
