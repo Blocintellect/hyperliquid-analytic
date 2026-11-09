@@ -3168,4 +3168,15 @@ $("clearFiltersBtn")?.addEventListener("click", () => {
   }
 });
 
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    // Tab became active again - refresh immediately
+    const activeWallet = actualWalletValue || walletEl.value.trim();
+    if (activeWallet) {
+      // Trigger immediate sync
+      getBtcPrice().then(price => { latestBtcPrice = price; updateMetrics(); });
+    }
+  }
+});
+
 walletEl.addEventListener("keydown", e => { if (e.key === "Enter") fetchBtn.click(); });
