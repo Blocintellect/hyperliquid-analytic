@@ -1237,6 +1237,7 @@ setInterval(() => {
         }
         if (holdingsSubtextEl) {
           holdingsSubtextEl.textContent = `BTC Price: $${latestBtcPrice.toLocaleString()}`;
+          holdingsSubtextEl.style.color = getThemeAwareBtcColor();
         }
       }
     });
@@ -1247,6 +1248,16 @@ window.toggleHoldingsCurrency = function() {
   holdingsInBtc = !holdingsInBtc;
   updateMetrics();
 };
+
+function getThemeAwareBtcColor() {
+  const isLight = document.body.classList.contains("light-theme");
+  
+  if (isLight) {
+    return "#000000"; // A darker
+  } else {
+    return "#00ff44"; 
+  }
+}
 
 function getTokenPrice(tokenSymbol) {
   const cleanSymbol = String(tokenSymbol || "").toUpperCase();
