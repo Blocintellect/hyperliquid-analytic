@@ -1196,7 +1196,9 @@ function updateMetrics() {
       }
 
       if (holdingsSubtextEl) {
-        holdingsSubtextEl.textContent = latestBtcPrice > 0 ? `BTC Price: $${latestBtcPrice.toLocaleString()}` : "Price feed error";
+        holdingsSubtextEl.innerHTML = latestBtcPrice > 0 
+          ? `BTC Price: <span style="color: ${getThemeAwareBtcColor()}; font-weight: 700;">$${latestBtcPrice.toLocaleString()}</span>` 
+          : "Price feed error";
       }
     });
   } else {
@@ -1208,7 +1210,7 @@ function updateMetrics() {
   renderShareCardPreview();
 }
 
-// Reliable 3-second auto-refresh for BTC price and holdings
+// Reliable 2-second auto-refresh for BTC price and holdings
 setInterval(() => {
   if (typeof holdingsInBtc !== "undefined" && holdingsInBtc) {
     const forceFresh = (Date.now() - lastBtcFetchTime > 2500);
@@ -1220,7 +1222,7 @@ setInterval(() => {
       if (btcPrice > 0) {
         latestBtcPrice = btcPrice;
         let perpAccountVal = 0;
-        // console.log("Updating holdings in BTC with latest BTC price:", latestBtcPrice);
+        
         if (holdingsData?.marginSummary?.accountValue) {
           perpAccountVal += num(holdingsData.marginSummary.accountValue);
         }
@@ -1235,9 +1237,10 @@ setInterval(() => {
         if (holdingsValEl) {
           holdingsValEl.textContent = "₿" + displayHoldingsVal.toLocaleString(undefined, { minimumFractionDigits: 7, maximumFractionDigits: 7 });
         }
+        
         if (holdingsSubtextEl) {
-          holdingsSubtextEl.textContent = `BTC Price: $${latestBtcPrice.toLocaleString()}`;
-          holdingsSubtextEl.style.color = getThemeAwareBtcColor();
+          // Include both the label and the live price tag styled dynamically
+          holdingsSubtextEl.innerHTML = `BTC Price: <span style="color: ${getThemeAwareBtcColor()}; font-weight: 700;">$${latestBtcPrice.toLocaleString()}</span>`;
         }
       }
     });
@@ -1253,9 +1256,9 @@ function getThemeAwareBtcColor() {
   const isLight = document.body.classList.contains("light-theme");
   
   if (isLight) {
-    return "#000000"; // A darker
+    return "#047857"; // A rich, visible emerald/dark green for light mode
   } else {
-    return "#00ff44"; 
+    return "#00ff44"; // neon green for dark mode
   }
 }
 
