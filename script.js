@@ -2103,6 +2103,7 @@ function renderDepositsWithdrawals() {
 
   const depStart = $("depositStartDate")?.value ? msStart($("depositStartDate").value) : 0;
   const depEnd = $("depositEndDate")?.value ? msEnd($("depositEndDate").value) : Date.now();
+  const currentWallet = (actualWalletValue || walletEl.value || "").trim().toLowerCase();
 
   const filteredLedger = ledgerUpdates.filter(item => {
     const t = Number(item.time || item.delta?.time || 0);
@@ -2121,16 +2122,33 @@ function renderDepositsWithdrawals() {
     
     const rawType = String(delta.type || "").toLowerCase();
     const usdcVal = num(delta.usdc || delta.usdcValue || delta.amount || 0);
+    const itemUser = String(delta.user || "").trim().toLowerCase();
+    const destination = String(delta.destination || delta.to || "").trim().toLowerCase();
 
     let displayType = "Deposit";
     let isDeposit = true;
 
-    if (rawType.includes("withdraw") || rawType.includes("withdrawal") || rawType.includes("burn")) {
+    // Algorithmic flow check based on wallet addresses
+    if (rawType.includes("withdraw") || rawType.includes("burn") || usdcVal < 0) {
       displayType = "Withdraw";
       isDeposit = false;
-    } else if (rawType.includes("send") || rawType.includes("deposit") || rawType.includes("transfer")) {
+    } else if (rawType.includes("deposit") || rawType.includes("mint") || rawType.includes("receive")) {
       displayType = "Deposit";
       isDeposit = true;
+    } else if (currentWallet) {
+      // If destination matches your wallet, it's incoming (Deposit)
+      // If item.user matches your wallet and destination is elsewhere, it's outgoing (Withdraw)
+      if (destination && destination === currentWallet && itemUser !== currentWallet) {
+        displayType = "Deposit";
+        isDeposit = true;
+      } else if (itemUser === currentWallet && destination && destination !== currentWallet) {
+        displayType = "Withdraw";
+        isDeposit = false;
+      } else {
+        // Fallback to sign
+        isDeposit = usdcVal >= 0;
+        displayType = isDeposit ? "Deposit" : "Withdraw";
+      }
     } else {
       isDeposit = usdcVal >= 0;
       displayType = isDeposit ? "Deposit" : "Withdraw";
