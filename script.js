@@ -1094,18 +1094,20 @@ function updateMetrics() {
 
   let netFundingUsd = 0;
   let totalFundingPaid = 0;
+  let totalFundingReceived = 0;
   fundingHistory.forEach(item => {
     const timeVal = Number(item.time || item.delta?.time || 0);
     if (timeVal >= s && timeVal <= e) {
       const usdPayment = num(item.delta?.usdc);
       netFundingUsd += usdPayment;
       if (usdPayment < 0) totalFundingPaid += Math.abs(usdPayment);
+      if (usdPayment > 0) totalFundingReceived += usdPayment;
     }
   });
 
   const totalFees = tradingFees + totalFundingPaid + builderFees;
   const currentUnrealizedPnl = calculateTotalUnrealizedPnl();
-  const netPnl = closedPnl - tradingFees - builderFees + netFundingUsd + currentUnrealizedPnl;
+  const netPnl = closedPnl - totalFees + totalFundingReceived + currentUnrealizedPnl;
 
   const tradesWithPnl = targetFills.filter(f => num(f.closedPnl) !== 0);
   const winningTrades = tradesWithPnl.filter(f => num(f.closedPnl) > 0);
@@ -1137,6 +1139,7 @@ function updateMetrics() {
   $("modalTotalFills").textContent = targetFills.length.toLocaleString();
   $("modalTotalVol").textContent = plainMoney(totalVol, 2);
 
+  // Default USD modal values
   $("netModalClosed").textContent = money(closedPnl, 2);
   $("netModalUnrealized").textContent = money(currentUnrealizedPnl, 2);
   $("netModalFunding").textContent = money(netFundingUsd, 2);
@@ -1169,6 +1172,7 @@ function updateMetrics() {
   $("modalSpotValue").textContent = plainMoney(spotVal, 2);
   $("modalTotalHoldings").textContent = plainMoney(perpAccountVal + spotVal, 2);
 
+  // Set metrics in USD by default
   setMetric("mFills", targetFills.length, null, false, 0, false);
   setMetric("mPnl", closedPnl, closedPnl, true, 2, true);
   setMetric("mFees", totalFees, null, true, 2, false);
@@ -1178,27 +1182,71 @@ function updateMetrics() {
   const holdingsValEl = $("mWalletHoldings");
   const holdingsSubtextEl = $("holdingsSubtext");
 
+  const formatHoldingVal = (val) => {
+    if (holdingsInBtc && latestBtcPrice > 0) {
+      return "₿" + (val / latestBtcPrice).toLocaleString(undefined, { minimumFractionDigits: 7, maximumFractionDigits: 7 });
+    }
+    return plainMoney(val, 2);
+  };
+
+  const formatVal = (val, isSigned = false, decimals = 7) => {
+    if (holdingsInBtc && latestBtcPrice > 0) {
+      const btcVal = val / latestBtcPrice;
+      const s = isSigned ? (btcVal > 0 ? "+" : btcVal < 0 ? "-" : "") : "";
+      return s + "₿" + Math.abs(btcVal).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    }
+    return isSigned ? money(val, 2) : plainMoney(val, 2);
+  };
+
   if (typeof holdingsInBtc !== "undefined" && holdingsInBtc) {
     if (holdingsValEl) holdingsValEl.textContent = "Loading BTC...";
     if (holdingsSubtextEl) holdingsSubtextEl.textContent = "Fetching live BTC price...";
 
     getBtcPrice().then(btcPrice => {
       latestBtcPrice = btcPrice;
-      const displayHoldingsVal = latestBtcPrice > 0 ? (perpAccountVal / latestBtcPrice) : 0;
-
-      if (holdingsValEl) {
-        if (latestBtcPrice > 0) {
+      if (latestBtcPrice > 0) {
+        const displayHoldingsVal = perpAccountVal / latestBtcPrice;
+        if (holdingsValEl) {
           holdingsValEl.textContent = "₿" + displayHoldingsVal.toLocaleString(undefined, { minimumFractionDigits: 7, maximumFractionDigits: 7 });
-        } else {
-          holdingsValEl.textContent = "Unavailable";
+          holdingsValEl.style.color = "var(--coinglass-purple)";
         }
-        holdingsValEl.style.color = "var(--coinglass-purple)";
-      }
+        if (holdingsSubtextEl) {
+          holdingsSubtextEl.textContent = `BTC Price: $${latestBtcPrice.toLocaleString()}`;
+        }
 
-      if (holdingsSubtextEl) {
-        holdingsSubtextEl.innerHTML = latestBtcPrice > 0 
-          ? `BTC Price: <span style="color: ${getThemeAwareBtcColor()}; font-weight: 700;">$${latestBtcPrice.toLocaleString()}</span>` 
-          : "Price feed error";
+        // Update P&L & Fees Cards to BTC with 7 decimals
+        const mPnlEl = $("mPnl");
+        if (mPnlEl) mPnlEl.textContent = formatVal(closedPnl, true, 7);
+
+        const mFeesEl = $("mFees");
+        if (mFeesEl) mFeesEl.textContent = formatVal(totalFees, false, 7);
+
+        const mNetEl = $("mNet");
+        if (mNetEl) mNetEl.textContent = formatVal(netPnl, true, 7);
+
+        // Update Modals to BTC with 7 decimals
+        if ($("netModalClosed")) $("netModalClosed").textContent = formatVal(closedPnl, true, 7);
+        if ($("netModalUnrealized")) $("netModalUnrealized").textContent = formatVal(currentUnrealizedPnl, true, 7);
+        if ($("netModalFunding")) $("netModalFunding").textContent = formatVal(netFundingUsd, true, 7);
+        if ($("netModalFees")) $("netModalFees").textContent = formatVal(totalFees, false, 7);
+        if ($("netModalTotal")) $("netModalTotal").textContent = formatVal(netPnl, true, 7);
+
+        if ($("modalGrossProfit")) $("modalGrossProfit").textContent = formatVal(grossProfit, true, 7);
+        if ($("modalGrossLoss")) $("modalGrossLoss").textContent = formatVal(grossLoss, true, 7);
+        if ($("modalNetClosedPnl")) $("modalNetClosedPnl").textContent = formatVal(closedPnl, true, 7);
+
+        if ($("modalTradingFee")) $("modalTradingFee").textContent = formatVal(tradingFees, false, 7);
+        if ($("modalFundingFee")) $("modalFundingFee").textContent = formatVal(totalFundingPaid, false, 7);
+        if ($("modalBuilderFee")) $("modalBuilderFee").textContent = formatVal(builderFees, false, 7);
+        if ($("modalTotalFee")) $("modalTotalFee").textContent = formatVal(totalFees, false, 7);
+
+        if ($("modalPerpValue")) $("modalPerpValue").textContent = formatHoldingVal(perpAccountVal);
+        if ($("modalWithdrawable")) $("modalWithdrawable").textContent = formatHoldingVal(withdrawableVal);
+        if ($("modalSpotValue")) $("modalSpotValue").textContent = formatHoldingVal(spotVal);
+        if ($("modalTotalHoldings")) $("modalTotalHoldings").textContent = formatHoldingVal(perpAccountVal + spotVal);
+      } else {
+        if (holdingsValEl) holdingsValEl.textContent = "Unavailable";
+        if (holdingsSubtextEl) holdingsSubtextEl.textContent = "Price feed error";
       }
     });
   } else {
