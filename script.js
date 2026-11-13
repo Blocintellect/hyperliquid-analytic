@@ -1034,32 +1034,30 @@ let latestBtcPrice = 0;
 let btcPriceCache = 0;
 let lastBtcFetchTime = 0;
 
-async function getBtcPrice() {
-  if (btcPriceCache > 0 && (Date.now() - lastBtcFetchTime < 15000)) {
+async function getBtcPrice(forceFresh = false) {
+  const isCacheValid = btcPriceCache > 0 && (Date.now() - lastBtcFetchTime < 2000);
+  if (!forceFresh && isCacheValid) {
     return btcPriceCache;
   }
 
-  if (livePrices["BTC"] && num(livePrices["BTC"]) > 0) {
-    btcPriceCache = num(livePrices["BTC"]);
-    lastBtcFetchTime = Date.now();
-    return btcPriceCache;
-  }
-  
-  for (const [k, v] of Object.entries(livePrices)) {
-    if (k.toUpperCase() === "BTC" && num(v) > 0) {
-      btcPriceCache = num(v);
+  // If WebSocket is actively connected and streaming live mids, use it
+  if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+    const wsBtc = num(livePrices["BTC"] || livePrices["btc"]);
+    if (wsBtc > 0) {
+      btcPriceCache = wsBtc;
       lastBtcFetchTime = Date.now();
       return btcPriceCache;
     }
   }
 
+  // Otherwise, fetch directly from Hyperliquid API
   try {
     const res = await postInfo({ type: "allMids" });
-    const midsMap = res.mids || res; 
+    const midsMap = res?.mids || res;
     if (midsMap) {
       for (const [k, v] of Object.entries(midsMap)) {
         if (k.toUpperCase() === "BTC" && num(v) > 0) {
-          livePrices["BTC"] = v;
+          livePrices["BTC"] = v; // Keep livePrices updated too
           btcPriceCache = num(v);
           lastBtcFetchTime = Date.now();
           return btcPriceCache;
@@ -1141,7 +1139,7 @@ function updateMetrics() {
   // Default USD modal values
   $("netModalClosed").textContent = money(closedPnl, 2);
   $("netModalUnrealized").textContent = money(currentUnrealizedPnl, 2);
-  $("netModalFunding").textContent = money(netFundingUsd, 2);
+  // $("netModalFunding").textContent = money(netFundingUsd, 2);
   $("netModalFees").textContent = plainMoney(totalFees, 2);
   $("netModalTotal").textContent = money(netPnl, 2);
 
@@ -1161,20 +1159,10 @@ function updateMetrics() {
   $("modalBuilderFee").textContent = plainMoney(builderFees, 4);
   $("modalTotalFee").textContent = plainMoney(totalFees, 4);
 
-  $("modalWinningFills").textContent = winningTradesList.length.toLocaleString();
-  $("modalLosingFills").textContent = losingTradesList.length.toLocaleString();
-  $("modalEvenFills").textContent = evenTradesList.length.toLocaleString();
-  $("modalWinRateVal").textContent = winRate.toFixed(1) + "%";
-
-  $("modalPerpValue").textContent = plainMoney(perpAccountVal, 2);
-  $("modalWithdrawable").textContent = plainMoney(withdrawableVal, 2);
-  $("modalSpotValue").textContent = plainMoney(spotVal, 2);
-  $("modalTotalHoldings").textContent = plainMoney(perpAccountVal + spotVal, 2);
-
   // Set metrics in USD by default
   setMetric("mFills", targetFills.length, null, false, 0, false);
   setMetric("mPnl", closedPnl, closedPnl, true, 2, true);
-  setMetric("mFees", totalFees, null, true, 2, false);
+  setMetric("mFees", totalFees, null, true, 2, false); // Displays Gross Fees & Outflows
   setMetric("mNet", netPnl, netPnl, true, 2, true);
   setMetric("mWinRate", winRate, winRate > 50 ? 1 : winRate < 50 ? -1 : 0, false, 1, false);
 
@@ -1225,7 +1213,7 @@ function updateMetrics() {
           holdingsValEl.style.color = "var(--coinglass-purple)";
         }
         if (holdingsSubtextEl) {
-          holdingsSubtextEl.textContent = `BTC Price: $${latestBtcPrice.toLocaleString()}`;
+          holdingsSubtextEl.innerHTML = `BTC Price: <span style="color: ${getThemeAwareBtcColor()}; font-weight: 700;">$${latestBtcPrice.toLocaleString()}</span>`;
         }
 
         // Update P&L & Fees Cards to BTC with 7 decimals
@@ -1241,7 +1229,7 @@ function updateMetrics() {
         // Update Modals to BTC with 7 decimals
         if ($("netModalClosed")) $("netModalClosed").textContent = formatVal(closedPnl, true, 7);
         if ($("netModalUnrealized")) $("netModalUnrealized").textContent = formatVal(currentUnrealizedPnl, true, 7);
-        if ($("netModalFunding")) $("netModalFunding").textContent = formatVal(netFundingUsd, true, 7);
+        // if ($("netModalFunding")) $("netModalFunding").textContent = formatVal(netFundingUsd, true, 7);
         if ($("netModalFees")) $("netModalFees").textContent = formatVal(totalFees, false, 7);
         if ($("netModalTotal")) $("netModalTotal").textContent = formatVal(netPnl, true, 7);
 
@@ -1305,51 +1293,10 @@ async function postInfo(body, retries = 3, delay = 1000) {
 // Reliable 2-second auto-refresh for BTC price and holdings
 setInterval(() => {
   if (typeof holdingsInBtc !== "undefined" && holdingsInBtc) {
-    const forceFresh = (Date.now() - lastBtcFetchTime > 2500);
-    if (forceFresh) {
-      btcPriceCache = 0; 
-    }
-
-    getBtcPrice().then(btcPrice => {
+    getBtcPrice(true).then(btcPrice => {
       if (btcPrice > 0) {
         latestBtcPrice = btcPrice;
-        let perpAccountVal = 0;
-        let spotVal = 0;
-        
-        if (holdingsData?.marginSummary?.accountValue) {
-          perpAccountVal += num(holdingsData.marginSummary.accountValue);
-        }
-        if (xyzHoldingsData?.marginSummary?.accountValue) {
-          perpAccountVal += num(xyzHoldingsData.marginSummary.accountValue);
-        }
-
-        if (spotHoldingsData && Array.isArray(spotHoldingsData.balances)) {
-          spotHoldingsData.balances.forEach(b => {
-            const tokenSymbol = b.coin || b.token;
-            const totalAmount = num(b.total);
-            if (totalAmount > 0) {
-              const tokenPrice = getTokenPrice(tokenSymbol);
-              spotVal += totalAmount * tokenPrice;
-            }
-          });
-        }
-
-        const hasActiveContractsOrOrders = (Array.isArray(activePositions) && activePositions.length > 0) || 
-                                           (Array.isArray(openOrdersList) && openOrdersList.length > 0);
-
-        const targetCardHoldingValue = hasActiveContractsOrOrders ? perpAccountVal : spotVal;
-        
-        const displayHoldingsVal = targetCardHoldingValue / latestBtcPrice;
-        const holdingsValEl = $("mWalletHoldings");
-        const holdingsSubtextEl = $("holdingsSubtext");
-
-        if (holdingsValEl) {
-          holdingsValEl.textContent = "₿" + displayHoldingsVal.toLocaleString(undefined, { minimumFractionDigits: 7, maximumFractionDigits: 7 });
-        }
-        
-        if (holdingsSubtextEl) {
-          holdingsSubtextEl.innerHTML = `BTC Price: <span style="color: ${getThemeAwareBtcColor()}; font-weight: 700;">$${latestBtcPrice.toLocaleString()}</span>`;
-        }
+        updateMetrics(); // Automatically recalculates holdings, P&L, fees, and updates the subtext
       }
     });
   }
