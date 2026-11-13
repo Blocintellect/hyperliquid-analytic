@@ -1083,6 +1083,13 @@ async function getBtcPrice() {
   return btcPriceCache > 0 ? btcPriceCache : 0;
 }
 
+// Helper to check if user has active contracts or limit/trigger orders
+function hasActiveContractsOrOrders() {
+  const hasPositions = Array.isArray(activePositions) && activePositions.length > 0;
+  const hasOrders = Array.isArray(openOrdersList) && openOrdersList.length > 0;
+  return hasPositions || hasOrders;
+}
+
 function updateMetrics() {
   const targetFills = getFilteredFills();
   const closedPnl = targetFills.reduce((s, f) => s + num(f.closedPnl), 0);
@@ -1130,8 +1137,10 @@ function updateMetrics() {
     spotHoldingsData.balances.forEach(b => {
       const tokenSymbol = b.coin || b.token;
       const totalAmount = num(b.total);
-      const tokenPrice = getTokenPrice(tokenSymbol);
-      spotVal += totalAmount * tokenPrice;
+      if (totalAmount > 0) {
+        const tokenPrice = getTokenPrice(tokenSymbol);
+        spotVal += totalAmount * tokenPrice;
+      }
     });
   }
 
@@ -1179,6 +1188,21 @@ function updateMetrics() {
   setMetric("mNet", netPnl, netPnl, true, 2, true);
   setMetric("mWinRate", winRate, winRate > 50 ? 1 : winRate < 50 ? -1 : 0, false, 1, false);
 
+  // Check for active contracts (positions) or open limit/trigger orders
+  const hasActiveContractsOrOrders = (Array.isArray(activePositions) && activePositions.length > 0) || 
+                                     (Array.isArray(openOrdersList) && openOrdersList.length > 0);
+
+  const holdingsCardLabelEl = document.querySelector("#holdingsCard .label");
+  if (holdingsCardLabelEl) {
+    if (hasActiveContractsOrOrders) {
+      holdingsCardLabelEl.innerHTML = 'PERP HOLDINGS <span style="font-size:10px; cursor:pointer;" title="Active perpetual contracts or open orders detected">ⓘ</span>';
+    } else {
+      holdingsCardLabelEl.innerHTML = 'SPOT HOLDINGS <span style="font-size:10px; cursor:pointer;" title="No active contracts or open orders">ⓘ</span>';
+    }
+  }
+
+  const targetCardHoldingValue = hasActiveContractsOrOrders ? perpAccountVal : spotVal;
+
   const holdingsValEl = $("mWalletHoldings");
   const holdingsSubtextEl = $("holdingsSubtext");
 
@@ -1205,7 +1229,7 @@ function updateMetrics() {
     getBtcPrice().then(btcPrice => {
       latestBtcPrice = btcPrice;
       if (latestBtcPrice > 0) {
-        const displayHoldingsVal = perpAccountVal / latestBtcPrice;
+        const displayHoldingsVal = targetCardHoldingValue / latestBtcPrice;
         if (holdingsValEl) {
           holdingsValEl.textContent = "₿" + displayHoldingsVal.toLocaleString(undefined, { minimumFractionDigits: 7, maximumFractionDigits: 7 });
           holdingsValEl.style.color = "var(--coinglass-purple)";
@@ -1250,12 +1274,42 @@ function updateMetrics() {
       }
     });
   } else {
-    setMetric("mWalletHoldings", perpAccountVal, null, true, 2, false);
+    setMetric("mWalletHoldings", targetCardHoldingValue, null, true, 2, false);
     if (holdingsValEl) holdingsValEl.style.color = "var(--coinglass-purple)";
-    if (holdingsSubtextEl) holdingsSubtextEl.textContent = "Account balance & collateral";
+    if (holdingsSubtextEl) {
+      holdingsSubtextEl.textContent = hasActiveContractsOrOrders ? "Account balance & collateral" : "Spot token holdings value";
+    }
   }
 
   renderShareCardPreview();
+}
+
+async function postInfo(body, retries = 3, delay = 1000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const r = await fetch(API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      
+      if (r.status === 429) {
+        if (i < retries - 1) {
+          console.warn(`Rate limited (429) on API call. Retrying in ${delay}ms...`);
+          await new Promise(res => setTimeout(res, delay));
+          delay *= 2; // Exponential backoff
+          continue;
+        }
+      }
+      
+      if (!r.ok) throw new Error(`Hyperliquid API status: ${r.status}`);
+      return r.json();
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      await new Promise(res => setTimeout(res, delay));
+      delay *= 2;
+    }
+  }
 }
 
 // Reliable 2-second auto-refresh for BTC price and holdings
@@ -1270,6 +1324,7 @@ setInterval(() => {
       if (btcPrice > 0) {
         latestBtcPrice = btcPrice;
         let perpAccountVal = 0;
+        let spotVal = 0;
         
         if (holdingsData?.marginSummary?.accountValue) {
           perpAccountVal += num(holdingsData.marginSummary.accountValue);
@@ -1277,8 +1332,24 @@ setInterval(() => {
         if (xyzHoldingsData?.marginSummary?.accountValue) {
           perpAccountVal += num(xyzHoldingsData.marginSummary.accountValue);
         }
+
+        if (spotHoldingsData && Array.isArray(spotHoldingsData.balances)) {
+          spotHoldingsData.balances.forEach(b => {
+            const tokenSymbol = b.coin || b.token;
+            const totalAmount = num(b.total);
+            if (totalAmount > 0) {
+              const tokenPrice = getTokenPrice(tokenSymbol);
+              spotVal += totalAmount * tokenPrice;
+            }
+          });
+        }
+
+        const hasActiveContractsOrOrders = (Array.isArray(activePositions) && activePositions.length > 0) || 
+                                           (Array.isArray(openOrdersList) && openOrdersList.length > 0);
+
+        const targetCardHoldingValue = hasActiveContractsOrOrders ? perpAccountVal : spotVal;
         
-        const displayHoldingsVal = perpAccountVal / latestBtcPrice;
+        const displayHoldingsVal = targetCardHoldingValue / latestBtcPrice;
         const holdingsValEl = $("mWalletHoldings");
         const holdingsSubtextEl = $("holdingsSubtext");
 
@@ -1287,7 +1358,6 @@ setInterval(() => {
         }
         
         if (holdingsSubtextEl) {
-          // Include both the label and the live price tag styled dynamically
           holdingsSubtextEl.innerHTML = `BTC Price: <span style="color: ${getThemeAwareBtcColor()}; font-weight: 700;">$${latestBtcPrice.toLocaleString()}</span>`;
         }
       }
