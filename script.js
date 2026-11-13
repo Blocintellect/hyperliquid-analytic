@@ -620,16 +620,6 @@ function isAddress(v) { return /^0x[a-fA-F0-9]{40}$/.test(String(v).trim()); }
 function msStart(v) { return new Date(v + "T00:00:00.000Z").getTime(); }
 function msEnd(v) { return new Date(v + "T23:59:59.999Z").getTime(); }
 
-async function postInfo(body) {
-  const r = await fetch(API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
-  if (!r.ok) throw new Error(`Hyperliquid API status: ${r.status}`);
-  return r.json();
-}
-
 function startFiveSecondPoller(cleanUser) {
   if (pollTimer) {
     clearInterval(pollTimer);
