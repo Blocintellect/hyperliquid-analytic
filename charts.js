@@ -6,6 +6,8 @@ let assetBarInstance = null;
 
 let rawGlobalFills = [];
 let rawGlobalFunding = [];
+let rawAssetMap = {};
+let assetSearchQuery = "";
 let currentZoomRange = "all";
 
 let analyticsCache = {
@@ -107,6 +109,7 @@ window.addEventListener("storage", (e) => {
   if (e.key === "hyperliquid_force_clear" || !localStorage.getItem(CACHE_FILLS_KEY)) {
     rawGlobalFills = [];
     rawGlobalFunding = [];
+    rawAssetMap = {};
     
     analyticsCache = {
       peakPnl: 0, maxDrawdown: 0, totalWins: 0, totalLosses: 0,
@@ -296,6 +299,18 @@ window.addEventListener("DOMContentLoaded", () => {
   const savedFills = localStorage.getItem(CACHE_FILLS_KEY) || sessionStorage.getItem("hl_cached_fills");
   const savedFunding = localStorage.getItem(CACHE_FUNDING_KEY) || sessionStorage.getItem("hl_cached_funding");
 
+  // Bind Search Input Listener
+  const searchInput = $("assetSearchInput");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      assetSearchQuery = e.target.value;
+      if (Object.keys(rawAssetMap).length > 0) {
+        renderAssetTable(rawAssetMap);
+        renderAssetBarChart(rawAssetMap);
+      }
+    });
+  }
+
   if (savedFills) {
     try {
       const fillsData = JSON.parse(savedFills);
@@ -359,7 +374,6 @@ function processAndRenderAnalytics(fills, funding) {
   let sessionPnl = { asian: 0, london: 0, ny: 0 };
   let durationPnl = { scalp: 0, intraday: 0, swing: 0 };
   
-  // FIFO lot tracking queue per coin for accurate holding duration
   const coinOpenLots = {};
 
   fills.forEach((f) => {
@@ -395,7 +409,6 @@ function processAndRenderAnalytics(fills, funding) {
     assetMap[coin].volume += notionalVol;
     assetMap[coin].fills += 1;
 
-    // --- 1. CORRECTED LONG / SHORT DIRECTIONAL SPLIT ---
     if (dirStr.includes("LONG")) {
       longPnl += netTradePnl;
       longTotal++;
@@ -405,7 +418,6 @@ function processAndRenderAnalytics(fills, funding) {
       shortTotal++;
       if (closedPnl > 0) shortWins++;
     }
-    // ----------------------------------------------------
 
     const utcHour = d.getUTCHours();
     if (utcHour >= 0 && utcHour < 8) {
@@ -416,7 +428,6 @@ function processAndRenderAnalytics(fills, funding) {
       sessionPnl.ny += netTradePnl;
     }
 
-    // --- 2. ACCURATE HOLDING DURATION (FIFO LOT MATCHING) ---
     if (!coinOpenLots[coin]) coinOpenLots[coin] = [];
     const lots = coinOpenLots[coin];
 
@@ -455,7 +466,6 @@ function processAndRenderAnalytics(fills, funding) {
     if (fillSz > 0) {
       lots.push({ time: tMs, sz: fillSz, side: side });
     }
-    // ----------------------------------------------------
 
     if (netTradePnl > bestTrade.pnl) {
       bestTrade = { coin, pnl: netTradePnl };
@@ -514,6 +524,8 @@ function processAndRenderAnalytics(fills, funding) {
   if (bestTrade.pnl === -Infinity) bestTrade = { coin: "—", pnl: 0 };
   if (worstTrade.pnl === Infinity) worstTrade = { coin: "—", pnl: 0 };
 
+  rawAssetMap = assetMap;
+
   const dates = Object.keys(dailyMap).sort();
   let cumulativePnl = 0;
   let cumulativeFeeDrag = 0;
@@ -560,7 +572,6 @@ function processAndRenderAnalytics(fills, funding) {
 
   const avgRecoveryDays = recoveryCount > 0 ? Math.round(recoveryDaysSum / recoveryCount) : (dates.length > 0 ? Math.round(dates.length / 4) : 0);
   
-  // 3. FIXED AVERAGE TRADE EXPECTANCY (Denominator is closed trades count, not raw fills)
   const closedTradesCount = totalWins + totalLosses;
   const avgTradeExpectancy = closedTradesCount > 0 ? cumulativePnl / closedTradesCount : 0;
 
@@ -605,11 +616,8 @@ function processAndRenderAnalytics(fills, funding) {
   if ($("statProfitFactor")) $("statProfitFactor").textContent = profitFactorVal;
   if ($("statAvgTrade")) $("statAvgTrade").textContent = money(avgTradeExpectancy, 2);
   if ($("statStreak")) $("statStreak").textContent = `${maxWinStreak}W / ${maxLossStreak}L`;
-  
-  // 4. FIXED DOUBLE PLUS SIGN (++) BUG IN STAT CARDS
   if ($("statOutliers")) $("statOutliers").textContent = `${bestTrade.coin} (${money(bestTrade.pnl, 0)})`;
   if ($("statLongShort")) $("statLongShort").textContent = longPnl >= shortPnl ? `Longs (${money(longPnl, 0)})` : `Shorts (${money(shortPnl, 0)})`;
-  
   if ($("statSession")) $("statSession").textContent = `${topSessionName} (${money(maxSessionVal, 0)})`;
   if ($("statDuration")) $("statDuration").textContent = durationPnl.scalp >= durationPnl.intraday ? "Scalps" : "Intraday";
   if ($("statRecovery")) $("statRecovery").textContent = `${avgRecoveryDays} Days`;
@@ -689,14 +697,17 @@ function processAndRenderAnalytics(fills, funding) {
 function renderAssetBarChart(assetMap) {
   if (assetBarInstance) assetBarInstance.destroy();
 
+  const query = assetSearchQuery.trim().toLowerCase();
   const sortedCoins = Object.keys(assetMap).sort((a, b) => assetMap[b].netPnl - assetMap[a].netPnl);
-  const labels = sortedCoins;
-  const dataVals = sortedCoins.map(c => assetMap[c].netPnl);
+  const filteredCoins = query ? sortedCoins.filter(c => c.toLowerCase().includes(query)) : sortedCoins;
+
+  const labels = filteredCoins;
+  const dataVals = filteredCoins.map(c => assetMap[c].netPnl);
   const backgroundColors = dataVals.map(v => v >= 0 ? 'rgba(0, 184, 124, 0.7)' : 'rgba(246, 70, 93, 0.7)');
 
   const barContainer = $("barChartContainer");
   if (barContainer) {
-    const calculatedWidth = Math.max(600, sortedCoins.length * 55);
+    const calculatedWidth = Math.max(600, filteredCoins.length * 55);
     barContainer.style.width = calculatedWidth + "px";
   }
 
@@ -733,10 +744,12 @@ function renderAssetTable(assetMap) {
   const assetBody = $("assetTableBody");
   if (!assetBody) return;
 
+  const query = assetSearchQuery.trim().toLowerCase();
   const sortedCoins = Object.keys(assetMap).sort((a, b) => assetMap[b].netPnl - assetMap[a].netPnl);
+  const filteredCoins = query ? sortedCoins.filter(c => c.toLowerCase().includes(query)) : sortedCoins;
 
-  if (!sortedCoins.length) {
-    assetBody.innerHTML = '<tr class="empty-row"><td colspan="6">No asset trading data available for selected range.</td></tr>';
+  if (!filteredCoins.length) {
+    assetBody.innerHTML = '<tr class="empty-row"><td colspan="6">No matching asset trading data found.</td></tr>';
     return;
   }
 
@@ -746,7 +759,7 @@ function renderAssetTable(assetMap) {
   let totalVolume = 0;
   let totalFills = 0;
 
-  const rowsHtml = sortedCoins.map(coin => {
+  filteredCoins.forEach(coin => {
     const row = assetMap[coin];
     const assetTotalDrag = row.fees + row.funding;
     
@@ -755,6 +768,11 @@ function renderAssetTable(assetMap) {
     totalNetPnl += row.netPnl;
     totalVolume += row.volume;
     totalFills += row.fills;
+  });
+
+  const rowsHtml = filteredCoins.map(coin => {
+    const row = assetMap[coin];
+    const assetTotalDrag = row.fees + row.funding;
 
     return `
     <tr class="asset-card-row" data-coin="${esc(coin)}">
@@ -806,7 +824,7 @@ function renderAssetTable(assetMap) {
   const totalRowHtml = `
   <tr class="asset-total-row" title="Closed P&L minus Total Fees & Funding matches Net P&L precisely">
     <!-- PC Columns -->
-    <td class="pc-col pc-col-left coin-name">TOTAL / SUMMARY</td>
+    <td class="pc-col pc-col-left coin-name">${query ? "FILTERED TOTAL" : "TOTAL / SUMMARY"}</td>
     <td class="pc-col pc-col-right ${totalClosedPnl >= 0 ? "text-positive" : "text-negative"}">${money(totalClosedPnl, 2)}</td>
     <td class="pc-col pc-col-right">${plainMoney(totalFeesAndFunding, 2)}</td>
     <td class="pc-col pc-col-right ${totalNetPnl >= 0 ? "text-positive" : "text-negative"}">${money(totalNetPnl, 2)}</td>
@@ -816,7 +834,7 @@ function renderAssetTable(assetMap) {
     <!-- Mobile Card Fallback Wrapper -->
     <td class="mobile-card-wrapper-cell" style="display:none; padding:0;">
       <div class="mobile-card-header">
-        <span class="coin-name">TOTAL / SUMMARY</span>
+        <span class="coin-name">${query ? "FILTERED TOTAL" : "TOTAL / SUMMARY"}</span>
         <div class="mobile-header-right">
           <span class="${totalNetPnl >= 0 ? "text-positive" : "text-negative"}">${money(totalNetPnl, 2)}</span>
           <button class="mobile-card-toggle-btn" aria-label="Toggle details">▼</button>
@@ -887,6 +905,8 @@ function renderAssetTable(assetMap) {
   });
 
   if ($("tableMeta")) {
-    $("tableMeta").textContent = `Displaying performance across ${sortedCoins.length} traded asset market(s). Fees & Funding column fully accounts for trading commissions and net funding paid.`;
+    $("tableMeta").textContent = query 
+      ? `Displaying filtered results for "${query}" across ${filteredCoins.length} matching asset market(s).`
+      : `Displaying performance across ${filteredCoins.length} traded asset market(s). Fees & Funding column fully accounts for trading commissions and net funding paid.`;
   }
 }

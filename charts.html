@@ -354,10 +354,18 @@
 
     <!-- Asset Performance Breakdown Table -->
     <section class="panel table-panel">
-      <div class="table-header">
+      <div class="table-header" style="display: flex; flex-direction: column; align-items: flex-start; gap: 12px;">
         <div class="table-header-info">
           <h2>Asset Performance Breakdown</h2>
           <p id="tableMeta" class="meta-info">Aggregated net P&L, volume, and fill counts grouped by individual coin markets.</p>
+        </div>
+        <div class="asset-search-container" style="width: 100%;">
+          <input 
+            type="text" 
+            id="assetSearchInput" 
+            placeholder="Search asset (e.g., BTC, ETH, SOL)..." 
+            style="width: 100%; max-width: 320px; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color, #2a2e39); background: var(--bg-card, #1e222d); color: var(--text-main, #d1d4dc); font-size: 14px; outline: none;"
+          />
         </div>
       </div>
       <div class="table-wrap">
