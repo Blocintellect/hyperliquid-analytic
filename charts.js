@@ -358,7 +358,9 @@ function processAndRenderAnalytics(fills, funding) {
 
   let sessionPnl = { asian: 0, london: 0, ny: 0 };
   let durationPnl = { scalp: 0, intraday: 0, swing: 0 };
-  const coinOpenLots = {}; // FIFO lot tracking for accurate holding duration
+  
+  // FIFO lot tracking queue per coin for accurate holding duration
+  const coinOpenLots = {};
 
   fills.forEach((f) => {
     const tMs = Number(f.time);
@@ -366,6 +368,7 @@ function processAndRenderAnalytics(fills, funding) {
     const dateKey = d.toISOString().split("T")[0];
     const coin = f.coin || "PERP";
     const side = String(f.side || "").toUpperCase();
+    const dirStr = String(f.dir || "").toUpperCase();
 
     if (!dailyMap[dateKey]) {
       dailyMap[dateKey] = { netPnl: 0, fees: 0, wins: 0, losses: 0 };
@@ -392,15 +395,17 @@ function processAndRenderAnalytics(fills, funding) {
     assetMap[coin].volume += notionalVol;
     assetMap[coin].fills += 1;
 
-    if (side === "B" || side.includes("BUY")) {
+    // --- 1. CORRECTED LONG / SHORT DIRECTIONAL SPLIT ---
+    if (dirStr.includes("LONG")) {
       longPnl += netTradePnl;
       longTotal++;
       if (closedPnl > 0) longWins++;
-    } else {
+    } else if (dirStr.includes("SHORT")) {
       shortPnl += netTradePnl;
       shortTotal++;
       if (closedPnl > 0) shortWins++;
     }
+    // ----------------------------------------------------
 
     const utcHour = d.getUTCHours();
     if (utcHour >= 0 && utcHour < 8) {
@@ -411,7 +416,7 @@ function processAndRenderAnalytics(fills, funding) {
       sessionPnl.ny += netTradePnl;
     }
 
-    // --- ACCURATE HOLDING DURATION (FIFO LOT MATCHING) ---
+    // --- 2. ACCURATE HOLDING DURATION (FIFO LOT MATCHING) ---
     if (!coinOpenLots[coin]) coinOpenLots[coin] = [];
     const lots = coinOpenLots[coin];
 
