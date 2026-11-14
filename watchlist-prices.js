@@ -364,7 +364,7 @@
     if (pollIntervalId) clearInterval(pollIntervalId);
     pollIntervalId = setInterval(() => {
       fetchAssetPricesData(false);
-    }, 3000);
+    }, 12000);
   }
 
   function renderPricesTable() {
