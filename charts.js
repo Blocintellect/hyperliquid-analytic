@@ -358,8 +358,9 @@ function processAndRenderAnalytics(fills, funding) {
 
   let sessionPnl = { asian: 0, london: 0, ny: 0 };
   let durationPnl = { scalp: 0, intraday: 0, swing: 0 };
+  const coinOpenLots = {}; // FIFO lot tracking for accurate holding duration
 
-  fills.forEach((f, idx, arr) => {
+  fills.forEach((f) => {
     const tMs = Number(f.time);
     const d = new Date(tMs);
     const dateKey = d.toISOString().split("T")[0];
@@ -380,6 +381,7 @@ function processAndRenderAnalytics(fills, funding) {
     const totalItemFee = tradingFee + builderFee;
     const netTradePnl = closedPnl - totalItemFee;
     const notionalVol = Math.abs(num(f.px) * num(f.sz));
+    const fillSz = Math.abs(num(f.sz));
 
     dailyMap[dateKey].netPnl += netTradePnl;
     dailyMap[dateKey].fees += totalItemFee;
@@ -409,17 +411,46 @@ function processAndRenderAnalytics(fills, funding) {
       sessionPnl.ny += netTradePnl;
     }
 
-    let timeDeltaMin = 30;
-    if (idx < arr.length - 1 && arr[idx + 1].coin === coin) {
-      timeDeltaMin = Math.abs(tMs - Number(arr[idx + 1].time)) / 60000;
+    // --- ACCURATE HOLDING DURATION (FIFO LOT MATCHING) ---
+    if (!coinOpenLots[coin]) coinOpenLots[coin] = [];
+    const lots = coinOpenLots[coin];
+
+    if (closedPnl !== 0 && fillSz > 0) {
+      let remainingSzToMatch = fillSz;
+      let weightedDurationMs = 0;
+      let matchedSz = 0;
+
+      while (remainingSzToMatch > 0 && lots.length > 0) {
+        const oldestLot = lots[0];
+        const matchSz = Math.min(remainingSzToMatch, oldestLot.sz);
+        
+        const durationMs = tMs - oldestLot.time;
+        weightedDurationMs += durationMs * matchSz;
+        matchedSz += matchSz;
+
+        oldestLot.sz -= matchSz;
+        remainingSzToMatch -= matchSz;
+
+        if (oldestLot.sz <= 0) {
+          lots.shift();
+        }
+      }
+
+      const avgDurationMin = matchedSz > 0 ? (weightedDurationMs / matchedSz) / 60000 : 30;
+
+      if (avgDurationMin < 15) {
+        durationPnl.scalp += netTradePnl;
+      } else if (avgDurationMin <= 240) {
+        durationPnl.intraday += netTradePnl;
+      } else {
+        durationPnl.swing += netTradePnl;
+      }
     }
-    if (timeDeltaMin < 15) {
-      durationPnl.scalp += netTradePnl;
-    } else if (timeDeltaMin <= 240) {
-      durationPnl.intraday += netTradePnl;
-    } else {
-      durationPnl.swing += netTradePnl;
+
+    if (fillSz > 0) {
+      lots.push({ time: tMs, sz: fillSz, side: side });
     }
+    // ----------------------------------------------------
 
     if (netTradePnl > bestTrade.pnl) {
       bestTrade = { coin, pnl: netTradePnl };
