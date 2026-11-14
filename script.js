@@ -820,12 +820,38 @@ function esc(v) {
   return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+let activeWsCoinsKey = "";
+
 function initWebSocket(coins) {
+  if (!coins || coins.length === 0) {
+    if (wsConnection) {
+      wsConnection.onclose = null;
+      wsConnection.close();
+      wsConnection = null;
+    }
+    activeWsCoinsKey = "";
+    return;
+  }
+
+  const newKey = [...coins].sort().join(",");
+  // If already connecting or open with the exact same coins, do NOT close and restart!
+  if (
+    wsConnection &&
+    activeWsCoinsKey === newKey &&
+    (wsConnection.readyState === WebSocket.CONNECTING || wsConnection.readyState === WebSocket.OPEN)
+  ) {
+    return;
+  }
+
+  activeWsCoinsKey = newKey;
+
   if (wsConnection) {
-    wsConnection.close();
+    wsConnection.onclose = null;
+    if (wsConnection.readyState === WebSocket.OPEN) {
+      wsConnection.close();
+    }
     wsConnection = null;
   }
-  if (!coins || coins.length === 0) return;
 
   wsConnection = new WebSocket(WS_URL);
 
@@ -853,8 +879,9 @@ function initWebSocket(coins) {
   };
 
   wsConnection.onclose = () => {
+    activeWsCoinsKey = "";
     setTimeout(() => {
-      if (coins.length > 0) initWebSocket(coins);
+      if (activePositions.length > 0) initWebSocket(coins);
     }, 5000);
   };
 }
@@ -1262,7 +1289,7 @@ function updateMetrics() {
   renderShareCardPreview();
 }
 
-async function postInfo(body, retries = 3, delay = 1000) {
+async function postInfo(body, retries = 4, delay = 2000) {
   for (let i = 0; i < retries; i++) {
     try {
       const r = await fetch(API, {
@@ -1273,9 +1300,9 @@ async function postInfo(body, retries = 3, delay = 1000) {
       
       if (r.status === 429) {
         if (i < retries - 1) {
-          console.warn(`Rate limited (429) on API call. Retrying in ${delay}ms...`);
+          console.warn(`Rate limited (429) on API call. Backing off for ${delay}ms...`);
           await new Promise(res => setTimeout(res, delay));
-          delay *= 2; // Exponential backoff
+          delay *= 2; // Exponential backoff (2s, 4s, 8s, 16s)
           continue;
         }
       }

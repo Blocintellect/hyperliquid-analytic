@@ -271,12 +271,6 @@
         fetch(PRICES_API, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "metaAndAssetCtxs" })
-        }).then(res => res.json()).catch(() => null),
-
-        fetch(PRICES_API, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "metaAndAssetCtxs", dex: "xyz" })
         }).then(res => res.json()).catch(() => null)
       ]);

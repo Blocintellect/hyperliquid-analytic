@@ -1184,3 +1184,51 @@ body.light-theme .global-loader {
   margin-top: 10px;
   padding-top: 8px;
 }
+
+/* ================================================================= */
+/* VIP TIER RATE STRUCTURE MOBILE CARD RESPONSIVENESS               */
+/* ================================================================= */
+
+@media (max-width: 768px) {
+  /* Scope specifically to the VIP calculator panel table */
+  #panelFeeCalculator .coinglass-table, 
+  #panelFeeCalculator .coinglass-table tbody, 
+  #panelFeeCalculator .coinglass-table tr {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  #panelFeeCalculator .coinglass-table thead {
+    display: none !important;
+  }
+
+  #panelFeeCalculator .coinglass-table tbody tr {
+    background: var(--panel-bg, #121721);
+    border: 1px solid var(--panel-border, #1e2638);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+  }
+
+  #panelFeeCalculator .coinglass-table td {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 8px 0 !important;
+    border-bottom: 1px dashed var(--panel-border, #1e2638) !important;
+    text-align: right !important;
+    font-size: 11.5px !important;
+    white-space: normal !important;
+  }
+
+  #panelFeeCalculator .coinglass-table td:last-child {
+    border-bottom: none !important;
+  }
+
+  /* Add automated data labels using CSS pseudo-elements for mobile context */
+  #panelFeeCalculator .coinglass-table td:nth-child(1):before { content: "Tier Level"; font-weight: 800; font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+  #panelFeeCalculator .coinglass-table td:nth-child(2):before { content: "30D Volume Req"; font-weight: 800; font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+  #panelFeeCalculator .coinglass-table td:nth-child(3):before { content: "Maker Fee"; font-weight: 800; font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+  #panelFeeCalculator .coinglass-table td:nth-child(4):before { content: "Taker Fee"; font-weight: 800; font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+}
