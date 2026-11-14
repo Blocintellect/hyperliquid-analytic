@@ -682,22 +682,22 @@
           <p class="meta-info">Export clean, branded performance graphics for X/Twitter & Telegram.</p>
         </div>
       </div>
-      <div class="table-wrap" style="padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px;">
-        <div style="background: #0b0e14; border: 1px solid #1e2638; border-radius: 12px; padding: 24px; width: 100%; max-width: 520px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <div style="color: #00b87c; font-weight: 800; letter-spacing: 2px; font-size: 11px;">HYPERLIQUID PRO AUDIT</div>
-            <div id="shareCardDates" style="color: #8492a6; font-size: 10px; font-family: monospace;">All Time</div>
+      <div class="table-wrap share-card-wrap">
+        <div class="share-card-container">
+          <div class="share-card-top">
+            <div class="share-card-brand">HYPERLIQUID PRO AUDIT</div>
+            <div id="shareCardDates" class="share-card-dates">All Time</div>
           </div>
-          <h3 id="shareCardWallet" style="color: #f0f4f8; font-size: 14px; margin-bottom: 16px; font-family: monospace; text-align: left;">0x0000...0000</h3>
-          <div style="font-size: 11px; color: #8492a6; margin-bottom: 4px;">NET REALIZED PERFORMANCE</div>
-          <div id="shareCardPnl" style="font-size: 32px; font-weight: 800; color: #00b87c; margin-bottom: 16px;">$0.00</div>
+          <h3 id="shareCardWallet" class="share-card-wallet">0x0000...0000</h3>
+          <div class="share-card-subtitle">NET REALIZED PERFORMANCE</div>
+          <div id="shareCardPnl" class="share-card-pnl">$0.00</div>
           
-          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; border-top: 1px solid #1e2638; padding-top: 14px; font-size: 11px; color: #8492a6; text-align: left;">
-            <div>Holdings: <strong id="shareCardHoldings" style="color: #f0f4f8; float: right;">$0.00</strong></div>
-            <div>Win Rate: <strong id="shareCardWinRate" style="color: #f0f4f8; float: right;">0%</strong></div>
-            <div>Total Fills: <strong id="shareCardFills" style="color: #f0f4f8; float: right;">0</strong></div>
-            <div>Total Volume: <strong id="shareCardVol" style="color: #f0f4f8; float: right;">$0.00</strong></div>
-            <div>Total Fees: <strong id="shareCardFees" style="color: #f0f4f8; float: right;">$0.00</strong></div>
+          <div class="share-card-metrics">
+            <div class="share-metric-row"><span>Holdings:</span> <strong id="shareCardHoldings">$0.00</strong></div>
+            <div class="share-metric-row"><span>Win Rate:</span> <strong id="shareCardWinRate">0%</strong></div>
+            <div class="share-metric-row"><span>Total Fills:</span> <strong id="shareCardFills">0</strong></div>
+            <div class="share-metric-row"><span>Total Volume:</span> <strong id="shareCardVol">$0.00</strong></div>
+            <div class="share-metric-row"><span>Total Fees:</span> <strong id="shareCardFees">$0.00</strong></div>
           </div>
         </div>
         <button id="downloadShareCardBtn" class="btn-primary">Download Share Card (PNG)</button>

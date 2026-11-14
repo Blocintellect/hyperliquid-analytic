@@ -563,13 +563,14 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
 /* SOCIAL SHARE CARD CONTAINER STYLING                              */
 /* ================================================================= */
 
-#panelShareCard .table-wrap {
+.share-card-wrap {
   padding: 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 16px;
   box-sizing: border-box;
+  width: 100%;
 }
 
 .share-card-container {
@@ -582,6 +583,114 @@ a.hash:hover { color: var(--coinglass-green); text-decoration: underline; }
   box-sizing: border-box;
   text-align: center;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+
+.share-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.share-card-brand {
+  color: #00b87c;
+  font-weight: 800;
+  letter-spacing: 2px;
+  font-size: 11px;
+}
+
+.share-card-dates {
+  color: #8492a6;
+  font-size: 10px;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.share-card-wallet {
+  color: #f0f4f8;
+  font-size: 13px;
+  margin: 0 0 16px 0;
+  font-family: monospace;
+  text-align: left;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+.share-card-subtitle {
+  font-size: 11px;
+  color: #8492a6;
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+
+.share-card-pnl {
+  font-size: 32px;
+  font-weight: 800;
+  color: #00b87c;
+  margin-bottom: 16px;
+  word-break: break-word;
+}
+
+.share-card-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px 16px;
+  border-top: 1px solid #1e2638;
+  padding-top: 14px;
+  font-size: 11px;
+  color: #8492a6;
+  text-align: left;
+}
+
+.share-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.share-metric-row strong {
+  color: #f0f4f8;
+  font-family: monospace;
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .share-card-wrap {
+    padding: 12px 6px !important;
+  }
+  
+  .share-card-container {
+    padding: 16px 12px !important;
+    border-radius: 8px !important;
+  }
+
+  .share-card-brand {
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+
+  .share-card-wallet {
+    font-size: 11.5px;
+    margin-bottom: 12px;
+  }
+
+  .share-card-pnl {
+    font-size: 26px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .share-card-metrics {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+    padding-top: 10px !important;
+  }
+
+  .share-metric-row {
+    font-size: 10.5px !important;
+  }
 }
 
 /* ================================================================= */
