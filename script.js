@@ -662,7 +662,7 @@ function startFiveSecondPoller(cleanUser) {
     } catch (e) {
       console.warn("Background user state poll error:", e);
     }
-  }, 15000);
+  }, 5000);
 }
 
 async function fetchAccountData(user, startMs, endMs) {
