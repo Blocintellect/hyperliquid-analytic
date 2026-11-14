@@ -559,7 +559,11 @@ function processAndRenderAnalytics(fills, funding) {
   });
 
   const avgRecoveryDays = recoveryCount > 0 ? Math.round(recoveryDaysSum / recoveryCount) : (dates.length > 0 ? Math.round(dates.length / 4) : 0);
-  const avgTradeExpectancy = fills.length > 0 ? cumulativePnl / fills.length : 0;
+  
+  // 3. FIXED AVERAGE TRADE EXPECTANCY (Denominator is closed trades count, not raw fills)
+  const closedTradesCount = totalWins + totalLosses;
+  const avgTradeExpectancy = closedTradesCount > 0 ? cumulativePnl / closedTradesCount : 0;
+
   const winLossRatioStr = totalLosses > 0 ? (totalWins / totalLosses).toFixed(2) : totalWins > 0 ? "∞" : "0.00";
   const profitFactorVal = grossLoss > 0 ? (grossProfit / grossLoss).toFixed(2) : grossProfit > 0 ? "∞" : "0.00";
 
@@ -601,8 +605,11 @@ function processAndRenderAnalytics(fills, funding) {
   if ($("statProfitFactor")) $("statProfitFactor").textContent = profitFactorVal;
   if ($("statAvgTrade")) $("statAvgTrade").textContent = money(avgTradeExpectancy, 2);
   if ($("statStreak")) $("statStreak").textContent = `${maxWinStreak}W / ${maxLossStreak}L`;
-  if ($("statOutliers")) $("statOutliers").textContent = `${bestTrade.coin} (+${money(bestTrade.pnl, 0)})`;
-  if ($("statLongShort")) $("statLongShort").textContent = longPnl >= shortPnl ? `Longs (+${money(longPnl, 0)})` : `Shorts (+${money(shortPnl, 0)})`;
+  
+  // 4. FIXED DOUBLE PLUS SIGN (++) BUG IN STAT CARDS
+  if ($("statOutliers")) $("statOutliers").textContent = `${bestTrade.coin} (${money(bestTrade.pnl, 0)})`;
+  if ($("statLongShort")) $("statLongShort").textContent = longPnl >= shortPnl ? `Longs (${money(longPnl, 0)})` : `Shorts (${money(shortPnl, 0)})`;
+  
   if ($("statSession")) $("statSession").textContent = `${topSessionName} (${money(maxSessionVal, 0)})`;
   if ($("statDuration")) $("statDuration").textContent = durationPnl.scalp >= durationPnl.intraday ? "Scalps" : "Intraday";
   if ($("statRecovery")) $("statRecovery").textContent = `${avgRecoveryDays} Days`;
@@ -682,13 +689,11 @@ function processAndRenderAnalytics(fills, funding) {
 function renderAssetBarChart(assetMap) {
   if (assetBarInstance) assetBarInstance.destroy();
 
-  // Sort all available coins instead of slicing to 10, enabling full asset exploration
   const sortedCoins = Object.keys(assetMap).sort((a, b) => assetMap[b].netPnl - assetMap[a].netPnl);
   const labels = sortedCoins;
   const dataVals = sortedCoins.map(c => assetMap[c].netPnl);
   const backgroundColors = dataVals.map(v => v >= 0 ? 'rgba(0, 184, 124, 0.7)' : 'rgba(246, 70, 93, 0.7)');
 
-  // Dynamically set min-width based on item count to ensure horizontal scrolling triggers nicely
   const barContainer = $("barChartContainer");
   if (barContainer) {
     const calculatedWidth = Math.max(600, sortedCoins.length * 55);
