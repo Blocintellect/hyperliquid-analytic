@@ -265,9 +265,16 @@
     }
   };
 
-  async function fetchAssetPricesData(isInitial = true) {
+async function fetchAssetPricesData(isInitial = true) {
     try {
+      // Fetch both native perp markets (BTC, ETH, etc.) and xyz ecosystem assets in parallel
       const [nativeRes, xyzRes] = await Promise.all([
+        fetch(PRICES_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "metaAndAssetCtxs" })
+        }).then(res => res.json()).catch(() => null),
+
         fetch(PRICES_API, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -277,6 +284,7 @@
 
       let parsedAssets = [];
 
+      // Parse Native Perpetual Markets (BTC, ETH, SOL, etc.)
       if (Array.isArray(nativeRes) && nativeRes.length >= 2) {
         const universe = nativeRes[0]?.universe || [];
         const assetCtxs = nativeRes[1] || [];
@@ -298,6 +306,7 @@
         });
       }
 
+      // Parse XYZ Markets
       if (Array.isArray(xyzRes) && xyzRes.length >= 2) {
         const universe = xyzRes[0]?.universe || [];
         const assetCtxs = xyzRes[1] || [];
@@ -367,7 +376,7 @@
     }, 12000);
   }
 
-  function renderPricesTable() {
+function renderPricesTable() {
     const tbody = document.getElementById("pricesTableBody");
     if (!tbody) return;
 
@@ -427,9 +436,9 @@
 
     filtered.forEach(item => {
       const upperCoin = item.coin.toUpperCase();
-      if (["GOLD", "SILVER", "CL", "BRENTOIL", "NATGAS"].includes(upperCoin)) {
+      if (["GOLD", "SILVER", "CL", "BRENTOIL", "NATGAS", "OIL", "COPPER"].includes(upperCoin)) {
         grouped["Metals & Commodities"].push(item);
-      } else if (["SP500", "GOOGL", "NVDA", "AAPL"].includes(upperCoin)) {
+      } else if (["SP500", "GOOGL", "NVDA", "AAPL", "TSLA", "MSFT", "AMZN"].includes(upperCoin)) {
         grouped["Indices & Equities"].push(item);
       } else {
         grouped["Cryptocurrencies"].push(item);
