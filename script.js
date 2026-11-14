@@ -2760,21 +2760,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     window.showControls();
   }
 
-  const cacheTime = Number(localStorage.getItem(CACHE_TIME_KEY) || 0);
-  const isExpired = (Date.now() - cacheTime) > 7200000;
-
-  if (isExpired) {
-    localStorage.removeItem(CACHE_FILLS_KEY);
-    localStorage.removeItem(CACHE_FUNDING_KEY);
-    localStorage.removeItem(CACHE_LEDGER_KEY);
-    localStorage.removeItem(CACHE_ORDERS_KEY);
-    localStorage.removeItem(CACHE_HOLDINGS_KEY);
-    localStorage.removeItem(CACHE_SPOT_HOLDINGS_KEY);
-    localStorage.removeItem(CACHE_POSITIONS_KEY);
-    localStorage.removeItem(CACHE_TIME_KEY);
-    sessionStorage.clear();
-  }
-
+  // 1. Load any previously persisted data from localStorage instantly
   const savedFills = localStorage.getItem(CACHE_FILLS_KEY);
   const savedFunding = localStorage.getItem(CACHE_FUNDING_KEY);
   const savedLedger = localStorage.getItem(CACHE_LEDGER_KEY);
@@ -2792,57 +2778,8 @@ window.addEventListener("DOMContentLoaded", async () => {
       holdingsData = savedHoldings ? JSON.parse(savedHoldings) : null;
       spotHoldingsData = savedSpotHoldings ? JSON.parse(savedSpotHoldings) : null;
       activePositions = savedPositions ? JSON.parse(savedPositions) : [];
-      if (fills.length > 0 || activePositions.length > 0) {
-        updateCoinFilterOptions();
-        renderTrades();
-        renderContracts();
-        renderDepositsWithdrawals();
-        renderOpenOrders();
-        renderWalletDetails();
-        renderQuantMetrics();
-        if (activePositions.length > 0) {
-          const uniqueCoins = [...new Set(activePositions.map(p => (p.position || p).coin))];
-          initWebSocket(uniqueCoins);
-          const currentWallet = actualWalletValue || walletEl.value.trim();
-          if (currentWallet) {
-            startFiveSecondPoller(currentWallet.toLowerCase());
-          }
-        }
-        setStatus(`Loaded persisted data from local storage.`, "success");
-      }
-    } catch (e) {
-      console.warn("Failed to load persisted storage data:", e);
-    }
-  }
 
-  if (actualWalletValue && isAddress(actualWalletValue)) {
-    try {
-      showGlobalLoader("Detecting Wallet Inception...", "Finding the date of your very first trade on Hyperliquid.");
-      await setInceptionPreset();
-      
-      showGlobalLoader("Syncing Historical Trade Data...", "Fetching lifetime fills, funding, ledger updates, and open orders...");
-      const cleanUser = actualWalletValue.toLowerCase();
-      const s = msStart(startEl.value), e = msEnd(endEl.value);
-
-      const accountData = await fetchAccountData(cleanUser, s, e);
-      fills = accountData.fills;
-      fundingHistory = accountData.funding;
-      ledgerUpdates = accountData.ledger;
-      openOrdersList = accountData.orders;
-      holdingsData = accountData.holdings;
-      spotHoldingsData = accountData.spotHoldings;
-      activePositions = accountData.positions;
-      await fetchAssetFundingRates();
-
-      localStorage.setItem(CACHE_FILLS_KEY, JSON.stringify(fills));
-      localStorage.setItem(CACHE_FUNDING_KEY, JSON.stringify(fundingHistory));
-      localStorage.setItem(CACHE_LEDGER_KEY, JSON.stringify(ledgerUpdates));
-      localStorage.setItem(CACHE_ORDERS_KEY, JSON.stringify(openOrdersList));
-      localStorage.setItem(CACHE_HOLDINGS_KEY, JSON.stringify(holdingsData));
-      localStorage.setItem(CACHE_SPOT_HOLDINGS_KEY, JSON.stringify(spotHoldingsData));
-      localStorage.setItem(CACHE_POSITIONS_KEY, JSON.stringify(activePositions));
-      localStorage.setItem(CACHE_TIME_KEY, Date.now());
-
+      // Render cached UI instantly
       updateCoinFilterOptions();
       renderTrades();
       renderContracts();
@@ -2854,19 +2791,108 @@ window.addEventListener("DOMContentLoaded", async () => {
       if (activePositions.length > 0) {
         const uniqueCoins = [...new Set(activePositions.map(p => (p.position || p).coin))];
         initWebSocket(uniqueCoins);
+      }
+    } catch (e) {
+      console.warn("Failed to load persisted storage data:", e);
+    }
+  }
+
+  // 2. If a wallet address is configured, execute FAST path first
+  if (actualWalletValue && isAddress(actualWalletValue)) {
+    const cleanUser = actualWalletValue.toLowerCase();
+
+    try {
+      // Show quick loader just for critical account state (~1 second)
+      showGlobalLoader("Loading Account State...", "Fetching active contracts, margins, and open orders...");
+      
+      // Step A: Fetch ONLY clearinghouse state and open orders first (Lightning fast)
+      const [defaultData, xyzData, spotData, nativeOrders, xyzOrders] = await Promise.all([
+        postInfo({ type: "clearinghouseState", user: cleanUser }).catch(() => null),
+        postInfo({ type: "clearinghouseState", user: cleanUser, dex: "xyz" }).catch(() => null),
+        postInfo({ type: "spotClearinghouseState", user: cleanUser }).catch(() => null),
+        postInfo({ type: "openOrders", user: cleanUser }).catch(() => []),
+        postInfo({ type: "openOrders", user: cleanUser, dex: "xyz" }).catch(() => [])
+      ]);
+
+      holdingsData = defaultData;
+      xyzHoldingsData = xyzData;
+      spotHoldingsData = spotData;
+
+      activePositions = [
+        ...(defaultData?.assetPositions || []),
+        ...(xyzData?.assetPositions || [])
+      ].filter(item => num(item.position?.szi) !== 0);
+
+      openOrdersList = [...(Array.isArray(nativeOrders) ? nativeOrders : []), ...(Array.isArray(xyzOrders) ? xyzOrders : [])];
+
+      // Render critical views immediately! User sees active contracts & holdings right now.
+      renderContracts();
+      renderOpenOrders();
+      renderWalletDetails();
+      updateMetrics();
+
+      if (activePositions.length > 0) {
+        const uniqueCoins = [...new Set(activePositions.map(p => (p.position || p).coin))];
+        initWebSocket(uniqueCoins);
         startFiveSecondPoller(cleanUser);
       }
+
+      // Hide the blocking loader IMMEDIATELY after critical data is rendered
+      hideGlobalLoader();
 
       controlsPanel.classList.add("hidden");
       unhideBtn.classList.remove("hidden");
       localStorage.setItem("hyperliquid_controls_hidden", "true");
+
+      // Step B: Kick off heavy historical trade sync IN THE BACKGROUND
+      runBackgroundHistorySync(cleanUser);
+
     } catch (e) {
-      console.warn("Auto-fetch all-time data on load error:", e);
-    } finally {
+      console.warn("Fast path load error:", e);
       hideGlobalLoader();
     }
   }
 });
+
+async function runBackgroundHistorySync(cleanUser) {
+  try {
+    setStatus("Syncing historical trade fills in background...", "");
+    await setInceptionPreset();
+
+    const s = startEl.value ? msStart(startEl.value) : 0;
+    const e = endEl.value ? msEnd(endEl.value) : Date.now();
+
+    // Fetch lifetime fills, funding, and ledger updates asynchronously
+    const accountData = await fetchAccountData(cleanUser, s, e);
+    
+    fills = accountData.fills;
+    fundingHistory = accountData.funding;
+    ledgerUpdates = accountData.ledger;
+    await fetchAssetFundingRates();
+
+    // Update local storage cache
+    localStorage.setItem(CACHE_FILLS_KEY, JSON.stringify(fills));
+    localStorage.setItem(CACHE_FUNDING_KEY, JSON.stringify(fundingHistory));
+    localStorage.setItem(CACHE_LEDGER_KEY, JSON.stringify(ledgerUpdates));
+    localStorage.setItem(CACHE_TIME_KEY, Date.now());
+
+    // Refresh trade tables, charts, and metrics smoothly
+    updateCoinFilterOptions();
+    renderTrades();
+    renderDailyPnl();
+    renderMonthlyPnl();
+    renderDepositsWithdrawals();
+    renderQuantMetrics();
+    updateMetrics();
+
+    setStatus(`Background sync complete: Analyzed ${fills.length.toLocaleString()} lifetime fills.`, "success");
+    setTimeout(() => clearStatus(), 4000);
+
+  } catch (err) {
+    console.warn("Background history sync warning:", err);
+    setStatus("Background history sync encountered an issue. Click 'Fetch Data' to retry.", "error");
+  }
+}
 
 // Re-render table whenever any filter checkbox changes
 document.querySelectorAll('input[name="filterPnl"], input[name="filterDir"]').forEach(cb => {
